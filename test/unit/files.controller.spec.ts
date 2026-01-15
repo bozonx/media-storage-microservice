@@ -241,7 +241,9 @@ describe('FilesController (unit)', () => {
 
       expect(state.status).toBe(HttpStatus.OK);
       expect(state.headers['Content-Type']).toBe('text/plain');
-      expect(state.headers['Content-Disposition']).toBe('attachment; filename="a.txt"');
+      expect(state.headers['Content-Disposition']).toBe(
+        'attachment; filename="a.txt"; filename*=UTF-8\'\'a.txt',
+      );
       expect(state.headers['Cache-Control']).toBe('public, max-age=31536000, immutable');
       expect(state.headers['ETag']).toBe('"etag123"');
       expect(state.headers['Content-Length']).toBe('3');
