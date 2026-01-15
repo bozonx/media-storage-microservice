@@ -19,14 +19,14 @@
     "prisma:migrate:dev": "dotenv -e .env.development -- prisma migrate dev",
     "prisma:migrate:deploy": "dotenv -e .env.development -- prisma migrate deploy",
     "prisma:studio": "dotenv -e .env.development -- prisma studio",
-    "test": "dotenv -e .env.test -- NODE_OPTIONS='--experimental-vm-modules' jest",
-    "test:unit": "dotenv -e .env.test -- NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit",
+    "test": "dotenv -e .env.test -- cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:unit": "dotenv -e .env.test -- cross-env NODE_OPTIONS=--experimental-vm-modules jest --selectProjects unit",
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch",
     "test:cov": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
     "test:debug": "node --inspect-brk --loader ts-node/esm node_modules/.bin/jest --runInBand --detectOpenHandles",
     "test:unit:debug": "node --inspect-brk --loader ts-node/esm node_modules/.bin/jest --runInBand --selectProjects unit --detectOpenHandles",
     "test:e2e:debug": "node --inspect-brk --loader ts-node/esm node_modules/.bin/jest --runInBand --selectProjects e2e --detectOpenHandles",
-    "test:e2e": "dotenv -e .env.test -- NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects e2e"
+    "test:e2e": "dotenv -e .env.test -- cross-env NODE_OPTIONS=--experimental-vm-modules jest --selectProjects e2e"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.970.0",
@@ -62,6 +62,7 @@
     "@types/pg": "^8.16.0",
     "@typescript-eslint/eslint-plugin": "^8.53.0",
     "@typescript-eslint/parser": "^8.53.0",
+    "cross-env": "^7.0.3",
     "dotenv-cli": "^8.0.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
