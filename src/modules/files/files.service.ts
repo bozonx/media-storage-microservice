@@ -4,9 +4,11 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  GoneException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
+import { Transform, type Readable } from 'stream';
 import { StorageService } from '../storage/storage.service.js';
 import { ImageOptimizerService } from '../optimization/image-optimizer.service.js';
 import { OptimizeParamsDto } from './dto/optimize-params.dto.js';
@@ -25,11 +27,23 @@ export interface UploadFileParams {
   metadata?: Record<string, any>;
 }
 
+function cryptoRandomId(): string {
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 export interface DownloadFileResult {
   buffer: Buffer;
   filename: string;
   mimeType: string;
   size: number;
+}
+
+export interface DownloadFileStreamResult {
+  stream: Readable;
+  filename: string;
+  mimeType: string;
+  size?: number;
+  etag?: string;
 }
 
 @Injectable()
@@ -46,6 +60,89 @@ export class FilesService {
   ) {
     this.bucket = this.configService.get<string>('storage.bucket')!;
     this.basePath = this.configService.get<string>('BASE_PATH') || '';
+  }
+
+  async uploadFileStream(params: {
+    stream: Readable;
+    filename: string;
+    mimeType: string;
+    optimizeParams?: OptimizeParamsDto;
+    metadata?: Record<string, any>;
+  }): Promise<FileResponseDto> {
+    const { stream, filename, mimeType, optimizeParams, metadata } = params;
+
+    if (optimizeParams) {
+      throw new BadRequestException('Stream upload does not support optimization');
+    }
+
+    const tempKey = `tmp/${cryptoRandomId()}`;
+
+    const file = await this.prismaService.file.create({
+      data: {
+        filename,
+        mimeType,
+        size: null,
+        originalSize: null,
+        checksum: null,
+        s3Key: tempKey,
+        s3Bucket: this.bucket,
+        status: FileStatus.UPLOADING,
+        optimizationParams: null,
+        metadata: metadata ?? null,
+        uploadedAt: null,
+      },
+    });
+
+    const hash = createHash('sha256');
+    let size = 0;
+
+    const hasher = new Transform({
+      transform: (chunk, _encoding, callback) => {
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        size += buf.length;
+        hash.update(buf);
+        callback(null, buf);
+      },
+    });
+
+    try {
+      await this.storageService.uploadStream({
+        key: tempKey,
+        body: stream.pipe(hasher),
+        mimeType,
+      });
+
+      const checksum = `sha256:${hash.digest('hex')}`;
+      const finalKey = this.generateS3Key(checksum, mimeType);
+
+      await this.storageService.copyObject({
+        sourceKey: tempKey,
+        destinationKey: finalKey,
+        contentType: mimeType,
+      });
+      await this.storageService.deleteFile(tempKey);
+
+      const updated = await this.prismaService.file.update({
+        where: { id: file.id },
+        data: {
+          checksum,
+          size: BigInt(size),
+          s3Key: finalKey,
+          status: FileStatus.READY,
+          uploadedAt: new Date(),
+        },
+      });
+
+      return this.toResponseDto(updated);
+    } catch (error) {
+      await this.prismaService.file.update({
+        where: { id: file.id },
+        data: {
+          status: FileStatus.FAILED,
+        },
+      });
+      throw error;
+    }
   }
 
   async uploadFile(params: UploadFileParams): Promise<FileResponseDto> {
@@ -138,11 +235,11 @@ export class FilesService {
     }
 
     if (file.status === FileStatus.DELETED) {
-      throw new NotFoundException('File has been deleted');
+      throw new GoneException('File has been deleted');
     }
 
     if (file.status !== FileStatus.READY) {
-      throw new BadRequestException('File is not ready for download');
+      throw new ConflictException('File is not ready for download');
     }
 
     const buffer = await this.storageService.downloadFile(file.s3Key);
@@ -152,6 +249,36 @@ export class FilesService {
       filename: file.filename,
       mimeType: file.mimeType,
       size: Number(file.size ?? 0n),
+    };
+  }
+
+  async downloadFileStream(id: string): Promise<DownloadFileStreamResult> {
+    const file = await this.prismaService.file.findUnique({
+      where: { id },
+    });
+
+    if (!file) {
+      throw new NotFoundException('File not found');
+    }
+
+    if (file.status === FileStatus.DELETED) {
+      throw new GoneException('File has been deleted');
+    }
+
+    if (file.status !== FileStatus.READY) {
+      throw new ConflictException('File is not ready for download');
+    }
+
+    const { stream, etag, contentLength } = await this.storageService.downloadStream(file.s3Key);
+
+    return {
+      stream,
+      filename: file.filename,
+      mimeType: file.mimeType,
+      size: file.size ? Number(file.size) : contentLength,
+      etag: (file.checksum ?? '').startsWith('sha256:')
+        ? (file.checksum ?? '').replace('sha256:', '')
+        : etag,
     };
   }
 
@@ -196,9 +323,18 @@ export class FilesService {
   }
 
   async listFiles(params: ListFilesDto): Promise<ListFilesResponseDto> {
-    const { limit = 50, offset = 0, sortBy = 'uploadedAt', order = 'desc' } = params;
+    const { limit = 50, offset = 0, sortBy = 'uploadedAt', order = 'desc', q, mimeType } = params;
 
-    const where = { status: FileStatus.READY };
+    const where: any = { status: FileStatus.READY };
+    if (typeof q === 'string' && q.trim().length > 0) {
+      where.filename = {
+        contains: q.trim(),
+        mode: 'insensitive',
+      };
+    }
+    if (typeof mimeType === 'string' && mimeType.trim().length > 0) {
+      where.mimeType = mimeType.trim();
+    }
     const [items, total] = await this.prismaService.$transaction([
       this.prismaService.file.findMany({
         where,
@@ -232,7 +368,6 @@ export class FilesService {
       excludeExtraneousValues: true,
     });
 
-    // Ensure runtime types match DTO
     dto.size = Number(file.size ?? 0n);
     dto.originalSize = file.originalSize === null ? undefined : Number(file.originalSize);
     dto.checksum = file.checksum ?? '';

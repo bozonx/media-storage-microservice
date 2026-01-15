@@ -23,4 +23,12 @@ export class ListFilesDto {
   @IsString()
   @IsIn(['asc', 'desc'])
   order?: 'asc' | 'desc' = 'desc';
+
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  mimeType?: string;
 }

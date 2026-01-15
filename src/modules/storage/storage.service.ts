@@ -1,4 +1,11 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
@@ -6,6 +13,8 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
+  CopyObjectCommand,
 } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 import { StorageConfig } from '../../config/storage.config.js';
@@ -32,6 +41,33 @@ export class StorageService {
     this.bucket = config.bucket;
   }
 
+  async copyObject(params: {
+    sourceKey: string;
+    destinationKey: string;
+    contentType?: string;
+    metadata?: Record<string, string>;
+  }): Promise<void> {
+    try {
+      const command = new CopyObjectCommand({
+        Bucket: this.bucket,
+        Key: params.destinationKey,
+        CopySource: `${this.bucket}/${params.sourceKey}`,
+        ContentType: params.contentType,
+        Metadata: params.metadata,
+        MetadataDirective: params.metadata ? 'REPLACE' : undefined,
+      });
+
+      await this.s3Client.send(command);
+      this.logger.log(`File copied successfully: ${params.sourceKey} -> ${params.destinationKey}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to copy file in S3: ${params.sourceKey} -> ${params.destinationKey}`,
+        error,
+      );
+      throw this.mapS3Error(error, 'Failed to copy file in storage');
+    }
+  }
+
   async uploadFile(key: string, buffer: Buffer, mimeType: string): Promise<void> {
     try {
       const command = new PutObjectCommand({
@@ -45,7 +81,32 @@ export class StorageService {
       this.logger.log(`File uploaded successfully: ${key}`);
     } catch (error) {
       this.logger.error(`Failed to upload file to S3: ${key}`, error);
-      throw new InternalServerErrorException('Failed to upload file to storage');
+      throw this.mapS3Error(error, 'Failed to upload file to storage');
+    }
+  }
+
+  async uploadStream(params: {
+    key: string;
+    body: Readable;
+    mimeType: string;
+    contentLength?: number;
+    metadata?: Record<string, string>;
+  }): Promise<void> {
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: params.key,
+        Body: params.body,
+        ContentType: params.mimeType,
+        ContentLength: params.contentLength,
+        Metadata: params.metadata,
+      });
+
+      await this.s3Client.send(command);
+      this.logger.log(`File uploaded successfully: ${params.key}`);
+    } catch (error) {
+      this.logger.error(`Failed to upload file to S3: ${params.key}`, error);
+      throw this.mapS3Error(error, 'Failed to upload file to storage');
     }
   }
 
@@ -72,7 +133,57 @@ export class StorageService {
       return Buffer.concat(chunks);
     } catch (error) {
       this.logger.error(`Failed to download file from S3: ${key}`, error);
-      throw new InternalServerErrorException('Failed to download file from storage');
+      throw this.mapS3Error(error, 'Failed to download file from storage');
+    }
+  }
+
+  async downloadStream(
+    key: string,
+  ): Promise<{ stream: Readable; contentLength?: number; etag?: string }> {
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      });
+
+      const response = await this.s3Client.send(command);
+
+      if (!response.Body) {
+        throw new Error('Empty response body');
+      }
+
+      return {
+        stream: response.Body as Readable,
+        contentLength:
+          typeof response.ContentLength === 'number' ? response.ContentLength : undefined,
+        etag: response.ETag ? response.ETag.replace(/\"/g, '') : undefined,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to download file from S3: ${key}`, error);
+      throw this.mapS3Error(error, 'Failed to download file from storage');
+    }
+  }
+
+  async headObject(
+    key: string,
+  ): Promise<{ contentLength?: number; etag?: string; contentType?: string }> {
+    try {
+      const command = new HeadObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      });
+
+      const response = await this.s3Client.send(command);
+
+      return {
+        contentLength:
+          typeof response.ContentLength === 'number' ? response.ContentLength : undefined,
+        etag: response.ETag ? response.ETag.replace(/\"/g, '') : undefined,
+        contentType: response.ContentType,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to head object in S3: ${key}`, error);
+      throw this.mapS3Error(error, 'Failed to get file metadata from storage');
     }
   }
 
@@ -87,7 +198,7 @@ export class StorageService {
       this.logger.log(`File deleted successfully: ${key}`);
     } catch (error) {
       this.logger.error(`Failed to delete file from S3: ${key}`, error);
-      throw new InternalServerErrorException('Failed to delete file from storage');
+      throw this.mapS3Error(error, 'Failed to delete file from storage');
     }
   }
 
@@ -103,5 +214,36 @@ export class StorageService {
       this.logger.error('S3 connection check failed', error);
       return false;
     }
+  }
+
+  private mapS3Error(error: unknown, fallbackMessage: string): Error {
+    const err = error as any;
+
+    const statusCode: number | undefined =
+      typeof err?.$metadata?.httpStatusCode === 'number'
+        ? err.$metadata.httpStatusCode
+        : typeof err?.statusCode === 'number'
+          ? err.statusCode
+          : undefined;
+
+    const name: string | undefined = typeof err?.name === 'string' ? err.name : undefined;
+
+    if (statusCode === 404 || name === 'NoSuchKey' || name === 'NotFound') {
+      return new NotFoundException('File not found in storage');
+    }
+
+    if (statusCode === 403 || name === 'AccessDenied') {
+      return new ForbiddenException('Storage access denied');
+    }
+
+    if (statusCode === 400) {
+      return new BadRequestException(fallbackMessage);
+    }
+
+    if (typeof statusCode === 'number' && statusCode >= 500) {
+      return new InternalServerErrorException(fallbackMessage);
+    }
+
+    return new InternalServerErrorException(fallbackMessage);
   }
 }

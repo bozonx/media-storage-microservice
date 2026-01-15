@@ -2,11 +2,22 @@ import { Test } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from '../../src/app.module.js';
+import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
+import { StorageService } from '../../src/modules/storage/storage.service.js';
 
 export async function createTestApp(): Promise<NestFastifyApplication> {
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
-  }).compile();
+  })
+    .overrideProvider(PrismaService)
+    .useValue({
+      $queryRaw: async () => 1,
+    })
+    .overrideProvider(StorageService)
+    .useValue({
+      checkConnection: async () => true,
+    })
+    .compile();
 
   const app = moduleRef.createNestApplication<NestFastifyApplication>(
     new FastifyAdapter({
@@ -20,8 +31,10 @@ export async function createTestApp(): Promise<NestFastifyApplication> {
 
   // Ensure defaults the same as in main.ts
   const basePath = (process.env.BASE_PATH ?? '').replace(/^\/+|\/+$/g, '');
-  const globalPrefix = basePath ? `${basePath}/api/v1` : 'api/v1';
-  app.setGlobalPrefix(globalPrefix);
+  const globalPrefix = basePath ? `${basePath}` : '';
+  if (globalPrefix) {
+    app.setGlobalPrefix(globalPrefix);
+  }
 
   await app.init();
   // Ensure Fastify has completed plugin registration and routing before tests

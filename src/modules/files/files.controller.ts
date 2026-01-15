@@ -10,11 +10,14 @@ import {
   HttpStatus,
   HttpCode,
   BadRequestException,
+  UnsupportedMediaTypeException,
 } from '@nestjs/common';
-import { FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { FilesService } from './files.service.js';
 import { ListFilesDto } from './dto/list-files.dto.js';
 import { OptimizeParamsDto } from './dto/optimize-params.dto.js';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
 
 @Controller('api/v1/files')
 export class FilesController {
@@ -37,7 +40,13 @@ export class FilesController {
 
     if (optimizeField?.value) {
       try {
-        optimizeParams = JSON.parse(optimizeField.value);
+        const raw = JSON.parse(optimizeField.value);
+        const dto = plainToInstance(OptimizeParamsDto, raw);
+        const errors = validateSync(dto, { whitelist: true, forbidNonWhitelisted: true });
+        if (errors.length > 0) {
+          throw new BadRequestException('Invalid optimize parameter');
+        }
+        optimizeParams = dto;
       } catch {
         throw new BadRequestException('Invalid optimize parameter');
       }
@@ -51,13 +60,25 @@ export class FilesController {
       }
     }
 
-    const buffer = await data.toBuffer();
+    if (isExecutableMimeType(data.mimetype)) {
+      throw new UnsupportedMediaTypeException('Executable file types are not allowed');
+    }
 
-    return this.filesService.uploadFile({
-      buffer,
+    if (optimizeParams) {
+      const buffer = await data.toBuffer();
+      return this.filesService.uploadFile({
+        buffer,
+        filename: data.filename,
+        mimeType: data.mimetype,
+        optimizeParams,
+        metadata,
+      });
+    }
+
+    return this.filesService.uploadFileStream({
+      stream: data.file,
       filename: data.filename,
       mimeType: data.mimetype,
-      optimizeParams,
       metadata,
     });
   }
@@ -68,15 +89,36 @@ export class FilesController {
   }
 
   @Get(':id/download')
-  async downloadFile(@Param('id') id: string, @Res() reply: FastifyReply) {
-    const result = await this.filesService.downloadFile(id);
+  async downloadFile(
+    @Param('id') id: string,
+    @Req() request: FastifyRequest,
+    @Res() reply: FastifyReply,
+  ) {
+    const result = await this.filesService.downloadFileStream(id);
 
-    reply
+    const ifNoneMatch = request.headers['if-none-match'];
+    if (
+      result.etag &&
+      typeof ifNoneMatch === 'string' &&
+      ifNoneMatch.replace(/\"/g, '') === result.etag
+    ) {
+      return reply.status(HttpStatus.NOT_MODIFIED).header('ETag', `"${result.etag}"`).send();
+    }
+
+    const response = reply
       .status(HttpStatus.OK)
       .header('Content-Type', result.mimeType)
-      .header('Content-Length', result.size.toString())
       .header('Content-Disposition', `attachment; filename="${result.filename}"`)
-      .send(result.buffer);
+      .header('Cache-Control', 'public, max-age=31536000, immutable');
+
+    if (result.etag) {
+      response.header('ETag', `"${result.etag}"`);
+    }
+    if (typeof result.size === 'number') {
+      response.header('Content-Length', result.size.toString());
+    }
+
+    return response.send(result.stream);
   }
 
   @Delete(':id')
@@ -89,4 +131,34 @@ export class FilesController {
   async listFiles(@Query() query: ListFilesDto) {
     return this.filesService.listFiles(query);
   }
+}
+
+function isExecutableMimeType(mimeType: string): boolean {
+  const enabled = (process.env.BLOCK_EXECUTABLE_UPLOADS ?? 'true') !== 'false';
+  if (!enabled) {
+    return false;
+  }
+
+  const defaults = new Set([
+    'application/x-msdownload',
+    'application/x-dosexec',
+    'application/x-msi',
+    'application/x-bat',
+    'application/x-executable',
+    'application/x-sh',
+    'application/x-elf',
+    'application/x-mach-binary',
+    'application/java-archive',
+  ]);
+
+  const extra = (process.env.BLOCKED_MIME_TYPES ?? '')
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean);
+
+  for (const v of extra) {
+    defaults.add(v);
+  }
+
+  return defaults.has(mimeType);
 }

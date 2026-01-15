@@ -9,11 +9,13 @@ import { AppModule } from './app.module.js';
 import type { AppConfig } from './config/app.config.js';
 
 async function bootstrap() {
+  const maxFileSize = parseInt(process.env.MAX_FILE_SIZE || '104857600', 10);
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({
       logger: false,
-      bodyLimit: 104857600,
+      bodyLimit: maxFileSize,
     }),
     {
       bufferLogs: true,
@@ -26,7 +28,6 @@ async function bootstrap() {
   const logger = app.get(Logger);
 
   const appConfig = configService.get<AppConfig>('app')!;
-  const maxFileSize = parseInt(process.env.MAX_FILE_SIZE || '104857600', 10);
 
   await app.register(multipart, {
     limits: {
