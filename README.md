@@ -26,6 +26,8 @@
 
 ## Быстрый старт (Development)
 
+### Автоматическая настройка
+
 ```bash
 # Автоматическая настройка окружения
 pnpm setup:dev
@@ -50,8 +52,8 @@ pnpm install
 # 2. Настройка окружения
 cp .env.development.example .env.development
 
-# 3. Запуск PostgreSQL и MinIO
-docker compose -f docker/docker-compose.yml up -d postgres minio
+# 3. Запуск PostgreSQL и MinIO через docker-compose.dev.yml
+docker compose -f docker-compose.dev.yml up -d
 
 # 4. Выполнение миграций Prisma
 pnpm prisma migrate deploy
@@ -62,6 +64,19 @@ bash scripts/init-minio.sh
 # 6. Запуск приложения
 pnpm start:dev
 ```
+
+#### Альтернативный способ с docker/docker-compose.yml
+
+```bash
+# 3. Запуск PostgreSQL и MinIO через docker/docker-compose.yml
+docker compose -f docker/docker-compose.yml up -d postgres minio
+
+# 4-6. Те же шаги, что и выше
+```
+
+**Различия между docker-compose файлами:**
+- `docker-compose.dev.yml` — для локальной разработки, данные монтируются в `./test-data/`
+- `docker/docker-compose.yml` — для production, использует Docker volumes
 
 API доступен по адресу: `http://localhost:8080/api/v1`
 

@@ -1,6 +1,7 @@
 test-data/
 dist/
 test-nest/
+/docker-compose.yml
 
 # dotenv environment variable files
 .env

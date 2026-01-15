@@ -3,26 +3,26 @@ import { Exclude, Expose } from 'class-transformer';
 @Exclude()
 export class FileResponseDto {
   @Expose()
-  id: string;
+  id!: string;
 
   @Expose()
-  filename: string;
+  filename!: string;
 
   @Expose()
-  mimeType: string;
+  mimeType!: string;
 
   @Expose()
-  size: number;
+  size!: number;
 
   @Expose()
   originalSize?: number;
 
   @Expose()
-  checksum: string;
+  checksum!: string;
 
   @Expose()
-  uploadedAt: Date;
+  uploadedAt!: Date;
 
   @Expose()
-  url: string;
+  url!: string;
 }

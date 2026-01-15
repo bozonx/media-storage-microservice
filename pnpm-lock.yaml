@@ -4,6 +4,10 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  fastify: 5.7.0
+  cron: 4.3.5
+
 importers:
 
   .:
@@ -42,10 +46,10 @@ importers:
         specifier: ^0.14.3
         version: 0.14.3
       cron:
-        specifier: ^3.1.7
-        version: 3.5.0
+        specifier: 4.3.5
+        version: 4.3.5
       fastify:
-        specifier: ^5.7.0
+        specifier: 5.7.0
         version: 5.7.0
       nestjs-pino:
         specifier: ^4.5.0
@@ -1585,9 +1589,6 @@ packages:
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
-  '@types/luxon@3.4.2':
-    resolution: {integrity: sha512-TifLZlFudklWlMBfhubvgqTXRzLDI5pCbGa4P8a3wPyUQSW+1xQ5eDsreP9DWHX3tjq1ke96uYG/nwundroWcA==}
-
   '@types/luxon@3.7.1':
     resolution: {integrity: sha512-H3iskjFIAn5SlJU7OuxUmTEpebK6TKB8rxZShDslBMZJ5u9S//KM1sbdAisiSrqwLQncVjnpi2OK2J51h+4lsg==}
 
@@ -2142,9 +2143,6 @@ packages:
   create-require@1.1.1:
     resolution: {integrity: sha512-dcKFX3jn0MpIaXjisoRvexIJVEKzaq7z2rZKxf+MSr9TkdmHmsU4m2lcLojrj/FHl8mk5VxMmYA+ftRkP/3oKQ==}
 
-  cron@3.5.0:
-    resolution: {integrity: sha512-0eYZqCnapmxYcV06uktql93wNWdlTmmBFP2iYz+JPVcQqlyFYcn1lFuIk4R54pkOmE7mcldTAPZv6X5XA4Q46A==}
-
   cron@4.3.5:
     resolution: {integrity: sha512-hKPP7fq1+OfyCqoePkKfVq7tNAdFwiQORr4lZUHwrf0tebC65fYEeWgOrXOL6prn1/fegGOdTfrM6e34PJfksg==}
     engines: {node: '>=18.x'}
@@ -2426,9 +2424,6 @@ packages:
 
   fastify-plugin@5.1.0:
     resolution: {integrity: sha512-FAIDA8eovSt5qcDgcBvDuX/v0Cjz0ohGhENZ/wpc3y+oZCY2afZ9Baqql3g/lC+OHRnciQol4ww7tuthOb9idw==}
-
-  fastify@5.6.2:
-    resolution: {integrity: sha512-dPugdGnsvYkBlENLhCgX8yhyGCsCPrpA8lFWbTNU428l+YOnLgYHR69hzV8HWPC79n536EqzqQtvhtdaCE0dKg==}
 
   fastify@5.7.0:
     resolution: {integrity: sha512-EA1WUXWhvo+G3ed9TUm+jd8UYdnSGMpCywM1A1CtZtb+h0cKnLb0t8w3TWPN3/w55JfzKZxd959ENp2nOKnZQw==}
@@ -2931,10 +2926,6 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
-
-  luxon@3.5.0:
-    resolution: {integrity: sha512-rh+Zjr6DNfUYR3bPwJEnuwDdqMbxZW7LOQfUN4B54+Cl+0o5zaU9RJ6bcidfDtC1cWCZXQ+nvX8bf6bAji37QQ==}
-    engines: {node: '>=12'}
 
   luxon@3.7.2:
     resolution: {integrity: sha512-vtEhXh/gNjI9Yg1u4jX/0YVPMvxzHuGgCm6tC5kZyb08yjGWGnqAjGJvcXbqQR2P3MyMEFnRbpcdFS6PBcLqew==}
@@ -5352,7 +5343,7 @@ snapshots:
       '@nestjs/common': 11.1.12(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.1.12(@nestjs/common@11.1.12(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
       fast-querystring: 1.1.2
-      fastify: 5.6.2
+      fastify: 5.7.0
       fastify-plugin: 5.1.0
       find-my-way: 9.4.0
       light-my-request: 6.6.0
@@ -5861,8 +5852,6 @@ snapshots:
       pretty-format: 30.2.0
 
   '@types/json-schema@7.0.15': {}
-
-  '@types/luxon@3.4.2': {}
 
   '@types/luxon@3.7.1': {}
 
@@ -6432,11 +6421,6 @@ snapshots:
 
   create-require@1.1.1: {}
 
-  cron@3.5.0:
-    dependencies:
-      '@types/luxon': 3.4.2
-      luxon: 3.5.0
-
   cron@4.3.5:
     dependencies:
       '@types/luxon': 3.7.1
@@ -6697,24 +6681,6 @@ snapshots:
       strnum: 2.1.2
 
   fastify-plugin@5.1.0: {}
-
-  fastify@5.6.2:
-    dependencies:
-      '@fastify/ajv-compiler': 4.0.5
-      '@fastify/error': 4.2.0
-      '@fastify/fast-json-stringify-compiler': 5.0.3
-      '@fastify/proxy-addr': 5.1.0
-      abstract-logging: 2.0.1
-      avvio: 9.1.0
-      fast-json-stringify: 6.1.1
-      find-my-way: 9.4.0
-      light-my-request: 6.6.0
-      pino: 10.2.0
-      process-warning: 5.0.0
-      rfdc: 1.4.1
-      secure-json-parse: 4.1.0
-      semver: 7.7.3
-      toad-cache: 3.7.0
 
   fastify@5.7.0:
     dependencies:
@@ -7405,8 +7371,6 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
-
-  luxon@3.5.0: {}
 
   luxon@3.7.2: {}
 
