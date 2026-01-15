@@ -32,7 +32,7 @@ const config: Config = {
       testEnvironment: 'node',
       moduleFileExtensions,
       rootDir: '.',
-      testMatch: ['<rootDir>/test/unit/health*.spec.ts'],
+      testMatch: ['<rootDir>/test/unit/**/*.spec.ts'],
       testPathIgnorePatterns: ['<rootDir>/test/e2e/', '<rootDir>/dist/'],
       setupFilesAfterEnv: ['<rootDir>/test/setup/unit.setup.ts'],
       collectCoverageFrom: ['src/**/*.(t|j)s'],

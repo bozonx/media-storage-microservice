@@ -10,6 +10,8 @@
  * - Override per-test if needed using jest.setTimeout() or passing timeout as third arg to it()
  */
 
+import { jest } from '@jest/globals';
+
 // Set global timeout for all e2e tests to 30 seconds
 // This prevents individual tests from needing to specify timeout manually
 jest.setTimeout(30000);
