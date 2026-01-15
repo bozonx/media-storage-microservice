@@ -8,6 +8,7 @@ test-nest/
 .env.*
 !.env.example
 !.env.*.example
+!.env.test
 
 # Logs
 logs

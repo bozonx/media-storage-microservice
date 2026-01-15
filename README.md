@@ -56,7 +56,7 @@ cp .env.development.example .env.development
 docker compose -f docker-compose.dev.yml up -d
 
 # 4. Выполнение миграций Prisma
-pnpm prisma migrate deploy
+pnpm prisma:migrate:deploy
 
 # 5. Инициализация MinIO bucket
 bash scripts/init-minio.sh
@@ -263,7 +263,7 @@ curl http://localhost:8080/api/v1/health
 
 ```bash
 # Создание новой миграции (development)
-pnpm prisma migrate dev --name migration_name
+pnpm prisma:migrate:dev --name migration_name
 
 # Применение миграций (production)
 pnpm prisma migrate deploy
@@ -328,6 +328,8 @@ pnpm test:e2e
 # Все тесты с coverage
 pnpm test:cov
 ```
+
+Тестовые скрипты используют `.env.test`.
 
 ## Структура проекта
 

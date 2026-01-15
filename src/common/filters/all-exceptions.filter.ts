@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { Prisma } from '@prisma/client';
 
 /**
  * Global exception filter that catches all exceptions
@@ -72,7 +72,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     message: string;
     errorResponse?: object;
   } {
-    if (exception instanceof PrismaClientKnownRequestError) {
+    if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       if (exception.code === 'P2002') {
         const mapped = new ConflictException('Resource already exists');
         return this.fromHttpException(mapped);

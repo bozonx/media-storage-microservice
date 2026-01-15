@@ -1,6 +1,7 @@
-import { registerAs } from '@nestjs/config';
+import 'dotenv/config';
+import { defineConfig } from 'prisma/config';
 
-export function getDatabaseUrl(): string {
+function getDatabaseUrl(): string {
   const existing = process.env.DATABASE_URL;
   if (existing && existing.trim().length > 0) {
     return existing;
@@ -22,6 +23,12 @@ export function getDatabaseUrl(): string {
   return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}${query ? `?${query}` : ''}`;
 }
 
-export default registerAs('database', () => ({
-  url: getDatabaseUrl(),
-}));
+export default defineConfig({
+  schema: './prisma/schema.prisma',
+  migrations: {
+    path: './prisma/migrations',
+  },
+  datasource: {
+    url: getDatabaseUrl(),
+  },
+});

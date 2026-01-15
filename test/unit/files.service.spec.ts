@@ -139,7 +139,7 @@ describe('FilesService (unit)', () => {
         url: 'http://localhost:3000/api/v1/files/file-id/download',
       });
 
-      expect((storageMock.uploadFile as jest.Mock).mock.calls.length).toBe(0);
+      expect((storageMock.uploadFile as jest.Mock).mock.calls).toHaveLength(0);
       expect((prismaMock as any).file.create).not.toHaveBeenCalled();
     });
 

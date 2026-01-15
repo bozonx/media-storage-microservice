@@ -21,7 +21,7 @@ echo "Initializing MinIO bucket..."
 bash scripts/init-minio.sh
 
 echo "Applying database migrations..."
-pnpm prisma migrate deploy
+dotenv -e .env.development -- prisma migrate deploy
 
 echo ""
 echo "✅ Development environment is ready!"
