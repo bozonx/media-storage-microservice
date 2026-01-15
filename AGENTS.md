@@ -14,5 +14,5 @@
 - Guides: `docs/`
 - Development stage docs: `dev_docs/`
 - Update `docs/CHANGELOG.md` for significant changes
-- README, all the documentation, jsdoc, messages and strings have to be in English
+- jsdoc, messages and strings have to be in English
 - Environment variables: `.env.production.example` is the source of truth for expected variables
