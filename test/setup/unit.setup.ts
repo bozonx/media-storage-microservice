@@ -12,10 +12,12 @@
  */
 
 import nock from 'nock';
-import { beforeAll, afterEach, afterAll } from '@jest/globals';
 
 // Block all external network calls; allow localhost for tests that use local adapters
 beforeAll(() => {
+  process.env.S3_ACCESS_KEY_ID ??= 'test';
+  process.env.S3_SECRET_ACCESS_KEY ??= 'test';
+
   nock.disableNetConnect();
   nock.enableNetConnect('127.0.0.1');
 });

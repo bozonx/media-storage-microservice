@@ -6,6 +6,9 @@ import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
 import { StorageService } from '../../src/modules/storage/storage.service.js';
 
 export async function createTestApp(): Promise<NestFastifyApplication> {
+  process.env.S3_ACCESS_KEY_ID ??= 'test';
+  process.env.S3_SECRET_ACCESS_KEY ??= 'test';
+
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
   })

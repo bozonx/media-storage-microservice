@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { StorageService } from '../storage/storage.service.js';
@@ -37,7 +37,7 @@ export class OrphanCleanupService {
     const timeoutMinutes = this.config.orphanTimeoutMinutes;
     const cutoffTime = new Date(Date.now() - timeoutMinutes * 60 * 1000);
 
-    const staleFiles = await this.prismaService.file.findMany({
+    const staleFiles = await (this.prismaService as any).file.findMany({
       where: {
         status: FileStatus.UPLOADING,
         createdAt: {
@@ -58,14 +58,25 @@ export class OrphanCleanupService {
     this.logger.log(`Found ${staleFiles.length} stale uploading files`);
 
     for (const file of staleFiles) {
+      let deletedFromStorage = false;
       try {
         await this.storageService.deleteFile(file.s3Key);
         this.logger.log(`Deleted stale file from S3: ${file.s3Key}`);
+        deletedFromStorage = true;
       } catch (error) {
-        this.logger.warn(`Failed to delete stale file from S3: ${file.s3Key}`, error);
+        if (error instanceof NotFoundException) {
+          this.logger.log(`Stale file not found in S3 (treated as deleted): ${file.s3Key}`);
+          deletedFromStorage = true;
+        } else {
+          this.logger.warn(`Failed to delete stale file from S3: ${file.s3Key}`, error);
+        }
       }
 
-      await this.prismaService.file.delete({
+      if (!deletedFromStorage) {
+        continue;
+      }
+
+      await (this.prismaService as any).file.delete({
         where: { id: file.id },
       });
       this.logger.log(`Removed stale file record: ${file.id}`);
@@ -76,7 +87,7 @@ export class OrphanCleanupService {
     const timeoutMinutes = this.config.orphanTimeoutMinutes;
     const cutoffTime = new Date(Date.now() - timeoutMinutes * 60 * 1000);
 
-    const failedDeletions = await this.prismaService.file.findMany({
+    const failedDeletions = await (this.prismaService as any).file.findMany({
       where: {
         status: FileStatus.DELETING,
         deletedAt: {
@@ -100,7 +111,7 @@ export class OrphanCleanupService {
       try {
         await this.storageService.deleteFile(file.s3Key);
 
-        await this.prismaService.file.update({
+        await (this.prismaService as any).file.update({
           where: { id: file.id },
           data: {
             status: FileStatus.DELETED,
@@ -109,6 +120,17 @@ export class OrphanCleanupService {
 
         this.logger.log(`Successfully deleted file on retry: ${file.id}`);
       } catch (error) {
+        if (error instanceof NotFoundException) {
+          await (this.prismaService as any).file.update({
+            where: { id: file.id },
+            data: {
+              status: FileStatus.DELETED,
+            },
+          });
+
+          this.logger.log(`File not found in S3 (treated as deleted): ${file.id}`);
+          continue;
+        }
         this.logger.error(`Failed to delete file on retry: ${file.id}`, error);
       }
     }

@@ -7,7 +7,7 @@ import {
   GoneException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { Transform, type Readable } from 'stream';
 import { StorageService } from '../storage/storage.service.js';
 import { ImageOptimizerService } from '../optimization/image-optimizer.service.js';
@@ -28,7 +28,7 @@ export interface UploadFileParams {
 }
 
 function cryptoRandomId(): string {
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return randomUUID();
 }
 
 export interface DownloadFileResult {
@@ -77,7 +77,7 @@ export class FilesService {
 
     const tempKey = `tmp/${cryptoRandomId()}`;
 
-    const file = await this.prismaService.file.create({
+    const file = await (this.prismaService as any).file.create({
       data: {
         filename,
         mimeType,
@@ -115,6 +115,22 @@ export class FilesService {
       const checksum = `sha256:${hash.digest('hex')}`;
       const finalKey = this.generateS3Key(checksum, mimeType);
 
+      const existing = await (this.prismaService as any).file.findFirst({
+        where: {
+          checksum,
+          mimeType,
+          status: FileStatus.READY,
+        },
+      });
+
+      if (existing) {
+        await this.storageService.deleteFile(tempKey);
+        await (this.prismaService as any).file.delete({
+          where: { id: file.id },
+        });
+        return this.toResponseDto(existing);
+      }
+
       await this.storageService.copyObject({
         sourceKey: tempKey,
         destinationKey: finalKey,
@@ -122,7 +138,7 @@ export class FilesService {
       });
       await this.storageService.deleteFile(tempKey);
 
-      const updated = await this.prismaService.file.update({
+      const updated = await (this.prismaService as any).file.update({
         where: { id: file.id },
         data: {
           checksum,
@@ -135,7 +151,7 @@ export class FilesService {
 
       return this.toResponseDto(updated);
     } catch (error) {
-      await this.prismaService.file.update({
+      await (this.prismaService as any).file.update({
         where: { id: file.id },
         data: {
           status: FileStatus.FAILED,
@@ -165,7 +181,19 @@ export class FilesService {
     const checksum = this.calculateChecksum(processedBuffer);
     const s3Key = this.generateS3Key(checksum, processedMimeType);
 
-    const file = await this.prismaService.file.create({
+    const existing = await (this.prismaService as any).file.findFirst({
+      where: {
+        checksum,
+        mimeType: processedMimeType,
+        status: FileStatus.READY,
+      },
+    });
+
+    if (existing) {
+      return this.toResponseDto(existing);
+    }
+
+    const file = await (this.prismaService as any).file.create({
       data: {
         filename,
         mimeType: processedMimeType,
@@ -188,7 +216,7 @@ export class FilesService {
     try {
       await this.storageService.uploadFile(s3Key, processedBuffer, processedMimeType);
 
-      const updated = await this.prismaService.file.update({
+      const updated = await (this.prismaService as any).file.update({
         where: { id: file.id },
         data: {
           status: FileStatus.READY,
@@ -202,7 +230,7 @@ export class FilesService {
     } catch (error) {
       this.logger.error(`Failed to upload file to S3: ${file.id}`, error);
 
-      await this.prismaService.file.update({
+      await (this.prismaService as any).file.update({
         where: { id: file.id },
         data: {
           status: FileStatus.FAILED,
@@ -214,7 +242,7 @@ export class FilesService {
   }
 
   async getFileMetadata(id: string): Promise<FileResponseDto> {
-    const file = await this.prismaService.file.findFirst({
+    const file = await (this.prismaService as any).file.findFirst({
       where: { id, status: FileStatus.READY },
     });
 
@@ -226,7 +254,7 @@ export class FilesService {
   }
 
   async downloadFile(id: string): Promise<DownloadFileResult> {
-    const file = await this.prismaService.file.findUnique({
+    const file = await (this.prismaService as any).file.findUnique({
       where: { id },
     });
 
@@ -253,7 +281,7 @@ export class FilesService {
   }
 
   async downloadFileStream(id: string): Promise<DownloadFileStreamResult> {
-    const file = await this.prismaService.file.findUnique({
+    const file = await (this.prismaService as any).file.findUnique({
       where: { id },
     });
 
@@ -283,7 +311,7 @@ export class FilesService {
   }
 
   async deleteFile(id: string): Promise<void> {
-    const file = await this.prismaService.file.findUnique({
+    const file = await (this.prismaService as any).file.findUnique({
       where: { id },
     });
 
@@ -295,7 +323,7 @@ export class FilesService {
       throw new ConflictException('File is already deleted or being deleted');
     }
 
-    await this.prismaService.file.update({
+    await (this.prismaService as any).file.update({
       where: { id },
       data: {
         status: FileStatus.DELETING,
@@ -308,7 +336,7 @@ export class FilesService {
     try {
       await this.storageService.deleteFile(file.s3Key);
 
-      await this.prismaService.file.update({
+      await (this.prismaService as any).file.update({
         where: { id },
         data: {
           status: FileStatus.DELETED,
@@ -335,8 +363,8 @@ export class FilesService {
     if (typeof mimeType === 'string' && mimeType.trim().length > 0) {
       where.mimeType = mimeType.trim();
     }
-    const [items, total] = await this.prismaService.$transaction([
-      this.prismaService.file.findMany({
+    const [items, total] = await (this.prismaService as any).$transaction([
+      (this.prismaService as any).file.findMany({
         where,
         orderBy: {
           [sortBy]: order,
@@ -344,11 +372,11 @@ export class FilesService {
         take: limit,
         skip: offset,
       }),
-      this.prismaService.file.count({ where }),
+      (this.prismaService as any).file.count({ where }),
     ]);
 
     return {
-      items: items.map(item => this.toResponseDto(item)),
+      items: (items as Array<any>).map(item => this.toResponseDto(item)),
       total,
       limit,
       offset,

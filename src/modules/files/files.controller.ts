@@ -69,6 +69,9 @@ export class FilesController {
     }
 
     if (optimizeParams) {
+      if (!data.mimetype.startsWith('image/')) {
+        throw new UnsupportedMediaTypeException('Optimization is supported only for images');
+      }
       const buffer = await data.toBuffer();
       return this.filesService.uploadFile({
         buffer,
