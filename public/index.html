@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Storage - File Upload</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📁 Media Storage</h1>
+            <p>Upload your files to the storage service</p>
+        </header>
+
+        <main>
+            <div class="upload-section">
+                <div class="drop-zone" id="dropZone">
+                    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p class="drop-text">Drag & drop files here or click to browse</p>
+                    <input type="file" id="fileInput" multiple hidden>
+                    <button type="button" class="browse-btn" id="browseBtn">Browse Files</button>
+                </div>
+
+                <div class="file-list" id="fileList"></div>
+            </div>
+
+            <div class="upload-controls" id="uploadControls" style="display: none;">
+                <button type="button" class="btn btn-primary" id="uploadBtn">
+                    <span class="btn-text">Upload Files</span>
+                    <span class="btn-loader" style="display: none;"></span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="clearBtn">Clear All</button>
+            </div>
+
+            <div class="results" id="results"></div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

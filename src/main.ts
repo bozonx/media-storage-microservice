@@ -5,6 +5,10 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from 'nestjs-pino';
 import multipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
+import { join } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { AppModule } from './app.module.js';
 import type { AppConfig } from './config/app.config.js';
 
@@ -33,6 +37,15 @@ async function bootstrap() {
     limits: {
       fileSize: maxFileSize,
     },
+  });
+
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  const publicPath = join(__dirname, '..', '..', 'public');
+
+  await app.register(fastifyStatic, {
+    root: publicPath,
+    prefix: '/',
   });
 
   app.useGlobalPipes(
