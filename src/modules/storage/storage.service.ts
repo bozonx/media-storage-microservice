@@ -3,11 +3,11 @@ import {
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
-  Logger,
   NotFoundException,
   OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import {
   S3Client,
   PutObjectCommand,
@@ -22,11 +22,11 @@ import { StorageConfig } from '../../config/storage.config.js';
 
 @Injectable()
 export class StorageService implements OnModuleDestroy {
-  private readonly logger = new Logger(StorageService.name);
-  private readonly s3Client: S3Client;
-  private readonly bucket: string;
-
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    @InjectPinoLogger(StorageService.name)
+    private readonly logger: PinoLogger,
+    private readonly configService: ConfigService,
+  ) {
     const config = this.configService.get<StorageConfig>('storage')!;
 
     this.s3Client = new S3Client({
@@ -41,6 +41,9 @@ export class StorageService implements OnModuleDestroy {
 
     this.bucket = config.bucket;
   }
+
+  private readonly s3Client: S3Client;
+  private readonly bucket: string;
 
   onModuleDestroy(): void {
     this.s3Client.destroy();
@@ -63,11 +66,14 @@ export class StorageService implements OnModuleDestroy {
       });
 
       await this.s3Client.send(command);
-      this.logger.log(`File copied successfully: ${params.sourceKey} -> ${params.destinationKey}`);
+      this.logger.info(
+        { sourceKey: params.sourceKey, destinationKey: params.destinationKey },
+        'File copied successfully',
+      );
     } catch (error) {
       this.logger.error(
-        `Failed to copy file in S3: ${params.sourceKey} -> ${params.destinationKey}`,
-        error,
+        { err: error, sourceKey: params.sourceKey, destinationKey: params.destinationKey },
+        'Failed to copy file in storage',
       );
       throw this.mapS3Error(error, 'Failed to copy file in storage');
     }
@@ -83,9 +89,9 @@ export class StorageService implements OnModuleDestroy {
       });
 
       await this.s3Client.send(command);
-      this.logger.log(`File uploaded successfully: ${key}`);
+      this.logger.info({ key }, 'File uploaded successfully');
     } catch (error) {
-      this.logger.error(`Failed to upload file to S3: ${key}`, error);
+      this.logger.error({ err: error, key }, 'Failed to upload file to storage');
       throw this.mapS3Error(error, 'Failed to upload file to storage');
     }
   }
@@ -108,9 +114,9 @@ export class StorageService implements OnModuleDestroy {
       });
 
       await this.s3Client.send(command);
-      this.logger.log(`File uploaded successfully: ${params.key}`);
+      this.logger.info({ key: params.key }, 'File uploaded successfully');
     } catch (error) {
-      this.logger.error(`Failed to upload file to S3: ${params.key}`, error);
+      this.logger.error({ err: error, key: params.key }, 'Failed to upload file to storage');
       throw this.mapS3Error(error, 'Failed to upload file to storage');
     }
   }
@@ -137,7 +143,7 @@ export class StorageService implements OnModuleDestroy {
 
       return Buffer.concat(chunks);
     } catch (error) {
-      this.logger.error(`Failed to download file from S3: ${key}`, error);
+      this.logger.error({ err: error, key }, 'Failed to download file from storage');
       throw this.mapS3Error(error, 'Failed to download file from storage');
     }
   }
@@ -164,7 +170,7 @@ export class StorageService implements OnModuleDestroy {
         etag: response.ETag ? response.ETag.replace(/\"/g, '') : undefined,
       };
     } catch (error) {
-      this.logger.error(`Failed to download file from S3: ${key}`, error);
+      this.logger.error({ err: error, key }, 'Failed to download file from storage');
       throw this.mapS3Error(error, 'Failed to download file from storage');
     }
   }
@@ -187,7 +193,7 @@ export class StorageService implements OnModuleDestroy {
         contentType: response.ContentType,
       };
     } catch (error) {
-      this.logger.error(`Failed to head object in S3: ${key}`, error);
+      this.logger.error({ err: error, key }, 'Failed to get file metadata from storage');
       throw this.mapS3Error(error, 'Failed to get file metadata from storage');
     }
   }
@@ -200,9 +206,9 @@ export class StorageService implements OnModuleDestroy {
       });
 
       await this.s3Client.send(command);
-      this.logger.log(`File deleted successfully: ${key}`);
+      this.logger.info({ key }, 'File deleted successfully');
     } catch (error) {
-      this.logger.error(`Failed to delete file from S3: ${key}`, error);
+      this.logger.error({ err: error, key }, 'Failed to delete file from storage');
       throw this.mapS3Error(error, 'Failed to delete file from storage');
     }
   }
@@ -216,7 +222,7 @@ export class StorageService implements OnModuleDestroy {
       await this.s3Client.send(command);
       return true;
     } catch (error) {
-      this.logger.error('S3 connection check failed', error);
+      this.logger.error({ err: error }, 'S3 connection check failed');
       return false;
     }
   }

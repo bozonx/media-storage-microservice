@@ -12,6 +12,7 @@ import { ImageOptimizerService } from '../../src/modules/optimization/image-opti
 import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
 import { ConfigService } from '@nestjs/config';
 import { FileStatus } from '../../src/modules/files/file-status.js';
+import { getLoggerToken } from 'nestjs-pino';
 
 async function drainStream(stream: AsyncIterable<unknown>): Promise<void> {
   for await (const _chunk of stream) {
@@ -77,6 +78,17 @@ describe('FilesService (unit)', () => {
     moduleRef = await Test.createTestingModule({
       providers: [
         FilesService,
+        {
+          provide: getLoggerToken(FilesService.name),
+          useValue: {
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            debug: jest.fn(),
+            trace: jest.fn(),
+            fatal: jest.fn(),
+          },
+        },
         { provide: PrismaService, useValue: prismaMock },
         { provide: StorageService, useValue: storageMock },
         { provide: ImageOptimizerService, useValue: imageOptimizerMock },

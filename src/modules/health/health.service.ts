@@ -1,12 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { StorageService } from '../storage/storage.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 @Injectable()
 export class HealthService {
-  private readonly logger = new Logger(HealthService.name);
-
   constructor(
+    @InjectPinoLogger(HealthService.name)
+    private readonly logger: PinoLogger,
     private readonly prismaService: PrismaService,
     private readonly storageService: StorageService,
   ) {}
@@ -30,10 +31,10 @@ export class HealthService {
 
   private async checkDatabase(): Promise<boolean> {
     try {
-      await this.prismaService.$queryRaw`SELECT 1`;
+      await (this.prismaService as any).$queryRaw`SELECT 1`;
       return true;
     } catch (error) {
-      this.logger.error('Database health check failed', error);
+      this.logger.error({ err: error }, 'Database health check failed');
       return false;
     }
   }
@@ -42,7 +43,7 @@ export class HealthService {
     try {
       return await this.storageService.checkConnection();
     } catch (error) {
-      this.logger.error('S3 health check failed', error);
+      this.logger.error({ err: error }, 'S3 health check failed');
       return false;
     }
   }

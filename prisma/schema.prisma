@@ -37,5 +37,6 @@ model File {
   @@index([mimeType])
   @@index([checksum])
   @@index([s3Key])
+  @@unique([checksum, mimeType, status])
   @@map("files")
 }

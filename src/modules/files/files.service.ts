@@ -1,12 +1,12 @@
 import {
   Injectable,
-  Logger,
   NotFoundException,
   BadRequestException,
   ConflictException,
   GoneException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { createHash, randomUUID } from 'crypto';
 import { Transform, type Readable } from 'stream';
 import { StorageService } from '../storage/storage.service.js';
@@ -18,6 +18,7 @@ import { ListFilesResponseDto } from './dto/list-files-response.dto.js';
 import { plainToInstance } from 'class-transformer';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { FileStatus } from './file-status.js';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 /**
  * Parameters for uploading a file from an in-memory buffer.
@@ -58,11 +59,12 @@ export interface DownloadFileStreamResult {
 
 @Injectable()
 export class FilesService {
-  private readonly logger = new Logger(FilesService.name);
   private readonly bucket: string;
   private readonly basePath: string;
 
   constructor(
+    @InjectPinoLogger(FilesService.name)
+    private readonly logger: PinoLogger,
     private readonly prismaService: PrismaService,
     private readonly storageService: StorageService,
     private readonly imageOptimizer: ImageOptimizerService,
@@ -156,15 +158,12 @@ export class FilesService {
       });
       await this.storageService.deleteFile(tempKey);
 
-      const updated = await (this.prismaService as any).file.update({
-        where: { id: file.id },
-        data: {
-          checksum,
-          size: BigInt(size),
-          s3Key: finalKey,
-          status: FileStatus.READY,
-          uploadedAt: new Date(),
-        },
+      const updated = await this.promoteUploadedFileToReady({
+        fileId: file.id,
+        checksum,
+        size,
+        finalKey,
+        mimeType,
       });
 
       return this.toResponseDto(updated);
@@ -198,7 +197,10 @@ export class FilesService {
         processedBuffer = result.buffer;
         processedMimeType = result.format;
         originalSize = buffer.length;
-        this.logger.log(`Image optimized: ${filename} (${buffer.length} -> ${result.size} bytes)`);
+        this.logger.info(
+          { filename, beforeBytes: buffer.length, afterBytes: result.size },
+          'Image optimized',
+        );
       }
     }
 
@@ -217,25 +219,36 @@ export class FilesService {
       return this.toResponseDto(existing);
     }
 
-    const file = await (this.prismaService as any).file.create({
-      data: {
-        filename,
-        mimeType: processedMimeType,
-        size: BigInt(processedBuffer.length),
-        originalSize: originalSize === null ? null : BigInt(originalSize),
-        checksum,
-        s3Key,
-        s3Bucket: this.bucket,
-        status: FileStatus.UPLOADING,
-        optimizationParams: optimizeParams
-          ? (optimizeParams as unknown as Record<string, any>)
-          : null,
-        metadata: metadata ?? null,
-        uploadedAt: null,
-      },
-    });
+    let file: any;
+    try {
+      file = await (this.prismaService as any).file.create({
+        data: {
+          filename,
+          mimeType: processedMimeType,
+          size: BigInt(processedBuffer.length),
+          originalSize: originalSize === null ? null : BigInt(originalSize),
+          checksum,
+          s3Key,
+          s3Bucket: this.bucket,
+          status: FileStatus.UPLOADING,
+          optimizationParams: optimizeParams
+            ? (optimizeParams as unknown as Record<string, any>)
+            : null,
+          metadata: metadata ?? null,
+          uploadedAt: null,
+        },
+      });
+    } catch (error) {
+      if (this.isUniqueConstraintViolation(error)) {
+        const dedup = await this.findReadyByChecksum({ checksum, mimeType: processedMimeType });
+        if (dedup) {
+          return this.toResponseDto(dedup);
+        }
+      }
+      throw error;
+    }
 
-    this.logger.log(`File record created with status=uploading: ${file.id}`);
+    this.logger.info({ fileId: file.id }, 'File record created with status=uploading');
 
     try {
       await this.storageService.uploadFile(s3Key, processedBuffer, processedMimeType);
@@ -248,11 +261,11 @@ export class FilesService {
         },
       });
 
-      this.logger.log(`File upload completed: ${updated.id}`);
+      this.logger.info({ fileId: updated.id }, 'File upload completed');
 
       return this.toResponseDto(updated);
     } catch (error) {
-      this.logger.error(`Failed to upload file to S3: ${file.id}`, error);
+      this.logger.error({ err: error, fileId: file.id, s3Key }, 'Failed to upload file to storage');
 
       await (this.prismaService as any).file.update({
         where: { id: file.id },
@@ -384,7 +397,7 @@ export class FilesService {
       },
     });
 
-    this.logger.log(`File marked for deletion: ${id}`);
+    this.logger.info({ fileId: id }, 'File marked for deletion');
 
     try {
       await this.storageService.deleteFile(file.s3Key);
@@ -396,9 +409,9 @@ export class FilesService {
         },
       });
 
-      this.logger.log(`File deleted successfully: ${id}`);
+      this.logger.info({ fileId: id }, 'File deleted successfully');
     } catch (error) {
-      this.logger.error(`Failed to delete file from S3: ${id}`, error);
+      this.logger.error({ err: error, fileId: id }, 'Failed to delete file from storage');
       throw error;
     }
   }
@@ -492,5 +505,61 @@ export class FilesService {
     };
 
     return mimeToExt[mimeType] || '';
+  }
+
+  private isUniqueConstraintViolation(error: unknown): boolean {
+    return error instanceof PrismaClientKnownRequestError && error.code === 'P2002';
+  }
+
+  private async findReadyByChecksum(params: {
+    checksum: string;
+    mimeType: string;
+  }): Promise<any | null> {
+    const { checksum, mimeType } = params;
+    return (this.prismaService as any).file.findFirst({
+      where: {
+        checksum,
+        mimeType,
+        status: FileStatus.READY,
+      },
+    });
+  }
+
+  private async promoteUploadedFileToReady(params: {
+    fileId: string;
+    checksum: string;
+    size: number;
+    finalKey: string;
+    mimeType: string;
+  }): Promise<any> {
+    const { fileId, checksum, size, finalKey, mimeType } = params;
+
+    try {
+      return await (this.prismaService as any).file.update({
+        where: { id: fileId },
+        data: {
+          checksum,
+          size: BigInt(size),
+          s3Key: finalKey,
+          status: FileStatus.READY,
+          uploadedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      if (!this.isUniqueConstraintViolation(error)) {
+        throw error;
+      }
+
+      const existing = await this.findReadyByChecksum({
+        checksum,
+        mimeType,
+      });
+      if (!existing) {
+        throw error;
+      }
+
+      await (this.prismaService as any).file.delete({ where: { id: fileId } });
+      return existing;
+    }
   }
 }

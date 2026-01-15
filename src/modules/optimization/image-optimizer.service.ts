@@ -1,5 +1,6 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import sharp from 'sharp';
 import { OptimizationConfig } from '../../config/optimization.config.js';
 import { OptimizeParamsDto } from '../files/dto/optimize-params.dto.js';
@@ -12,10 +13,13 @@ export interface OptimizationResult {
 
 @Injectable()
 export class ImageOptimizerService {
-  private readonly logger = new Logger(ImageOptimizerService.name);
   private readonly config: OptimizationConfig;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    @InjectPinoLogger(ImageOptimizerService.name)
+    private readonly logger: PinoLogger,
+    private readonly configService: ConfigService,
+  ) {
     this.config = this.configService.get<OptimizationConfig>('optimization')!;
   }
 
@@ -81,12 +85,15 @@ export class ImageOptimizerService {
 
       const optimizedBuffer = await image.toBuffer();
 
-      const resultFormat = format
-        ? `image/${format}`
-        : mimeType;
+      const resultFormat = format ? `image/${format}` : mimeType;
 
-      this.logger.log(
-        `Image optimized: ${buffer.length} -> ${optimizedBuffer.length} bytes (${((1 - optimizedBuffer.length / buffer.length) * 100).toFixed(1)}% reduction)`,
+      this.logger.info(
+        {
+          beforeBytes: buffer.length,
+          afterBytes: optimizedBuffer.length,
+          reductionPercent: Number(((1 - optimizedBuffer.length / buffer.length) * 100).toFixed(1)),
+        },
+        'Image optimized',
       );
 
       return {
@@ -95,7 +102,7 @@ export class ImageOptimizerService {
         format: resultFormat,
       };
     } catch (error) {
-      this.logger.error('Failed to optimize image', error);
+      this.logger.error({ err: error }, 'Failed to optimize image');
       throw new BadRequestException('Failed to optimize image');
     }
   }
