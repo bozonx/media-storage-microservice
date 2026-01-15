@@ -59,6 +59,10 @@ docker compose -f docker-compose.dev.yml up -d
 pnpm prisma:migrate:deploy
 
 # 5. Инициализация MinIO bucket
+# Если MinIO запущен в Docker контейнере:
+docker exec media-storage-minio-dev sh -c "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb local/media-files --ignore-existing"
+
+# Если MinIO запущен локально:
 bash scripts/init-minio.sh
 
 # 6. Запуск приложения
@@ -71,7 +75,10 @@ pnpm start:dev
 # 3. Запуск PostgreSQL и MinIO через docker/docker-compose.yml
 docker compose -f docker/docker-compose.yml up -d postgres minio
 
-# 4-6. Те же шаги, что и выше
+# 5. Инициализация MinIO bucket (внутри контейнера)
+docker exec media-storage-minio sh -c "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb local/media-files --ignore-existing"
+
+# 4, 6. Те же шаги, что и выше
 ```
 
 **Различия между docker-compose файлами:**
