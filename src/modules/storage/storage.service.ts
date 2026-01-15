@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { Upload } from '@aws-sdk/lib-storage';
 import {
   S3Client,
   PutObjectCommand,
@@ -104,16 +105,19 @@ export class StorageService implements OnModuleDestroy {
     metadata?: Record<string, string>;
   }): Promise<void> {
     try {
-      const command = new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: params.key,
-        Body: params.body,
-        ContentType: params.mimeType,
-        ContentLength: params.contentLength,
-        Metadata: params.metadata,
+      const uploader = new Upload({
+        client: this.s3Client,
+        params: {
+          Bucket: this.bucket,
+          Key: params.key,
+          Body: params.body,
+          ContentType: params.mimeType,
+          ...(params.contentLength !== undefined && { ContentLength: params.contentLength }),
+          Metadata: params.metadata,
+        },
       });
 
-      await this.s3Client.send(command);
+      await uploader.done();
       this.logger.info({ key: params.key }, 'File uploaded successfully');
     } catch (error) {
       this.logger.error({ err: error, key: params.key }, 'Failed to upload file to storage');
