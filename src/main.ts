@@ -44,6 +44,10 @@ async function bootstrap() {
 
   const appConfig = configService.get<AppConfig>('app')!;
 
+  const globalPrefix = appConfig.basePath ? `${appConfig.basePath}` : '';
+  const basePathPrefix = globalPrefix ? `/${globalPrefix}` : '';
+  const uiPrefix = `${basePathPrefix}/ui/`;
+
   await app.register(multipart, {
     limits: {
       fileSize: maxFileSize,
@@ -56,14 +60,22 @@ async function bootstrap() {
 
   await app.register(fastifyStatic, {
     root: publicPath,
-    prefix: '/',
+    prefix: uiPrefix,
+  });
+
+  const fastify = app.getHttpAdapter().getInstance();
+
+  fastify.get(`${basePathPrefix}/ui`, async (_request: any, reply: any) => {
+    reply.redirect(`${basePathPrefix}/ui/`, 302);
+  });
+
+  fastify.get(`${basePathPrefix}/ui/`, async (_request: any, reply: any) => {
+    return reply.sendFile('index.html');
   });
 
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
-
-  const globalPrefix = appConfig.basePath ? `${appConfig.basePath}` : '';
   if (globalPrefix) {
     app.setGlobalPrefix(globalPrefix);
   }
@@ -88,8 +100,13 @@ async function bootstrap() {
   await app.listen(appConfig.port, appConfig.host);
 
   const apiPath = globalPrefix ? `${globalPrefix}/api/v1` : 'api/v1';
+  const uiPath = globalPrefix ? `${globalPrefix}/ui` : 'ui';
   logger.log(
     `🚀 NestJS service is running on: http://${appConfig.host}:${appConfig.port}/${apiPath}`,
+    'Bootstrap',
+  );
+  logger.log(
+    `🌐 UI is available at: http://${appConfig.host}:${appConfig.port}/${uiPath}`,
     'Bootstrap',
   );
   logger.log(`📊 Environment: ${appConfig.nodeEnv}`, 'Bootstrap');
