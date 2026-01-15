@@ -4,44 +4,53 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from 'nestjs-pino';
+import multipart from '@fastify/multipart';
 import { AppModule } from './app.module.js';
 import type { AppConfig } from './config/app.config.js';
 
 async function bootstrap() {
-  // Create app with bufferLogs enabled to capture early logs
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({
-      logger: false, // We'll use Pino logger instead
+      logger: false,
+      bodyLimit: 104857600,
     }),
     {
       bufferLogs: true,
     },
   );
 
-  // Use Pino logger for the entire application
   app.useLogger(app.get(Logger));
 
   const configService = app.get(ConfigService);
   const logger = app.get(Logger);
 
   const appConfig = configService.get<AppConfig>('app')!;
+  const maxFileSize = parseInt(process.env.MAX_FILE_SIZE || '104857600', 10);
+
+  await app.register(multipart, {
+    limits: {
+      fileSize: maxFileSize,
+    },
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
 
-  // Configure global API prefix from configuration
-  const globalPrefix = appConfig.basePath ? `${appConfig.basePath}/api/v1` : 'api/v1';
-  app.setGlobalPrefix(globalPrefix);
+  const globalPrefix = appConfig.basePath ? `${appConfig.basePath}` : '';
+  if (globalPrefix) {
+    app.setGlobalPrefix(globalPrefix);
+  }
 
   // Enable graceful shutdown
   app.enableShutdownHooks();
 
   await app.listen(appConfig.port, appConfig.host);
 
+  const apiPath = globalPrefix ? `${globalPrefix}/api/v1` : 'api/v1';
   logger.log(
-    `🚀 NestJS service is running on: http://${appConfig.host}:${appConfig.port}/${globalPrefix}`,
+    `🚀 NestJS service is running on: http://${appConfig.host}:${appConfig.port}/${apiPath}`,
     'Bootstrap',
   );
   logger.log(`📊 Environment: ${appConfig.nodeEnv}`, 'Bootstrap');

@@ -1,16 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
+import { HealthService } from './health.service.js';
 
-/**
- * Simple health check controller
- * Provides a minimal `/health` endpoint
- */
-@Controller('health')
+@Controller('api/v1/health')
 export class HealthController {
-  /**
-   * Basic health check endpoint returning a simple OK status
-   */
+  constructor(private readonly healthService: HealthService) {}
+
   @Get()
-  public check() {
-    return { status: 'ok' };
+  async check() {
+    return this.healthService.check();
   }
 }

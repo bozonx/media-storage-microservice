@@ -1,10 +1,11 @@
 {
-  "name": "microservice-boilerplate",
-  "version": "0.1.0",
-  "description": "NestJS + Fastify microservice boilerplate with health checks",
+  "name": "media-storage-microservice",
+  "version": "1.0.0",
+  "description": "Media storage microservice with S3, PostgreSQL, and image optimization",
   "type": "module",
   "main": "dist/src/main.js",
   "scripts": {
+    "setup:dev": "bash scripts/setup-dev.sh",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
@@ -22,17 +23,24 @@
     "test:e2e": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects e2e"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.716.0",
     "@nestjs/common": "^11.1.9",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.9",
     "@nestjs/platform-fastify": "^11.1.9",
+    "@nestjs/schedule": "^4.1.1",
+    "@nestjs/typeorm": "^10.0.2",
+    "@fastify/multipart": "^9.0.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
     "fastify": "^5.6.2",
     "nestjs-pino": "^4.5.0",
+    "pg": "^8.13.1",
     "pino": "^10.1.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "sharp": "^0.33.5",
+    "typeorm": "^0.3.20"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -41,6 +49,7 @@
     "@nestjs/testing": "^11.1.9",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.0.1",
+    "@types/pg": "^8.11.10",
     "@typescript-eslint/eslint-plugin": "^8.49.0",
     "@typescript-eslint/parser": "^8.49.0",
     "eslint": "^9.39.1",
