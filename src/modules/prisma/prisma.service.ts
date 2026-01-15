@@ -5,10 +5,8 @@ import { getDatabaseUrl } from '../../config/database.config.js';
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor() {
-    const databaseUrl = getDatabaseUrl();
-    super({
-      datasourceUrl: databaseUrl,
-    });
+    process.env.DATABASE_URL ??= getDatabaseUrl();
+    super();
   }
 
   public async onModuleInit(): Promise<void> {

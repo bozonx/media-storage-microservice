@@ -18,7 +18,18 @@ import { ListFilesResponseDto } from './dto/list-files-response.dto.js';
 import { plainToInstance } from 'class-transformer';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { FileStatus } from './file-status.js';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+
+function isPrismaKnownRequestError(error: unknown): error is {
+  name: string;
+  code: string;
+} {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+
+  const e = error as Record<string, unknown>;
+  return e.name === 'PrismaClientKnownRequestError' && typeof e.code === 'string';
+}
 
 /**
  * Parameters for uploading a file from an in-memory buffer.
@@ -508,7 +519,7 @@ export class FilesService {
   }
 
   private isUniqueConstraintViolation(error: unknown): boolean {
-    return error instanceof PrismaClientKnownRequestError && error.code === 'P2002';
+    return isPrismaKnownRequestError(error) && error.code === 'P2002';
   }
 
   private async findReadyByChecksum(params: {
