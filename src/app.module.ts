@@ -9,6 +9,7 @@ import { FilesModule } from './modules/files/files.module.js';
 import { StorageModule } from './modules/storage/storage.module.js';
 import { OptimizationModule } from './modules/optimization/optimization.module.js';
 import { CleanupModule } from './modules/cleanup/cleanup.module.js';
+import { ShutdownModule } from './common/shutdown/shutdown.module.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import appConfig from './config/app.config.js';
 import storageConfig from './config/storage.config.js';
@@ -25,6 +26,7 @@ import pkg from '../package.json' with { type: 'json' };
       envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}`, '.env'],
       cache: true,
     }),
+    ShutdownModule,
     PrismaModule,
     ScheduleModule.forRoot(),
     LoggerModule.forRootAsync({

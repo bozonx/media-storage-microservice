@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -20,7 +21,7 @@ import { Readable } from 'stream';
 import { StorageConfig } from '../../config/storage.config.js';
 
 @Injectable()
-export class StorageService {
+export class StorageService implements OnModuleDestroy {
   private readonly logger = new Logger(StorageService.name);
   private readonly s3Client: S3Client;
   private readonly bucket: string;
@@ -39,6 +40,10 @@ export class StorageService {
     });
 
     this.bucket = config.bucket;
+  }
+
+  onModuleDestroy(): void {
+    this.s3Client.destroy();
   }
 
   async copyObject(params: {

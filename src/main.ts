@@ -10,6 +10,7 @@ import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { AppModule } from './app.module.js';
+import { ShutdownService } from './common/shutdown/shutdown.service.js';
 import type { AppConfig } from './config/app.config.js';
 
 function resolveMaxFileSize(): number {
@@ -37,6 +38,7 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const logger = app.get(Logger);
+  const shutdownService = app.get(ShutdownService);
 
   const appConfig = configService.get<AppConfig>('app')!;
 
@@ -64,8 +66,22 @@ async function bootstrap() {
     app.setGlobalPrefix(globalPrefix);
   }
 
-  // Enable graceful shutdown
-  app.enableShutdownHooks();
+  app.enableShutdownHooks(['SIGTERM', 'SIGINT']);
+
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addHook('onRequest', (_request: any, reply: any, done: () => void) => {
+      if (!shutdownService.isShuttingDown()) {
+        done();
+        return;
+      }
+
+      reply.status(503).send({
+        statusCode: 503,
+        message: 'Service is shutting down',
+      });
+    });
 
   await app.listen(appConfig.port, appConfig.host);
 
@@ -76,8 +92,6 @@ async function bootstrap() {
   );
   logger.log(`📊 Environment: ${appConfig.nodeEnv}`, 'Bootstrap');
   logger.log(`📝 Log level: ${appConfig.logLevel}`, 'Bootstrap');
-
-  // Rely on enableShutdownHooks for graceful shutdown
 }
 
 void bootstrap();
