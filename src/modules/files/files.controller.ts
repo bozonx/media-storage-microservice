@@ -23,6 +23,18 @@ import { validateSync } from 'class-validator';
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
+  /**
+   * Uploads a file using multipart/form-data.
+   *
+   * Supported multipart fields:
+   * - `file` (required)
+   * - `optimize` (optional JSON string, images only)
+   * - `metadata` (optional JSON string)
+   *
+   * Depending on `optimize` presence, the controller either:
+   * - reads the whole file into memory and performs optional image optimization, or
+   * - streams the upload directly to storage.
+   */
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async uploadFile(@Req() request: FastifyRequest) {
@@ -95,6 +107,11 @@ export class FilesController {
     return this.filesService.getFileMetadata(id);
   }
 
+  /**
+   * Downloads a file by streaming it from storage.
+   *
+   * If the service provides an `etag`, the handler supports conditional GET via `If-None-Match`.
+   */
   @Get(':id/download')
   async downloadFile(
     @Param('id') id: string,
@@ -140,6 +157,11 @@ export class FilesController {
   }
 }
 
+/**
+ * Returns true if uploads of the given MIME type should be blocked as executable content.
+ *
+ * Can be toggled via `BLOCK_EXECUTABLE_UPLOADS=false`.
+ */
 function isExecutableMimeType(mimeType: string): boolean {
   const enabled = (process.env.BLOCK_EXECUTABLE_UPLOADS ?? 'true') !== 'false';
   if (!enabled) {
@@ -170,6 +192,11 @@ function isExecutableMimeType(mimeType: string): boolean {
   return defaults.has(mimeType);
 }
 
+/**
+ * Returns true if uploads of the given MIME type should be blocked as archive content.
+ *
+ * Can be toggled via `BLOCK_ARCHIVE_UPLOADS=false`.
+ */
 function isArchiveMimeType(mimeType: string): boolean {
   const enabled = (process.env.BLOCK_ARCHIVE_UPLOADS ?? 'true') !== 'false';
   if (!enabled) {

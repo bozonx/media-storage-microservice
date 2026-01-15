@@ -19,6 +19,11 @@ import { plainToInstance } from 'class-transformer';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { FileStatus } from './file-status.js';
 
+/**
+ * Parameters for uploading a file from an in-memory buffer.
+ *
+ * `optimizeParams` is supported only for image uploads.
+ */
 export interface UploadFileParams {
   buffer: Buffer;
   filename: string;
@@ -38,6 +43,11 @@ export interface DownloadFileResult {
   size: number;
 }
 
+/**
+ * Result of a streaming download.
+ *
+ * `etag` can be used by the HTTP layer for conditional requests (If-None-Match / 304).
+ */
 export interface DownloadFileStreamResult {
   stream: Readable;
   filename: string;
@@ -62,6 +72,14 @@ export class FilesService {
     this.basePath = this.configService.get<string>('BASE_PATH') || '';
   }
 
+  /**
+   * Uploads a file from a readable stream.
+   *
+   * The file is uploaded to a temporary key first and then promoted to a final key derived from
+   * its SHA-256 checksum (deduplication).
+   *
+   * @throws {BadRequestException} If `optimizeParams` is provided.
+   */
   async uploadFileStream(params: {
     stream: Readable;
     filename: string;
@@ -161,6 +179,12 @@ export class FilesService {
     }
   }
 
+  /**
+   * Uploads a file from a buffer.
+   *
+   * If `optimizeParams` is provided, the image may be optimized first. The resulting content is
+   * then deduplicated by checksum.
+   */
   async uploadFile(params: UploadFileParams): Promise<FileResponseDto> {
     const { buffer, filename, mimeType, optimizeParams, metadata } = params;
 
@@ -241,6 +265,11 @@ export class FilesService {
     }
   }
 
+  /**
+   * Returns metadata for a READY file.
+   *
+   * @throws {NotFoundException} If the file does not exist or is not READY.
+   */
   async getFileMetadata(id: string): Promise<FileResponseDto> {
     const file = await (this.prismaService as any).file.findFirst({
       where: { id, status: FileStatus.READY },
@@ -253,6 +282,15 @@ export class FilesService {
     return this.toResponseDto(file);
   }
 
+  /**
+   * Downloads the full file contents into memory.
+   *
+   * Prefer `downloadFileStream` for large files.
+   *
+   * @throws {NotFoundException} If the file does not exist.
+   * @throws {GoneException} If the file was deleted.
+   * @throws {ConflictException} If the file is not READY.
+   */
   async downloadFile(id: string): Promise<DownloadFileResult> {
     const file = await (this.prismaService as any).file.findUnique({
       where: { id },
@@ -280,6 +318,15 @@ export class FilesService {
     };
   }
 
+  /**
+   * Downloads file as a stream.
+   *
+   * Returned `etag` is derived from the stored checksum when available.
+   *
+   * @throws {NotFoundException} If the file does not exist.
+   * @throws {GoneException} If the file was deleted.
+   * @throws {ConflictException} If the file is not READY.
+   */
   async downloadFileStream(id: string): Promise<DownloadFileStreamResult> {
     const file = await (this.prismaService as any).file.findUnique({
       where: { id },
@@ -310,6 +357,12 @@ export class FilesService {
     };
   }
 
+  /**
+   * Marks a file for deletion and removes its object from storage.
+   *
+   * @throws {NotFoundException} If the file does not exist.
+   * @throws {ConflictException} If the file is already deleted / being deleted.
+   */
   async deleteFile(id: string): Promise<void> {
     const file = await (this.prismaService as any).file.findUnique({
       where: { id },
@@ -350,6 +403,9 @@ export class FilesService {
     }
   }
 
+  /**
+   * Lists READY files with optional search by filename and filter by MIME type.
+   */
   async listFiles(params: ListFilesDto): Promise<ListFilesResponseDto> {
     const { limit = 50, offset = 0, sortBy = 'uploadedAt', order = 'desc', q, mimeType } = params;
 
