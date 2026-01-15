@@ -64,6 +64,10 @@ export class FilesController {
       throw new UnsupportedMediaTypeException('Executable file types are not allowed');
     }
 
+    if (isArchiveMimeType(data.mimetype)) {
+      throw new UnsupportedMediaTypeException('Archive file types are not allowed');
+    }
+
     if (optimizeParams) {
       const buffer = await data.toBuffer();
       return this.filesService.uploadFile({
@@ -161,4 +165,31 @@ function isExecutableMimeType(mimeType: string): boolean {
   }
 
   return defaults.has(mimeType);
+}
+
+function isArchiveMimeType(mimeType: string): boolean {
+  const enabled = (process.env.BLOCK_ARCHIVE_UPLOADS ?? 'true') !== 'false';
+  if (!enabled) {
+    return false;
+  }
+
+  const archiveMimeTypes = new Set([
+    'application/zip',
+    'application/x-zip-compressed',
+    'application/x-tar',
+    'application/x-gzip',
+    'application/gzip',
+    'application/x-gtar',
+    'application/x-7z-compressed',
+    'application/x-rar-compressed',
+    'application/x-bzip',
+    'application/x-bzip2',
+    'application/x-compress',
+    'application/x-lzh',
+    'application/x-stuffit',
+    'application/x-sit',
+    'application/java-archive',
+  ]);
+
+  return archiveMimeTypes.has(mimeType);
 }

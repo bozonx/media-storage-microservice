@@ -10,9 +10,9 @@ export interface OptimizationConfig {
 export default registerAs(
   'optimization',
   (): OptimizationConfig => ({
-    enabled: process.env.OPTIMIZATION_ENABLED !== 'false',
-    defaultQuality: parseInt(process.env.OPTIMIZATION_DEFAULT_QUALITY || '85', 10),
-    maxWidth: parseInt(process.env.OPTIMIZATION_MAX_WIDTH || '3840', 10),
-    maxHeight: parseInt(process.env.OPTIMIZATION_MAX_HEIGHT || '2160', 10),
+    enabled: process.env.IMAGE_OPTIMIZATION_ENABLED !== 'false',
+    defaultQuality: parseInt(process.env.IMAGE_OPTIMIZATION_DEFAULT_QUALITY || '85', 10),
+    maxWidth: parseInt(process.env.IMAGE_OPTIMIZATION_MAX_WIDTH || '3840', 10),
+    maxHeight: parseInt(process.env.IMAGE_OPTIMIZATION_MAX_HEIGHT || '2160', 10),
   }),
 );

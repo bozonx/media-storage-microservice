@@ -206,15 +206,16 @@ curl http://localhost:8080/api/v1/health
 - `S3_FORCE_PATH_STYLE` — использовать path-style URLs (true для MinIO/Garage)
 
 ### Загрузка файлов
-- `MAX_FILE_SIZE` — максимальный размер файла в байтах (по умолчанию 104857600 = 100MB)
+- `MAX_FILE_SIZE_MB` — максимальный размер файла в мегабайтах (по умолчанию 100)
 - `BLOCK_EXECUTABLE_UPLOADS` — блокировать загрузку исполняемых файлов (по умолчанию true)
+- `BLOCK_ARCHIVE_UPLOADS` — блокировать загрузку архивов (по умолчанию true)
 - `BLOCKED_MIME_TYPES` — дополнительные MIME типы для блокировки (через запятую)
 
-### Оптимизация
-- `OPTIMIZATION_ENABLED` — включить оптимизацию (true/false)
-- `OPTIMIZATION_DEFAULT_QUALITY` — качество по умолчанию (1-100)
-- `OPTIMIZATION_MAX_WIDTH` — максимальная ширина (px)
-- `OPTIMIZATION_MAX_HEIGHT` — максимальная высота (px)
+### Оптимизация изображений
+- `IMAGE_OPTIMIZATION_ENABLED` — включить оптимизацию изображений (true/false)
+- `IMAGE_OPTIMIZATION_DEFAULT_QUALITY` — качество по умолчанию (1-100)
+- `IMAGE_OPTIMIZATION_MAX_WIDTH` — максимальная ширина (px)
+- `IMAGE_OPTIMIZATION_MAX_HEIGHT` — максимальная высота (px)
 
 ### Cleanup Job
 - `CLEANUP_ENABLED` — включить cleanup job (true/false)

@@ -12,8 +12,15 @@ import { dirname } from 'path';
 import { AppModule } from './app.module.js';
 import type { AppConfig } from './config/app.config.js';
 
+function resolveMaxFileSize(): number {
+  const fallbackMb = 100;
+  const parsedMb = parseInt(process.env.MAX_FILE_SIZE_MB ?? `${fallbackMb}`, 10);
+  const maxFileSizeMb = Number.isNaN(parsedMb) || parsedMb <= 0 ? fallbackMb : parsedMb;
+  return maxFileSizeMb * 1024 * 1024;
+}
+
 async function bootstrap() {
-  const maxFileSize = parseInt(process.env.MAX_FILE_SIZE || '104857600', 10);
+  const maxFileSize = resolveMaxFileSize();
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
