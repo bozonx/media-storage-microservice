@@ -17,6 +17,7 @@ COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
 
 RUN pnpm install --prod --frozen-lockfile --prefer-offline || pnpm install --prod --prefer-offline
+RUN pnpm prisma generate
 
 # Copy pre-built application
 COPY dist ./dist
