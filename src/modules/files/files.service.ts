@@ -5,11 +5,8 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
-import { FileEntity, FileStatus } from './entities/file.entity.js';
 import { StorageService } from '../storage/storage.service.js';
 import { ImageOptimizerService } from '../optimization/image-optimizer.service.js';
 import { OptimizeParamsDto } from './dto/optimize-params.dto.js';
@@ -17,6 +14,8 @@ import { ListFilesDto } from './dto/list-files.dto.js';
 import { FileResponseDto } from './dto/file-response.dto.js';
 import { ListFilesResponseDto } from './dto/list-files-response.dto.js';
 import { plainToInstance } from 'class-transformer';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { FileStatus } from './file-status.js';
 
 export interface UploadFileParams {
   buffer: Buffer;
@@ -40,8 +39,7 @@ export class FilesService {
   private readonly basePath: string;
 
   constructor(
-    @InjectRepository(FileEntity)
-    private readonly fileRepository: Repository<FileEntity>,
+    private readonly prismaService: PrismaService,
     private readonly storageService: StorageService,
     private readonly imageOptimizer: ImageOptimizerService,
     private readonly configService: ConfigService,
@@ -70,45 +68,56 @@ export class FilesService {
     const checksum = this.calculateChecksum(processedBuffer);
     const s3Key = this.generateS3Key(checksum, processedMimeType);
 
-    const fileEntity = this.fileRepository.create({
-      filename,
-      mimeType: processedMimeType,
-      size: processedBuffer.length,
-      originalSize,
-      checksum,
-      s3Key,
-      s3Bucket: this.bucket,
-      status: FileStatus.UPLOADING,
-      optimizationParams: optimizeParams || null,
-      metadata: metadata || null,
-      uploadedAt: null,
+    const file = await this.prismaService.file.create({
+      data: {
+        filename,
+        mimeType: processedMimeType,
+        size: BigInt(processedBuffer.length),
+        originalSize: originalSize === null ? null : BigInt(originalSize),
+        checksum,
+        s3Key,
+        s3Bucket: this.bucket,
+        status: FileStatus.UPLOADING,
+        optimizationParams: optimizeParams
+          ? (optimizeParams as unknown as Record<string, any>)
+          : null,
+        metadata: metadata ?? null,
+        uploadedAt: null,
+      },
     });
 
-    await this.fileRepository.save(fileEntity);
-    this.logger.log(`File record created with status=uploading: ${fileEntity.id}`);
+    this.logger.log(`File record created with status=uploading: ${file.id}`);
 
     try {
       await this.storageService.uploadFile(s3Key, processedBuffer, processedMimeType);
 
-      fileEntity.status = FileStatus.READY;
-      fileEntity.uploadedAt = new Date();
-      await this.fileRepository.save(fileEntity);
+      const updated = await this.prismaService.file.update({
+        where: { id: file.id },
+        data: {
+          status: FileStatus.READY,
+          uploadedAt: new Date(),
+        },
+      });
 
-      this.logger.log(`File upload completed: ${fileEntity.id}`);
+      this.logger.log(`File upload completed: ${updated.id}`);
 
-      return this.toResponseDto(fileEntity);
+      return this.toResponseDto(updated);
     } catch (error) {
-      this.logger.error(`Failed to upload file to S3: ${fileEntity.id}`, error);
+      this.logger.error(`Failed to upload file to S3: ${file.id}`, error);
 
-      fileEntity.status = FileStatus.FAILED;
-      await this.fileRepository.save(fileEntity);
+      await this.prismaService.file.update({
+        where: { id: file.id },
+        data: {
+          status: FileStatus.FAILED,
+        },
+      });
 
       throw error;
     }
   }
 
   async getFileMetadata(id: string): Promise<FileResponseDto> {
-    const file = await this.fileRepository.findOne({
+    const file = await this.prismaService.file.findFirst({
       where: { id, status: FileStatus.READY },
     });
 
@@ -120,7 +129,7 @@ export class FilesService {
   }
 
   async downloadFile(id: string): Promise<DownloadFileResult> {
-    const file = await this.fileRepository.findOne({
+    const file = await this.prismaService.file.findUnique({
       where: { id },
     });
 
@@ -142,12 +151,12 @@ export class FilesService {
       buffer,
       filename: file.filename,
       mimeType: file.mimeType,
-      size: file.size,
+      size: Number(file.size ?? 0n),
     };
   }
 
   async deleteFile(id: string): Promise<void> {
-    const file = await this.fileRepository.findOne({
+    const file = await this.prismaService.file.findUnique({
       where: { id },
     });
 
@@ -159,17 +168,25 @@ export class FilesService {
       throw new ConflictException('File is already deleted or being deleted');
     }
 
-    file.status = FileStatus.DELETING;
-    file.deletedAt = new Date();
-    await this.fileRepository.save(file);
+    await this.prismaService.file.update({
+      where: { id },
+      data: {
+        status: FileStatus.DELETING,
+        deletedAt: new Date(),
+      },
+    });
 
     this.logger.log(`File marked for deletion: ${id}`);
 
     try {
       await this.storageService.deleteFile(file.s3Key);
 
-      file.status = FileStatus.DELETED;
-      await this.fileRepository.save(file);
+      await this.prismaService.file.update({
+        where: { id },
+        data: {
+          status: FileStatus.DELETED,
+        },
+      });
 
       this.logger.log(`File deleted successfully: ${id}`);
     } catch (error) {
@@ -181,25 +198,45 @@ export class FilesService {
   async listFiles(params: ListFilesDto): Promise<ListFilesResponseDto> {
     const { limit = 50, offset = 0, sortBy = 'uploadedAt', order = 'desc' } = params;
 
-    const [items, total] = await this.fileRepository.findAndCount({
-      where: { status: FileStatus.READY },
-      order: { [sortBy]: order.toUpperCase() },
-      take: limit,
-      skip: offset,
-    });
+    const where = { status: FileStatus.READY };
+    const [items, total] = await this.prismaService.$transaction([
+      this.prismaService.file.findMany({
+        where,
+        orderBy: {
+          [sortBy]: order,
+        },
+        take: limit,
+        skip: offset,
+      }),
+      this.prismaService.file.count({ where }),
+    ]);
 
     return {
-      items: items.map((item) => this.toResponseDto(item)),
+      items: items.map(item => this.toResponseDto(item)),
       total,
       limit,
       offset,
     };
   }
 
-  private toResponseDto(file: FileEntity): FileResponseDto {
+  private toResponseDto(file: {
+    id: string;
+    filename: string;
+    mimeType: string;
+    size: bigint | null;
+    originalSize: bigint | null;
+    checksum: string | null;
+    uploadedAt: Date | null;
+  }): FileResponseDto {
     const dto = plainToInstance(FileResponseDto, file, {
       excludeExtraneousValues: true,
     });
+
+    // Ensure runtime types match DTO
+    dto.size = Number(file.size ?? 0n);
+    dto.originalSize = file.originalSize === null ? undefined : Number(file.originalSize);
+    dto.checksum = file.checksum ?? '';
+    dto.uploadedAt = file.uploadedAt ?? new Date(0);
 
     dto.url = `${this.basePath}/api/v1/files/${file.id}/download`;
 

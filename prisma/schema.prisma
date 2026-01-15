@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum FileStatus {
+  uploading
+  ready
+  deleting
+  deleted
+  failed
+  missing
+}
+
+model File {
+  id                 String     @id @default(uuid()) @db.Uuid
+  filename           String     @db.VarChar(255)
+  mimeType           String     @map("mime_type") @db.VarChar(100)
+  size               BigInt?
+  originalSize       BigInt?    @map("original_size")
+  checksum           String?    @db.VarChar(100)
+  s3Key              String     @map("s3_key") @db.VarChar(500)
+  s3Bucket           String     @map("s3_bucket") @db.VarChar(100)
+  status             FileStatus @default(uploading)
+  optimizationParams Json?      @map("optimization_params")
+  metadata           Json?
+  uploadedAt         DateTime?  @map("uploaded_at") @db.Timestamp(6)
+  deletedAt          DateTime?  @map("deleted_at") @db.Timestamp(6)
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@index([status, uploadedAt])
+  @@index([mimeType])
+  @@index([checksum])
+  @@index([s3Key])
+  @@map("files")
+}

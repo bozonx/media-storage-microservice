@@ -12,13 +12,18 @@ ENV LOG_LEVEL=warn
 # Install pnpm
 RUN corepack enable
 
-# Copy runtime files
+# Copy files required for dependency install + Prisma client generation
 COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma
+
 RUN pnpm install --prod --frozen-lockfile --prefer-offline || pnpm install --prod --prefer-offline
 
 # Copy pre-built application
 COPY dist ./dist
 
+COPY scripts/docker-entrypoint.sh ./scripts/docker-entrypoint.sh
+RUN chmod +x ./scripts/docker-entrypoint.sh
+
 EXPOSE 8080
 
-CMD ["node", "dist/src/main.js"]
+CMD ["./scripts/docker-entrypoint.sh"]

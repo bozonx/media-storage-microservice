@@ -1,11 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { FileEntity, FileStatus } from '../files/entities/file.entity.js';
 import { StorageService } from '../storage/storage.service.js';
 import { CleanupConfig } from '../../config/cleanup.config.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { FileStatus } from '../files/file-status.js';
 
 @Injectable()
 export class OrphanCleanupService {
@@ -13,8 +12,7 @@ export class OrphanCleanupService {
   private readonly config: CleanupConfig;
 
   constructor(
-    @InjectRepository(FileEntity)
-    private readonly fileRepository: Repository<FileEntity>,
+    private readonly prismaService: PrismaService,
     private readonly storageService: StorageService,
     private readonly configService: ConfigService,
   ) {
@@ -39,10 +37,16 @@ export class OrphanCleanupService {
     const timeoutMinutes = this.config.orphanTimeoutMinutes;
     const cutoffTime = new Date(Date.now() - timeoutMinutes * 60 * 1000);
 
-    const staleFiles = await this.fileRepository.find({
+    const staleFiles = await this.prismaService.file.findMany({
       where: {
         status: FileStatus.UPLOADING,
-        createdAt: LessThan(cutoffTime),
+        createdAt: {
+          lt: cutoffTime,
+        },
+      },
+      select: {
+        id: true,
+        s3Key: true,
       },
     });
 
@@ -61,7 +65,9 @@ export class OrphanCleanupService {
         this.logger.warn(`Failed to delete stale file from S3: ${file.s3Key}`, error);
       }
 
-      await this.fileRepository.remove(file);
+      await this.prismaService.file.delete({
+        where: { id: file.id },
+      });
       this.logger.log(`Removed stale file record: ${file.id}`);
     }
   }
@@ -70,10 +76,16 @@ export class OrphanCleanupService {
     const timeoutMinutes = this.config.orphanTimeoutMinutes;
     const cutoffTime = new Date(Date.now() - timeoutMinutes * 60 * 1000);
 
-    const failedDeletions = await this.fileRepository.find({
+    const failedDeletions = await this.prismaService.file.findMany({
       where: {
         status: FileStatus.DELETING,
-        deletedAt: LessThan(cutoffTime),
+        deletedAt: {
+          lt: cutoffTime,
+        },
+      },
+      select: {
+        id: true,
+        s3Key: true,
       },
     });
 
@@ -88,8 +100,12 @@ export class OrphanCleanupService {
       try {
         await this.storageService.deleteFile(file.s3Key);
 
-        file.status = FileStatus.DELETED;
-        await this.fileRepository.save(file);
+        await this.prismaService.file.update({
+          where: { id: file.id },
+          data: {
+            status: FileStatus.DELETED,
+          },
+        });
 
         this.logger.log(`Successfully deleted file on retry: ${file.id}`);
       } catch (error) {

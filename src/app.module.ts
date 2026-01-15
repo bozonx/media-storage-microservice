@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_FILTER } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
+import { PrismaModule } from './modules/prisma/prisma.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { FilesModule } from './modules/files/files.module.js';
 import { StorageModule } from './modules/storage/storage.module.js';
@@ -11,7 +11,6 @@ import { OptimizationModule } from './modules/optimization/optimization.module.j
 import { CleanupModule } from './modules/cleanup/cleanup.module.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import appConfig from './config/app.config.js';
-import databaseConfig from './config/database.config.js';
 import storageConfig from './config/storage.config.js';
 import optimizationConfig from './config/optimization.config.js';
 import cleanupConfig from './config/cleanup.config.js';
@@ -22,14 +21,11 @@ import pkg from '../package.json' with { type: 'json' };
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, storageConfig, optimizationConfig, cleanupConfig],
+      load: [appConfig, storageConfig, optimizationConfig, cleanupConfig],
       envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}`, '.env'],
       cache: true,
     }),
-    TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => configService.get('database')!,
-    }),
+    PrismaModule,
     ScheduleModule.forRoot(),
     LoggerModule.forRootAsync({
       inject: [ConfigService],

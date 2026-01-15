@@ -41,7 +41,9 @@ services:
       retries: 3
 
   microservice:
-    image: ghcr.io/bozonx/nestjs-boilerplate:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: media-storage-microservice
     hostname: media-storage
     restart: unless-stopped
@@ -61,6 +63,7 @@ services:
       - TZ=UTC
       - BASE_PATH=
       - LOG_LEVEL=warn
+      - DATABASE_URL=postgresql://media_user:media_password@postgres:5432/media_storage
       - DATABASE_HOST=postgres
       - DATABASE_PORT=5432
       - DATABASE_NAME=media_storage

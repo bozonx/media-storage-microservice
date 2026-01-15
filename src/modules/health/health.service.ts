@@ -1,15 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
 import { StorageService } from '../storage/storage.service.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 @Injectable()
 export class HealthService {
   private readonly logger = new Logger(HealthService.name);
 
   constructor(
-    @InjectDataSource()
-    private readonly dataSource: DataSource,
+    private readonly prismaService: PrismaService,
     private readonly storageService: StorageService,
   ) {}
 
@@ -32,7 +30,7 @@ export class HealthService {
 
   private async checkDatabase(): Promise<boolean> {
     try {
-      await this.dataSource.query('SELECT 1');
+      await this.prismaService.$queryRaw`SELECT 1`;
       return true;
     } catch (error) {
       this.logger.error('Database health check failed', error);
