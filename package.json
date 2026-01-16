@@ -6,7 +6,7 @@
   "main": "dist/src/main.js",
   "scripts": {
     "setup:dev": "bash scripts/setup-dev.sh",
-    "postinstall": "dotenv -e .env.development.example -- prisma generate",
+    "postinstall": "pnpm prisma generate",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

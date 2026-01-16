@@ -24,11 +24,11 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
 
-RUN pnpm install --prod --frozen-lockfile --prefer-offline || pnpm install --prod --prefer-offline
-RUN pnpm prisma generate
+RUN pnpm install --prod --frozen-lockfile --prefer-offline --ignore-scripts || pnpm install --prod --prefer-offline --ignore-scripts
 
 # Copy pre-built application
 COPY dist ./dist
+COPY public ./public
 
 COPY scripts/docker-entrypoint.sh ./scripts/docker-entrypoint.sh
 RUN chmod +x ./scripts/docker-entrypoint.sh
