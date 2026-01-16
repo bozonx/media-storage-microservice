@@ -10,6 +10,11 @@ import { PrismaService } from '../prisma/prisma.service.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+interface ThumbnailRow {
+  id: string;
+  s3Key: string;
+}
+
 @Injectable()
 export class CleanupService implements OnModuleInit, OnModuleDestroy {
   private static readonly jobName = 'cleanup';
@@ -97,75 +102,79 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
       try {
         const shouldDeleteBlob = await this.shouldDeleteBlob(file.checksum, file.mimeType, file.id);
 
-        if (shouldDeleteBlob) {
-          if (file.s3Key) {
-            try {
-              await this.storageService.deleteFile(file.s3Key);
-              this.logger.info({ fileId: file.id, s3Key: file.s3Key }, 'Deleted blob from storage');
-            } catch (error) {
-              if (!(error instanceof NotFoundException)) {
-                this.logger.warn(
-                  { err: error, fileId: file.id, s3Key: file.s3Key },
-                  'Failed to delete blob from storage',
-                );
-              }
-            }
-          }
-
-          if (file.originalS3Key) {
-            try {
-              await this.storageService.deleteFile(file.originalS3Key);
-              this.logger.info(
-                { fileId: file.id, s3Key: file.originalS3Key },
-                'Deleted original blob from storage',
-              );
-            } catch (error) {
-              if (!(error instanceof NotFoundException)) {
-                this.logger.warn(
-                  { err: error, fileId: file.id, s3Key: file.originalS3Key },
-                  'Failed to delete original blob from storage',
-                );
-              }
-            }
-          }
-        } else {
+        if (!shouldDeleteBlob) {
           this.logger.info(
             { fileId: file.id, checksum: file.checksum },
             'Skipping blob deletion (still referenced by other files)',
           );
         }
 
-        const thumbnails = await (this.prismaService as any).thumbnail.findMany({
+        const thumbnails = (await (this.prismaService as any).thumbnail.findMany({
           where: { fileId: file.id },
           select: { id: true, s3Key: true },
-        });
+        })) as ThumbnailRow[];
+
+        const storageKeysToDelete: string[] = [];
+        const blobKeys: string[] = [];
 
         for (const thumbnail of thumbnails) {
-          try {
-            await this.storageService.deleteFile(thumbnail.s3Key);
-          } catch (error) {
-            if (!(error instanceof NotFoundException)) {
-              this.logger.warn(
-                { err: error, thumbnailId: thumbnail.id, s3Key: thumbnail.s3Key },
-                'Failed to delete thumbnail from storage',
-              );
-            }
+          storageKeysToDelete.push(thumbnail.s3Key);
+        }
+
+        if (shouldDeleteBlob) {
+          if (file.s3Key) {
+            storageKeysToDelete.push(file.s3Key);
+            blobKeys.push(file.s3Key);
+          }
+          if (file.originalS3Key) {
+            storageKeysToDelete.push(file.originalS3Key);
+            blobKeys.push(file.originalS3Key);
           }
         }
 
+        const { deletedKeys, errors } = await this.storageService.deleteFiles(storageKeysToDelete);
+
+        for (const err of errors) {
+          this.logger.warn(
+            { fileId: file.id, s3Key: err.key, code: err.code, message: err.message },
+            'Failed to delete object from storage',
+          );
+        }
+
+        const deletableThumbnailIds = thumbnails
+          .filter((thumbnail: ThumbnailRow) => deletedKeys.has(thumbnail.s3Key))
+          .map((thumbnail: ThumbnailRow) => thumbnail.id);
+
+        const allThumbnailsDeleted = deletableThumbnailIds.length === thumbnails.length;
+        const allBlobKeysDeleted = blobKeys.every(key => deletedKeys.has(key));
+
         await this.prismaService.$transaction(async (tx: any) => {
-          if (thumbnails.length > 0) {
+          if (deletableThumbnailIds.length > 0) {
             await tx.thumbnail.deleteMany({
-              where: { fileId: file.id },
+              where: { id: { in: deletableThumbnailIds } },
             });
           }
 
-          await tx.file.delete({
-            where: { id: file.id },
-          });
+          if (allThumbnailsDeleted && allBlobKeysDeleted) {
+            await tx.file.delete({
+              where: { id: file.id },
+            });
+          }
         });
 
-        this.logger.info({ fileId: file.id }, 'Soft-deleted file cleaned up');
+        if (allThumbnailsDeleted && allBlobKeysDeleted) {
+          this.logger.info({ fileId: file.id }, 'Soft-deleted file cleaned up');
+        } else {
+          this.logger.warn(
+            {
+              fileId: file.id,
+              thumbnailsDeleted: deletableThumbnailIds.length,
+              thumbnailsTotal: thumbnails.length,
+              blobKeysTotal: blobKeys.length,
+            },
+            'Soft-deleted file cleanup is incomplete (will retry later)',
+          );
+        }
       } catch (error) {
         this.logger.error({ err: error, fileId: file.id }, 'Failed to cleanup soft-deleted file');
       }
@@ -365,28 +374,57 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.info({ count: oldThumbnails.length }, 'Found old thumbnails');
 
-    for (const thumbnail of oldThumbnails) {
+    const chunkSize = 100;
+    for (let i = 0; i < oldThumbnails.length; i += chunkSize) {
+      const chunk = oldThumbnails.slice(i, i + chunkSize);
+      const thumbnailKeyById = new Map<string, string>();
+      const keysToDelete: string[] = [];
+      for (const thumbnail of chunk) {
+        thumbnailKeyById.set(thumbnail.id, thumbnail.s3Key);
+        keysToDelete.push(thumbnail.s3Key);
+      }
+
       try {
-        await this.storageService.deleteFile(thumbnail.s3Key);
-        this.logger.info({ s3Key: thumbnail.s3Key }, 'Deleted thumbnail from storage');
-      } catch (error) {
-        if (!(error instanceof NotFoundException)) {
+        const { deletedKeys, errors } = await this.storageService.deleteFiles(keysToDelete);
+
+        for (const err of errors) {
           this.logger.warn(
-            { err: error, s3Key: thumbnail.s3Key },
+            { s3Key: err.key, code: err.code, message: err.message },
             'Failed to delete thumbnail from storage',
           );
         }
-      }
 
-      await this.prismaService.thumbnail.deleteMany({
-        where: {
-          id: thumbnail.id,
-          lastAccessedAt: {
-            lt: cutoffTime,
+        const deletableThumbnailIds: string[] = [];
+        for (const [id, s3Key] of thumbnailKeyById) {
+          if (deletedKeys.has(s3Key)) {
+            deletableThumbnailIds.push(id);
+          }
+        }
+
+        if (deletableThumbnailIds.length === 0) {
+          this.logger.warn('Old thumbnails cleanup: no thumbnails were deleted from storage');
+          continue;
+        }
+
+        await this.prismaService.thumbnail.deleteMany({
+          where: {
+            id: { in: deletableThumbnailIds },
+            lastAccessedAt: {
+              lt: cutoffTime,
+            },
           },
-        },
-      });
-      this.logger.info({ thumbnailId: thumbnail.id }, 'Removed thumbnail record');
+        });
+
+        this.logger.info(
+          {
+            deletedFromDb: deletableThumbnailIds.length,
+            deletedFromStorage: deletableThumbnailIds.length,
+          },
+          'Old thumbnails cleanup completed',
+        );
+      } catch (error) {
+        this.logger.error({ err: error }, 'Failed to cleanup old thumbnails');
+      }
     }
   }
 
@@ -474,64 +512,71 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     s3Key: string | null,
     originalS3Key: string | null,
   ) {
-    const thumbnails = await (this.prismaService as any).thumbnail.findMany({
+    const thumbnails = (await (this.prismaService as any).thumbnail.findMany({
       where: { fileId },
       select: { id: true, s3Key: true },
-    });
-
-    const deleteFromStorageOrThrow = async (key: string, logContext: Record<string, unknown>) => {
-      try {
-        await this.storageService.deleteFile(key);
-      } catch (error) {
-        if (error instanceof NotFoundException) {
-          return;
-        }
-
-        this.logger.error({ err: error, ...logContext }, 'Failed to delete object from storage');
-        throw error;
-      }
-    };
+    })) as ThumbnailRow[];
 
     try {
+      const storageKeysToDelete: string[] = [];
       for (const thumbnail of thumbnails) {
-        await deleteFromStorageOrThrow(thumbnail.s3Key, {
-          fileId,
-          s3Key: thumbnail.s3Key,
-          type: 'thumbnail',
-        });
+        storageKeysToDelete.push(thumbnail.s3Key);
       }
-
       if (s3Key) {
-        await deleteFromStorageOrThrow(s3Key, { fileId, s3Key, type: 'file' });
-        this.logger.info({ s3Key }, 'Deleted file from storage');
+        storageKeysToDelete.push(s3Key);
+      }
+      if (originalS3Key) {
+        storageKeysToDelete.push(originalS3Key);
       }
 
-      if (originalS3Key) {
-        await deleteFromStorageOrThrow(originalS3Key, {
-          fileId,
-          s3Key: originalS3Key,
-          type: 'original',
-        });
-        this.logger.info({ s3Key: originalS3Key }, 'Deleted original file from storage');
+      const { deletedKeys, errors } = await this.storageService.deleteFiles(storageKeysToDelete);
+
+      for (const err of errors) {
+        this.logger.error(
+          { fileId, s3Key: err.key, code: err.code, message: err.message },
+          'Failed to delete object from storage',
+        );
       }
+
+      const deletableThumbnailIds = thumbnails
+        .filter((thumbnail: ThumbnailRow) => deletedKeys.has(thumbnail.s3Key))
+        .map((thumbnail: ThumbnailRow) => thumbnail.id);
+
+      const allThumbnailsDeleted = deletableThumbnailIds.length === thumbnails.length;
+      const fileKeyDeleted = !s3Key || deletedKeys.has(s3Key);
+      const originalKeyDeleted = !originalS3Key || deletedKeys.has(originalS3Key);
 
       await this.prismaService.$transaction(async (tx: any) => {
-        if (thumbnails.length > 0) {
+        if (deletableThumbnailIds.length > 0) {
           await tx.thumbnail.deleteMany({
-            where: { fileId },
+            where: { id: { in: deletableThumbnailIds } },
           });
         }
 
-        await tx.file.delete({
-          where: { id: fileId },
-        });
+        if (allThumbnailsDeleted && fileKeyDeleted && originalKeyDeleted) {
+          await tx.file.delete({
+            where: { id: fileId },
+          });
+        }
       });
 
-      if (thumbnails.length > 0) {
-        this.logger.info({ fileId, count: thumbnails.length }, 'Deleted thumbnails');
+      if (allThumbnailsDeleted && fileKeyDeleted && originalKeyDeleted) {
+        if (thumbnails.length > 0) {
+          this.logger.info({ fileId, count: thumbnails.length }, 'Deleted thumbnails');
+        }
+        this.logger.info({ fileId }, 'Removed file record');
+      } else {
+        this.logger.error(
+          {
+            fileId,
+            thumbnailsDeleted: deletableThumbnailIds.length,
+            thumbnailsTotal: thumbnails.length,
+            fileKeyDeleted,
+            originalKeyDeleted,
+          },
+          'Failed to fully delete file (storage and/or database). Database records were preserved for non-deleted objects.',
+        );
       }
-
-      this.logger.info({ fileId }, 'Removed file record');
     } catch (error) {
       this.logger.error(
         { err: error, fileId },

@@ -14,12 +14,24 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   HeadBucketCommand,
   HeadObjectCommand,
   CopyObjectCommand,
 } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 import { StorageConfig } from '../../config/storage.config.js';
+
+export interface StorageDeleteManyError {
+  key: string;
+  code?: string;
+  message?: string;
+}
+
+export interface StorageDeleteManyResult {
+  deletedKeys: Set<string>;
+  errors: StorageDeleteManyError[];
+}
 
 @Injectable()
 export class StorageService implements OnModuleDestroy {
@@ -220,6 +232,81 @@ export class StorageService implements OnModuleDestroy {
       this.logger.error({ err: error, key }, 'Failed to delete file from storage');
       throw this.mapS3Error(error, 'Failed to delete file from storage');
     }
+  }
+
+  async deleteFiles(
+    keys: string[],
+    params?: { chunkSize?: number },
+  ): Promise<StorageDeleteManyResult> {
+    const uniqueKeys = Array.from(
+      new Set(keys.map(key => key.trim()).filter(key => key.length > 0)),
+    );
+
+    const chunkSize = params?.chunkSize ?? 1000;
+    const deletedKeys = new Set<string>();
+    const errors: StorageDeleteManyError[] = [];
+
+    if (uniqueKeys.length === 0) {
+      return { deletedKeys, errors };
+    }
+
+    for (let i = 0; i < uniqueKeys.length; i += chunkSize) {
+      const chunk = uniqueKeys.slice(i, i + chunkSize);
+
+      try {
+        const command = new DeleteObjectsCommand({
+          Bucket: this.bucket,
+          Delete: {
+            Objects: chunk.map(Key => ({ Key })),
+            Quiet: true,
+          },
+        });
+
+        const response = await this.s3Client.send(command);
+
+        for (const item of response.Deleted ?? []) {
+          if (item.Key) {
+            deletedKeys.add(item.Key);
+          }
+        }
+
+        for (const err of response.Errors ?? []) {
+          const key = err.Key;
+          if (!key) {
+            continue;
+          }
+
+          const code = err.Code;
+          if (code === 'NoSuchKey' || code === 'NotFound') {
+            deletedKeys.add(key);
+            continue;
+          }
+
+          errors.push({
+            key,
+            code,
+            message: err.Message,
+          });
+        }
+      } catch (error) {
+        this.logger.error(
+          { err: error, count: chunk.length },
+          'Failed to delete files from storage',
+        );
+        throw this.mapS3Error(error, 'Failed to delete files from storage');
+      }
+    }
+
+    if (errors.length === 0) {
+      this.logger.info({ count: uniqueKeys.length }, 'Files deleted successfully');
+    } else {
+      this.logger.warn(
+        { count: uniqueKeys.length, errorCount: errors.length },
+        'Batch delete completed with errors',
+      );
+    }
+
+    return { deletedKeys, errors };
   }
 
   async checkConnection(): Promise<boolean> {

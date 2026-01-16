@@ -21,6 +21,7 @@ describe('CleanupService (unit)', () => {
 
   const prismaMock: any = {
     file: {
+      count: jest.fn(),
       findMany: jest.fn(),
       updateMany: jest.fn(),
       update: jest.fn(),
@@ -35,7 +36,7 @@ describe('CleanupService (unit)', () => {
   };
 
   const storageMock: any = {
-    deleteFile: jest.fn(),
+    deleteFiles: jest.fn(),
   };
 
   const configServiceMock: any = {
@@ -62,17 +63,19 @@ describe('CleanupService (unit)', () => {
     jest.clearAllMocks();
 
     prismaMock.$queryRaw.mockReset();
+    prismaMock.file.count.mockReset();
     prismaMock.file.findMany.mockReset();
     prismaMock.file.updateMany.mockReset();
     prismaMock.$transaction.mockReset();
     prismaMock.thumbnail.findMany.mockReset();
-    storageMock.deleteFile.mockReset();
+    storageMock.deleteFiles.mockReset();
 
     prismaMock.$queryRaw.mockResolvedValue([]);
+    prismaMock.file.count.mockResolvedValue(0);
     prismaMock.file.findMany.mockResolvedValue([]);
     prismaMock.thumbnail.findMany.mockResolvedValue([]);
     prismaMock.file.updateMany.mockResolvedValue({ count: 0 });
-    storageMock.deleteFile.mockResolvedValue(undefined);
+    storageMock.deleteFiles.mockResolvedValue({ deletedKeys: new Set<string>(), errors: [] });
 
     moduleRef = await Test.createTestingModule({
       providers: [
@@ -134,7 +137,10 @@ describe('CleanupService (unit)', () => {
 
       prismaMock.file.count.mockResolvedValue(0);
       prismaMock.thumbnail.findMany.mockResolvedValue([]);
-      storageMock.deleteFile.mockResolvedValue(undefined);
+      storageMock.deleteFiles.mockResolvedValue({
+        deletedKeys: new Set(['aa/bb/hash.jpg']),
+        errors: [],
+      });
 
       prismaMock.$transaction.mockImplementation(async (fn: any) => {
         const tx = {
@@ -154,7 +160,7 @@ describe('CleanupService (unit)', () => {
           deletedAt: null,
         },
       });
-      expect(storageMock.deleteFile).toHaveBeenCalledWith('aa/bb/hash.jpg');
+      expect(storageMock.deleteFiles).toHaveBeenCalledWith(['aa/bb/hash.jpg']);
       expect(prismaMock.$transaction).toHaveBeenCalled();
     });
 
@@ -172,6 +178,8 @@ describe('CleanupService (unit)', () => {
       prismaMock.file.count.mockResolvedValue(2);
       prismaMock.thumbnail.findMany.mockResolvedValue([]);
 
+      storageMock.deleteFiles.mockResolvedValue({ deletedKeys: new Set<string>(), errors: [] });
+
       prismaMock.$transaction.mockImplementation(async (fn: any) => {
         const tx = {
           thumbnail: { deleteMany: jest.fn(async () => ({ count: 0 })) },
@@ -182,7 +190,7 @@ describe('CleanupService (unit)', () => {
 
       await service.runCleanup();
 
-      expect(storageMock.deleteFile).not.toHaveBeenCalled();
+      expect(storageMock.deleteFiles).toHaveBeenCalledWith([]);
       expect(prismaMock.$transaction).toHaveBeenCalled();
     });
 
@@ -203,6 +211,11 @@ describe('CleanupService (unit)', () => {
         { id: 'thumb-2', s3Key: 'thumbnails/thumb2.jpg' },
       ]);
 
+      storageMock.deleteFiles.mockResolvedValue({
+        deletedKeys: new Set(['thumbnails/thumb1.jpg', 'thumbnails/thumb2.jpg']),
+        errors: [],
+      });
+
       prismaMock.$transaction.mockImplementation(async (fn: any) => {
         const tx = {
           thumbnail: { deleteMany: jest.fn(async () => ({ count: 2 })) },
@@ -213,8 +226,10 @@ describe('CleanupService (unit)', () => {
 
       await service.runCleanup();
 
-      expect(storageMock.deleteFile).toHaveBeenCalledWith('thumbnails/thumb1.jpg');
-      expect(storageMock.deleteFile).toHaveBeenCalledWith('thumbnails/thumb2.jpg');
+      expect(storageMock.deleteFiles).toHaveBeenCalledWith([
+        'thumbnails/thumb1.jpg',
+        'thumbnails/thumb2.jpg',
+      ]);
       expect(prismaMock.$transaction).toHaveBeenCalled();
     });
   });
@@ -238,7 +253,10 @@ describe('CleanupService (unit)', () => {
 
       prismaMock.thumbnail.findMany.mockResolvedValue([]);
 
-      storageMock.deleteFile.mockResolvedValue(undefined);
+      storageMock.deleteFiles.mockResolvedValue({
+        deletedKeys: new Set(['k1', 'ok1']),
+        errors: [],
+      });
 
       prismaMock.$transaction.mockImplementation(async (fn: any) => {
         const tx = {
@@ -256,10 +274,10 @@ describe('CleanupService (unit)', () => {
       await service.runCleanup();
 
       expect(prismaMock.file.updateMany).toHaveBeenCalled();
-      expect(storageMock.deleteFile).toHaveBeenCalledWith('k1');
+      expect(storageMock.deleteFiles).toHaveBeenCalledWith(['k1', 'ok1']);
       expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
 
-      const storageCallOrder = storageMock.deleteFile.mock.invocationCallOrder[0];
+      const storageCallOrder = storageMock.deleteFiles.mock.invocationCallOrder[0];
       const txCallOrder = prismaMock.$transaction.mock.invocationCallOrder[0];
       expect(storageCallOrder).toBeLessThan(txCallOrder);
     });
@@ -282,7 +300,7 @@ describe('CleanupService (unit)', () => {
 
       prismaMock.thumbnail.findMany.mockResolvedValue([]);
 
-      storageMock.deleteFile.mockRejectedValueOnce(new Error('S3 outage'));
+      storageMock.deleteFiles.mockRejectedValueOnce(new Error('S3 outage'));
 
       await service.runCleanup();
 
@@ -306,7 +324,7 @@ describe('CleanupService (unit)', () => {
 
       await service.runCleanup();
 
-      expect(storageMock.deleteFile).not.toHaveBeenCalled();
+      expect(storageMock.deleteFiles).not.toHaveBeenCalled();
       expect(prismaMock.$transaction).not.toHaveBeenCalled();
     });
   });
