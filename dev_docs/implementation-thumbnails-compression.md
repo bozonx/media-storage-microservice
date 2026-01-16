@@ -816,7 +816,7 @@ CLEANUP_THUMBNAIL_DAYS=90
 - `sharp` (already installed)
 
 ### Infrastructure
-- PostgreSQL 17 (already configured)
+- PostgreSQL 18 (already configured)
 - S3-compatible storage (already configured)
 - Cloudflare CDN (external, configuration only)
 
