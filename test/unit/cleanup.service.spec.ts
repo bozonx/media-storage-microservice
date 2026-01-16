@@ -165,6 +165,32 @@ describe('CleanupService (unit)', () => {
       expect(storageCallOrder).toBeLessThan(txCallOrder);
     });
 
+    it('does not delete DB records when storage deletion fails', async () => {
+      prismaMock.$queryRaw.mockResolvedValue([]);
+
+      prismaMock.file.findMany.mockResolvedValue([
+        {
+          id: 'file-1',
+          status: PrismaFileStatus.uploading,
+          s3Key: 'k1',
+          originalS3Key: null,
+        },
+      ]);
+
+      prismaMock.file.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 1 });
+
+      prismaMock.thumbnail.findMany.mockResolvedValue([]);
+
+      storageMock.deleteFile.mockRejectedValueOnce(new Error('S3 outage'));
+
+      await service.runCleanup();
+
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+      expect(loggerMock.error).toHaveBeenCalled();
+    });
+
     it('skips deletion when claim fails', async () => {
       prismaMock.$queryRaw.mockResolvedValue([]);
 

@@ -155,8 +155,8 @@ describe('FilesService - Deduplication', () => {
   describe('uploadFileStream - deduplication after upload', () => {
     it('should delete tmp file and DB record when existing READY file is found', async () => {
       const fileId = 'new-file-id';
-      const tmpKey = 'tmp/random-uuid';
       const checksum = 'sha256:abcd1234';
+      const createdS3Key = 'tmp/test-key';
 
       const existingFile = {
         id: 'existing-id',
@@ -171,9 +171,9 @@ describe('FilesService - Deduplication', () => {
         uploadedAt: new Date(),
       };
 
-      (prismaService.file.create as jest.Mock).mockResolvedValue({
+      (prismaService.file.create as any).mockResolvedValue({
         id: fileId,
-        s3Key: tmpKey,
+        s3Key: createdS3Key,
         status: FileStatus.UPLOADING,
       });
 
@@ -190,18 +190,21 @@ describe('FilesService - Deduplication', () => {
         mimeType: 'text/plain',
       });
 
+      const uploadedKey = ((storageService.uploadStream as jest.Mock).mock.calls[0]?.[0] as any)
+        ?.key;
+
       expect(result.id).toBe('existing-id');
-      expect(storageService.deleteFile).toHaveBeenCalledWith(tmpKey);
+      expect(storageService.deleteFile).toHaveBeenCalledWith(uploadedKey);
       expect(prismaService.file.delete).toHaveBeenCalledWith({ where: { id: fileId } });
     });
 
     it('should cleanup tmp file on upload failure', async () => {
       const fileId = 'new-file-id';
-      const tmpKey = 'tmp/random-uuid';
+      const createdS3Key = 'tmp/test-key';
 
-      (prismaService.file.create as jest.Mock).mockResolvedValue({
+      (prismaService.file.create as any).mockResolvedValue({
         id: fileId,
-        s3Key: tmpKey,
+        s3Key: createdS3Key,
         status: FileStatus.UPLOADING,
       });
 
@@ -219,11 +222,14 @@ describe('FilesService - Deduplication', () => {
         }),
       ).rejects.toThrow('S3 error');
 
+      const uploadedKey = ((storageService.uploadStream as jest.Mock).mock.calls[0]?.[0] as any)
+        ?.key;
+
       expect(prismaService.file.update).toHaveBeenCalledWith({
         where: { id: fileId },
         data: expect.objectContaining({ status: FileStatus.FAILED }),
       });
-      expect(storageService.deleteFile).toHaveBeenCalledWith(tmpKey);
+      expect(storageService.deleteFile).toHaveBeenCalledWith(uploadedKey);
     });
   });
 
@@ -367,7 +373,7 @@ describe('FilesService - Deduplication', () => {
       expect(prismaService.file.delete).toHaveBeenCalledWith({ where: { id: fileId } });
       expect(storageService.deleteFile).toHaveBeenCalledWith(originalS3Key);
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.objectContaining({ fileId, checksum }),
+        expect.objectContaining({ fileId, checksum: expect.stringMatching(/^sha256:/) }),
         expect.stringContaining('Race condition'),
       );
     });

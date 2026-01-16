@@ -142,16 +142,21 @@ describe('FilesService (unit)', () => {
         checksum: 'sha256:abc',
       });
 
-      (storageMock.downloadStream as any).mockResolvedValue({
+      (storageMock.downloadStreamWithRange as any).mockResolvedValue({
         stream: (await import('stream')).Readable.from([Buffer.from('x')]),
         etag: 'etag',
         contentLength: 1,
+        isPartial: false,
+        contentRange: undefined,
       });
 
       const res = await service.downloadFileStream('id');
 
       expect((service as any).ensureOptimized).toHaveBeenCalledWith('id');
-      expect(storageMock.downloadStream).toHaveBeenCalledWith('aa/bb/optimized.webp');
+      expect(storageMock.downloadStreamWithRange).toHaveBeenCalledWith({
+        key: 'aa/bb/optimized.webp',
+        range: undefined,
+      });
       expect(res.mimeType).toBe('image/webp');
     });
   });
