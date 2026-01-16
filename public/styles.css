@@ -217,6 +217,9 @@ main {
 
 .file-row-actions {
     flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .link {
@@ -399,6 +402,15 @@ main {
 
 .btn-secondary:hover {
     background: #cbd5e0;
+}
+
+.btn-danger {
+    background: #fc8181;
+    color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: #f56565;
 }
 
 .btn-loader {

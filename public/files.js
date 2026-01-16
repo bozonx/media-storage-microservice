@@ -67,6 +67,20 @@ function setStatus(message, variant) {
     statusEl.className = `files-status ${variant || ''}`.trim();
 }
 
+async function deleteFileById(fileId) {
+    const url = buildApiUrl(`/api/v1/files/${encodeURIComponent(fileId)}`);
+
+    const response = await fetch(url, {
+        method: 'DELETE',
+    });
+
+    if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const message = typeof body.message === 'string' ? body.message : 'Delete request failed';
+        throw new Error(message);
+    }
+}
+
 function renderFiles(items) {
     if (!Array.isArray(items) || items.length === 0) {
         filesList.innerHTML = '<div class="empty-state">No files found</div>';
@@ -110,12 +124,52 @@ function renderFiles(items) {
                     </div>
                     <div class="file-row-actions">
                         <a class="link" href="${url}" target="_blank" rel="noreferrer">Download</a>
+                        <button type="button" class="btn btn-danger file-delete" data-file-id="${id}">Delete</button>
                     </div>
                 </div>
             `;
         })
         .join('');
 }
+
+filesList.addEventListener('click', async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+        return;
+    }
+
+    const button = target.closest('button.file-delete');
+    if (!(button instanceof HTMLButtonElement)) {
+        return;
+    }
+
+    const fileId = button.getAttribute('data-file-id');
+    if (!fileId) {
+        return;
+    }
+
+    button.disabled = true;
+    setStatus('Deleting...', 'info');
+
+    try {
+        await deleteFileById(fileId);
+
+        const row = button.closest('.file-row');
+        if (row) {
+            row.remove();
+        }
+
+        const remainingRows = filesList.querySelectorAll('.file-row');
+        if (remainingRows.length === 0) {
+            renderFiles([]);
+        }
+
+        setStatus('Deleted', 'success');
+    } catch (error) {
+        button.disabled = false;
+        setStatus(error?.message || 'Failed to delete file', 'error');
+    }
+});
 
 async function loadFiles() {
     setStatus('Loading...', 'info');

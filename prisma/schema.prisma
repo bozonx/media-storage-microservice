@@ -62,6 +62,7 @@ model File {
   @@index([checksum])
   @@index([s3Key])
   @@index([optimizationStatus])
+  @@index([deletedAt])
   @@unique([checksum, mimeType, status])
   @@map("files")
 }

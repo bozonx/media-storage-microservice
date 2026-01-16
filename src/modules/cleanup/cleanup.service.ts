@@ -54,12 +54,143 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.info('Starting cleanup job');
 
+    await this.cleanupSoftDeletedFiles();
     await this.cleanupCorruptedRecords();
     await this.cleanupBadStatusFiles();
     await this.cleanupOrphanedTemporaryFiles();
     await this.cleanupOldThumbnails();
 
     this.logger.info('Cleanup job completed');
+  }
+
+  private async cleanupSoftDeletedFiles() {
+    this.logger.info('Starting soft-deleted files cleanup');
+
+    const softDeletedFiles = await this.prismaService.$queryRaw<
+      Array<{
+        id: string;
+        s3Key: string | null;
+        originalS3Key: string | null;
+        checksum: string | null;
+        mimeType: string;
+      }>
+    >(Prisma.sql`
+      SELECT
+        id,
+        s3_key AS "s3Key",
+        original_s3_key AS "originalS3Key",
+        checksum,
+        mime_type AS "mimeType"
+      FROM files
+      WHERE deleted_at IS NOT NULL
+      LIMIT ${this.config.batchSize}
+    `);
+
+    if (softDeletedFiles.length === 0) {
+      this.logger.info('No soft-deleted files found');
+      return;
+    }
+
+    this.logger.info({ count: softDeletedFiles.length }, 'Found soft-deleted files');
+
+    for (const file of softDeletedFiles) {
+      try {
+        const shouldDeleteBlob = await this.shouldDeleteBlob(file.checksum, file.mimeType, file.id);
+
+        if (shouldDeleteBlob) {
+          if (file.s3Key) {
+            try {
+              await this.storageService.deleteFile(file.s3Key);
+              this.logger.info({ fileId: file.id, s3Key: file.s3Key }, 'Deleted blob from storage');
+            } catch (error) {
+              if (!(error instanceof NotFoundException)) {
+                this.logger.warn(
+                  { err: error, fileId: file.id, s3Key: file.s3Key },
+                  'Failed to delete blob from storage',
+                );
+              }
+            }
+          }
+
+          if (file.originalS3Key) {
+            try {
+              await this.storageService.deleteFile(file.originalS3Key);
+              this.logger.info(
+                { fileId: file.id, s3Key: file.originalS3Key },
+                'Deleted original blob from storage',
+              );
+            } catch (error) {
+              if (!(error instanceof NotFoundException)) {
+                this.logger.warn(
+                  { err: error, fileId: file.id, s3Key: file.originalS3Key },
+                  'Failed to delete original blob from storage',
+                );
+              }
+            }
+          }
+        } else {
+          this.logger.info(
+            { fileId: file.id, checksum: file.checksum },
+            'Skipping blob deletion (still referenced by other files)',
+          );
+        }
+
+        const thumbnails = await (this.prismaService as any).thumbnail.findMany({
+          where: { fileId: file.id },
+          select: { id: true, s3Key: true },
+        });
+
+        for (const thumbnail of thumbnails) {
+          try {
+            await this.storageService.deleteFile(thumbnail.s3Key);
+          } catch (error) {
+            if (!(error instanceof NotFoundException)) {
+              this.logger.warn(
+                { err: error, thumbnailId: thumbnail.id, s3Key: thumbnail.s3Key },
+                'Failed to delete thumbnail from storage',
+              );
+            }
+          }
+        }
+
+        await this.prismaService.$transaction(async (tx: any) => {
+          if (thumbnails.length > 0) {
+            await tx.thumbnail.deleteMany({
+              where: { fileId: file.id },
+            });
+          }
+
+          await tx.file.delete({
+            where: { id: file.id },
+          });
+        });
+
+        this.logger.info({ fileId: file.id }, 'Soft-deleted file cleaned up');
+      } catch (error) {
+        this.logger.error({ err: error, fileId: file.id }, 'Failed to cleanup soft-deleted file');
+      }
+    }
+  }
+
+  private async shouldDeleteBlob(
+    checksum: string | null,
+    mimeType: string,
+    excludeFileId: string,
+  ): Promise<boolean> {
+    if (!checksum) {
+      return true;
+    }
+
+    const otherFilesWithSameBlob = await (this.prismaService as any).file.count({
+      where: {
+        checksum,
+        mimeType,
+        id: { not: excludeFileId },
+        deletedAt: null,
+      },
+    });
+
+    return otherFilesWithSameBlob === 0;
   }
 
   private async cleanupCorruptedRecords() {

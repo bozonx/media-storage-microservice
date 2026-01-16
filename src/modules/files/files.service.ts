@@ -404,11 +404,11 @@ export class FilesService {
   /**
    * Returns metadata for a READY file.
    *
-   * @throws {NotFoundException} If the file does not exist or is not READY.
+   * @throws {NotFoundException} If the file does not exist, is not READY, or is soft-deleted.
    */
   async getFileMetadata(id: string): Promise<FileResponseDto> {
     const file = await (this.prismaService as any).file.findFirst({
-      where: { id, status: FileStatus.READY },
+      where: { id, status: FileStatus.READY, deletedAt: null },
     });
 
     if (!file) {
@@ -426,7 +426,7 @@ export class FilesService {
    *
    * @param id File ID
    * @param rangeHeader Optional Range header for partial content requests
-   * @throws {NotFoundException} If the file does not exist.
+   * @throws {NotFoundException} If the file does not exist or is soft-deleted.
    * @throws {GoneException} If the file was deleted.
    * @throws {ConflictException} If the file is not READY or optimization failed.
    */
@@ -435,7 +435,7 @@ export class FilesService {
       where: { id },
     });
 
-    if (!file) {
+    if (!file || file.deletedAt) {
       throw new NotFoundException('File not found');
     }
 
@@ -484,10 +484,12 @@ export class FilesService {
   }
 
   /**
-   * Marks a file for deletion and removes its object from storage.
+   * Soft deletes a file by marking it with deletedAt timestamp.
+   *
+   * Physical deletion from storage is handled by the cleanup service,
+   * which ensures deduplication is respected (only deletes when no other files reference the same blob).
    *
    * @throws {NotFoundException} If the file does not exist.
-   * @throws {ConflictException} If the file is already deleted / being deleted.
    */
   async deleteFile(id: string): Promise<void> {
     const file = await (this.prismaService as any).file.findUnique({
@@ -498,46 +500,29 @@ export class FilesService {
       throw new NotFoundException('File not found');
     }
 
-    if (file.status === FileStatus.DELETED || file.status === FileStatus.DELETING) {
-      throw new ConflictException('File is already deleted or being deleted');
+    if (file.deletedAt) {
+      this.logger.info({ fileId: id }, 'File already marked as deleted (idempotent)');
+      return;
     }
 
     await (this.prismaService as any).file.update({
       where: { id },
       data: {
-        status: FileStatus.DELETING,
-        statusChangedAt: new Date(),
         deletedAt: new Date(),
       },
     });
 
-    this.logger.info({ fileId: id }, 'File marked for deletion');
-
-    try {
-      await this.storageService.deleteFile(file.s3Key);
-
-      await (this.prismaService as any).file.update({
-        where: { id },
-        data: {
-          status: FileStatus.DELETED,
-          statusChangedAt: new Date(),
-        },
-      });
-
-      this.logger.info({ fileId: id }, 'File deleted successfully');
-    } catch (error) {
-      this.logger.error({ err: error, fileId: id }, 'Failed to delete file from storage');
-      throw error;
-    }
+    this.logger.info({ fileId: id }, 'File marked for deletion (soft delete)');
   }
 
   /**
    * Lists READY files with optional search by filename and filter by MIME type.
+   * Excludes soft-deleted files.
    */
   async listFiles(params: ListFilesDto): Promise<ListFilesResponseDto> {
     const { limit = 50, offset = 0, sortBy = 'uploadedAt', order = 'desc', q, mimeType } = params;
 
-    const where: any = { status: FileStatus.READY };
+    const where: any = { status: FileStatus.READY, deletedAt: null };
     if (typeof q === 'string' && q.trim().length > 0) {
       where.filename = {
         contains: q.trim(),

@@ -120,6 +120,105 @@ describe('CleanupService (unit)', () => {
     });
   });
 
+  describe('cleanupSoftDeletedFiles', () => {
+    it('deletes blob and record when no other files reference the same blob', async () => {
+      prismaMock.$queryRaw.mockResolvedValueOnce([
+        {
+          id: 'file-1',
+          s3Key: 'aa/bb/hash.jpg',
+          originalS3Key: null,
+          checksum: 'sha256:abc',
+          mimeType: 'image/jpeg',
+        },
+      ]);
+
+      prismaMock.file.count.mockResolvedValue(0);
+      prismaMock.thumbnail.findMany.mockResolvedValue([]);
+      storageMock.deleteFile.mockResolvedValue(undefined);
+
+      prismaMock.$transaction.mockImplementation(async (fn: any) => {
+        const tx = {
+          thumbnail: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+          file: { delete: jest.fn(async () => ({})) },
+        };
+        return fn(tx);
+      });
+
+      await service.runCleanup();
+
+      expect(prismaMock.file.count).toHaveBeenCalledWith({
+        where: {
+          checksum: 'sha256:abc',
+          mimeType: 'image/jpeg',
+          id: { not: 'file-1' },
+          deletedAt: null,
+        },
+      });
+      expect(storageMock.deleteFile).toHaveBeenCalledWith('aa/bb/hash.jpg');
+      expect(prismaMock.$transaction).toHaveBeenCalled();
+    });
+
+    it('skips blob deletion when other files still reference it', async () => {
+      prismaMock.$queryRaw.mockResolvedValueOnce([
+        {
+          id: 'file-1',
+          s3Key: 'aa/bb/hash.jpg',
+          originalS3Key: null,
+          checksum: 'sha256:abc',
+          mimeType: 'image/jpeg',
+        },
+      ]);
+
+      prismaMock.file.count.mockResolvedValue(2);
+      prismaMock.thumbnail.findMany.mockResolvedValue([]);
+
+      prismaMock.$transaction.mockImplementation(async (fn: any) => {
+        const tx = {
+          thumbnail: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+          file: { delete: jest.fn(async () => ({})) },
+        };
+        return fn(tx);
+      });
+
+      await service.runCleanup();
+
+      expect(storageMock.deleteFile).not.toHaveBeenCalled();
+      expect(prismaMock.$transaction).toHaveBeenCalled();
+    });
+
+    it('deletes thumbnails even when blob is shared', async () => {
+      prismaMock.$queryRaw.mockResolvedValueOnce([
+        {
+          id: 'file-1',
+          s3Key: 'aa/bb/hash.jpg',
+          originalS3Key: null,
+          checksum: 'sha256:abc',
+          mimeType: 'image/jpeg',
+        },
+      ]);
+
+      prismaMock.file.count.mockResolvedValue(1);
+      prismaMock.thumbnail.findMany.mockResolvedValue([
+        { id: 'thumb-1', s3Key: 'thumbnails/thumb1.jpg' },
+        { id: 'thumb-2', s3Key: 'thumbnails/thumb2.jpg' },
+      ]);
+
+      prismaMock.$transaction.mockImplementation(async (fn: any) => {
+        const tx = {
+          thumbnail: { deleteMany: jest.fn(async () => ({ count: 2 })) },
+          file: { delete: jest.fn(async () => ({})) },
+        };
+        return fn(tx);
+      });
+
+      await service.runCleanup();
+
+      expect(storageMock.deleteFile).toHaveBeenCalledWith('thumbnails/thumb1.jpg');
+      expect(storageMock.deleteFile).toHaveBeenCalledWith('thumbnails/thumb2.jpg');
+      expect(prismaMock.$transaction).toHaveBeenCalled();
+    });
+  });
+
   describe('race-condition claim & transactional delete order', () => {
     it('claims file before deleting and deletes from storage before DB transaction', async () => {
       prismaMock.$queryRaw.mockResolvedValue([]);

@@ -493,39 +493,39 @@ describe('FilesService (unit)', () => {
       await expect(service.deleteFile('id')).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('throws Conflict when already deleted/deleting', async () => {
-      (prismaMock as any).file.findUnique.mockResolvedValue({ status: FileStatus.DELETING });
-      await expect(service.deleteFile('id')).rejects.toBeInstanceOf(ConflictException);
-    });
-
-    it('marks DELETING, deletes in storage, marks DELETED', async () => {
+    it('is idempotent when already soft-deleted', async () => {
       (prismaMock as any).file.findUnique.mockResolvedValue({
         id: 'id',
         s3Key: 'aa/bb',
         status: FileStatus.READY,
+        deletedAt: new Date('2020-01-01T00:00:00.000Z'),
       });
-
-      (prismaMock as any).file.update.mockResolvedValue({});
-      (storageMock.deleteFile as any).mockResolvedValue(undefined);
 
       await service.deleteFile('id');
 
-      expect((prismaMock as any).file.update).toHaveBeenNthCalledWith(1, {
+      expect((prismaMock as any).file.update).not.toHaveBeenCalled();
+      expect(storageMock.deleteFile).not.toHaveBeenCalled();
+    });
+
+    it('marks file with deletedAt (soft delete)', async () => {
+      (prismaMock as any).file.findUnique.mockResolvedValue({
+        id: 'id',
+        s3Key: 'aa/bb',
+        status: FileStatus.READY,
+        deletedAt: null,
+      });
+
+      (prismaMock as any).file.update.mockResolvedValue({});
+
+      await service.deleteFile('id');
+
+      expect((prismaMock as any).file.update).toHaveBeenCalledWith({
         where: { id: 'id' },
         data: {
-          status: FileStatus.DELETING,
-          statusChangedAt: expect.any(Date),
           deletedAt: expect.any(Date),
         },
       });
-      expect(storageMock.deleteFile).toHaveBeenCalledWith('aa/bb');
-      expect((prismaMock as any).file.update).toHaveBeenNthCalledWith(2, {
-        where: { id: 'id' },
-        data: {
-          status: FileStatus.DELETED,
-          statusChangedAt: expect.any(Date),
-        },
-      });
+      expect(storageMock.deleteFile).not.toHaveBeenCalled();
     });
   });
 
