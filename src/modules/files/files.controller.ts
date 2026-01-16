@@ -13,12 +13,26 @@ import {
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { basename } from 'path';
 import { FilesService } from './files.service.js';
 import { ListFilesDto } from './dto/list-files.dto.js';
 
+function sanitizeFilename(filename: string): string {
+  const normalized = (filename ?? '').normalize('NFKC');
+  const asBasename = basename(normalized.replace(/\\/g, '/'));
+  const withoutCrLf = asBasename.replace(/[\r\n]/g, ' ');
+  const withoutControls = withoutCrLf.replace(/[\u0000-\u001F\u007F]/g, '');
+  const collapsedWhitespace = withoutControls.replace(/\s+/g, ' ');
+  const withoutSeparators = collapsedWhitespace.replace(/[\/]/g, '_');
+  const trimmed = withoutSeparators.trim();
+  const limited = trimmed.length > 255 ? trimmed.slice(0, 255) : trimmed;
+  return limited.length > 0 ? limited : 'file';
+}
+
 function buildContentDispositionHeader(filename: string): string {
-  const safeAscii = sanitizeContentDispositionFilename(filename);
-  const encoded = encodeRFC5987ValueChars(filename);
+  const safeFilename = sanitizeFilename(filename);
+  const safeAscii = sanitizeContentDispositionFilename(safeFilename);
+  const encoded = encodeRFC5987ValueChars(safeFilename);
   return `attachment; filename="${safeAscii}"; filename*=UTF-8''${encoded}`;
 }
 
@@ -148,7 +162,7 @@ export class FilesController {
 
     return this.filesService.uploadFileStream({
       stream: data.file,
-      filename: data.filename,
+      filename: sanitizeFilename(data.filename),
       mimeType: data.mimetype,
       metadata,
     });

@@ -8,21 +8,23 @@ describe('FilesController (unit)', () => {
   let controller: FilesController;
   let moduleRef: TestingModule;
 
-  const filesServiceMock: Pick<
-    FilesService,
-    | 'uploadFile'
-    | 'uploadFileStream'
-    | 'downloadFileStream'
-    | 'getFileMetadata'
-    | 'deleteFile'
-    | 'listFiles'
+  const filesServiceMock: jest.Mocked<
+    Pick<
+      FilesService,
+      | 'uploadFile'
+      | 'uploadFileStream'
+      | 'downloadFileStream'
+      | 'getFileMetadata'
+      | 'deleteFile'
+      | 'listFiles'
+    >
   > = {
-    uploadFile: jest.fn(),
-    uploadFileStream: jest.fn(),
-    downloadFileStream: jest.fn(),
-    getFileMetadata: jest.fn(),
-    deleteFile: jest.fn(),
-    listFiles: jest.fn(),
+    uploadFile: jest.fn<FilesService['uploadFile']>(),
+    uploadFileStream: jest.fn<FilesService['uploadFileStream']>(),
+    downloadFileStream: jest.fn<FilesService['downloadFileStream']>(),
+    getFileMetadata: jest.fn<FilesService['getFileMetadata']>(),
+    deleteFile: jest.fn<FilesService['deleteFile']>(),
+    listFiles: jest.fn<FilesService['listFiles']>(),
   };
 
   beforeEach(async () => {
@@ -87,7 +89,15 @@ describe('FilesController (unit)', () => {
 
     it('passes stream upload to service when no optimize param', async () => {
       const stream: any = { pipe: jest.fn() };
-      (filesServiceMock.uploadFileStream as jest.Mock).mockResolvedValue({ id: 'id' });
+      filesServiceMock.uploadFileStream.mockResolvedValue({
+        id: 'id',
+        filename: 'a.txt',
+        mimeType: 'text/plain',
+        size: 0,
+        checksum: 'sha256:x',
+        uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
+        url: 'http://localhost:3000/api/v1/files/id/download',
+      });
 
       const req: any = {
         file: async () => ({
@@ -107,6 +117,37 @@ describe('FilesController (unit)', () => {
         filename: 'a.txt',
         mimeType: 'text/plain',
         metadata: { a: 1 },
+      });
+    });
+
+    it('sanitizes filename before passing to service', async () => {
+      const stream: any = { pipe: jest.fn() };
+      filesServiceMock.uploadFileStream.mockResolvedValue({
+        id: 'id',
+        filename: 'evil name.exe',
+        mimeType: 'text/plain',
+        size: 0,
+        checksum: 'sha256:x',
+        uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
+        url: 'http://localhost:3000/api/v1/files/id/download',
+      });
+
+      const req: any = {
+        file: async () => ({
+          filename: '../evil\r\nname.exe',
+          mimetype: 'text/plain',
+          fields: {},
+          file: stream,
+        }),
+      };
+
+      await controller.uploadFile(req);
+
+      expect(filesServiceMock.uploadFileStream).toHaveBeenCalledWith({
+        stream,
+        filename: 'evil name.exe',
+        mimeType: 'text/plain',
+        metadata: undefined,
       });
     });
 
@@ -150,8 +191,8 @@ describe('FilesController (unit)', () => {
     }
 
     it('returns 304 when If-None-Match matches etag', async () => {
-      (filesServiceMock.downloadFileStream as jest.Mock).mockResolvedValue({
-        stream: { pipe: jest.fn() },
+      filesServiceMock.downloadFileStream.mockResolvedValue({
+        stream: { pipe: jest.fn() } as any,
         filename: 'a.txt',
         mimeType: 'text/plain',
         size: 3,
@@ -171,7 +212,7 @@ describe('FilesController (unit)', () => {
     it('sets headers and streams body when etag does not match', async () => {
       const stream: any = { pipe: jest.fn() };
 
-      (filesServiceMock.downloadFileStream as jest.Mock).mockResolvedValue({
+      filesServiceMock.downloadFileStream.mockResolvedValue({
         stream,
         filename: 'a.txt',
         mimeType: 'text/plain',
