@@ -428,14 +428,7 @@ LOG_LEVEL=warn
 TZ=UTC
 
 # Database
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_NAME=media_storage
-DATABASE_USER=media_user
-DATABASE_PASSWORD=<secret>
-DATABASE_SSL=true
-DATABASE_POOL_MIN=2
-DATABASE_POOL_MAX=10
+DATABASE_URL=postgresql://media_user:<secret>@localhost:5432/media_storage
 
 # S3 Storage (Garage)
 S3_ENDPOINT=https://s3.garage.example.com
