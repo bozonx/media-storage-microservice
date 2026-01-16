@@ -18,6 +18,7 @@ import { ListFilesResponseDto } from './dto/list-files-response.dto.js';
 import { plainToInstance } from 'class-transformer';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { FileStatus } from './file-status.js';
+import { OptimizationStatus } from './optimization-status.js';
 
 function isPrismaKnownRequestError(error: unknown): error is {
   name: string;
@@ -72,6 +73,8 @@ export interface DownloadFileStreamResult {
 export class FilesService {
   private readonly bucket: string;
   private readonly basePath: string;
+  private readonly optimizationWaitTimeout: number;
+  private readonly forceCompression: boolean;
 
   constructor(
     @InjectPinoLogger(FilesService.name)
@@ -83,6 +86,11 @@ export class FilesService {
   ) {
     this.bucket = this.configService.get<string>('storage.bucket')!;
     this.basePath = this.configService.get<string>('BASE_PATH') || '';
+    this.optimizationWaitTimeout = parseInt(
+      this.configService.get<string>('IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS') || '30000',
+      10,
+    );
+    this.forceCompression = this.configService.get<boolean>('compression.forceEnabled') ?? false;
   }
 
   /**
@@ -99,19 +107,26 @@ export class FilesService {
   }): Promise<FileResponseDto> {
     const { stream, filename, mimeType, metadata } = params;
 
-    const tempKey = `tmp/${cryptoRandomId()}`;
+    const needsOptimization = this.forceCompression && this.isImage(mimeType);
+    const originalKey = needsOptimization
+      ? `originals/${cryptoRandomId()}`
+      : `tmp/${cryptoRandomId()}`;
 
     const file = await (this.prismaService as any).file.create({
       data: {
         filename,
-        mimeType,
-        size: null,
+        originalMimeType: needsOptimization ? mimeType : null,
         originalSize: null,
+        originalChecksum: null,
+        originalS3Key: needsOptimization ? originalKey : null,
+        mimeType: needsOptimization ? null : mimeType,
+        size: null,
         checksum: null,
-        s3Key: tempKey,
+        s3Key: needsOptimization ? '' : originalKey,
         s3Bucket: this.bucket,
         status: FileStatus.UPLOADING,
-        optimizationParams: null,
+        optimizationStatus: needsOptimization ? OptimizationStatus.PENDING : null,
+        optimizationParams: needsOptimization ? {} : null,
         metadata: metadata ?? null,
         uploadedAt: null,
       },
@@ -131,12 +146,31 @@ export class FilesService {
 
     try {
       await this.storageService.uploadStream({
-        key: tempKey,
+        key: originalKey,
         body: stream.pipe(hasher),
         mimeType,
       });
 
       const checksum = `sha256:${hash.digest('hex')}`;
+
+      if (needsOptimization) {
+        const updated = await (this.prismaService as any).file.update({
+          where: { id: file.id },
+          data: {
+            originalChecksum: checksum,
+            originalSize: BigInt(size),
+            status: FileStatus.READY,
+            uploadedAt: new Date(),
+          },
+        });
+
+        this.logger.info(
+          { fileId: file.id, needsOptimization: true },
+          'File uploaded, optimization pending',
+        );
+        return this.toResponseDto(updated);
+      }
+
       const finalKey = this.generateS3Key(checksum, mimeType);
 
       const existing = await (this.prismaService as any).file.findFirst({
@@ -148,7 +182,7 @@ export class FilesService {
       });
 
       if (existing) {
-        await this.storageService.deleteFile(tempKey);
+        await this.storageService.deleteFile(originalKey);
         await (this.prismaService as any).file.delete({
           where: { id: file.id },
         });
@@ -156,11 +190,11 @@ export class FilesService {
       }
 
       await this.storageService.copyObject({
-        sourceKey: tempKey,
+        sourceKey: originalKey,
         destinationKey: finalKey,
         contentType: mimeType,
       });
-      await this.storageService.deleteFile(tempKey);
+      await this.storageService.deleteFile(originalKey);
 
       const updated = await this.promoteUploadedFileToReady({
         fileId: file.id,
@@ -358,7 +392,7 @@ export class FilesService {
    * @throws {ConflictException} If the file is not READY.
    */
   async downloadFileStream(id: string): Promise<DownloadFileStreamResult> {
-    const file = await (this.prismaService as any).file.findUnique({
+    let file = await (this.prismaService as any).file.findUnique({
       where: { id },
     });
 
@@ -374,12 +408,28 @@ export class FilesService {
       throw new ConflictException('File is not ready for download');
     }
 
-    const { stream, etag, contentLength } = await this.storageService.downloadStream(file.s3Key);
+    if (file.optimizationStatus === OptimizationStatus.FAILED) {
+      throw new ConflictException('Image optimization failed');
+    }
+
+    if (
+      file.optimizationStatus === OptimizationStatus.PENDING ||
+      file.optimizationStatus === OptimizationStatus.PROCESSING
+    ) {
+      file = await this.ensureOptimized(id);
+    }
+
+    const s3Key = file.s3Key || file.originalS3Key;
+    if (!s3Key) {
+      throw new ConflictException('File has no valid S3 key');
+    }
+
+    const { stream, etag, contentLength } = await this.storageService.downloadStream(s3Key);
 
     return {
       stream,
       filename: file.filename,
-      mimeType: file.mimeType,
+      mimeType: file.mimeType || file.originalMimeType,
       size: file.size ? Number(file.size) : contentLength,
       etag: (file.checksum ?? '').startsWith('sha256:')
         ? (file.checksum ?? '').replace('sha256:', '')
@@ -582,6 +632,113 @@ export class FilesService {
 
       await (this.prismaService as any).file.delete({ where: { id: fileId } });
       return existing;
+    }
+  }
+
+  private async ensureOptimized(fileId: string): Promise<any> {
+    const updated = await (this.prismaService as any).file.updateMany({
+      where: {
+        id: fileId,
+        optimizationStatus: OptimizationStatus.PENDING,
+      },
+      data: {
+        optimizationStatus: OptimizationStatus.PROCESSING,
+        optimizationStartedAt: new Date(),
+      },
+    });
+
+    if (updated.count > 0) {
+      void this.optimizeImage(fileId).catch(err => {
+        this.logger.error({ err, fileId }, 'Background optimization failed');
+      });
+    }
+
+    const startTime = Date.now();
+    while (Date.now() - startTime < this.optimizationWaitTimeout) {
+      const file = await (this.prismaService as any).file.findUnique({
+        where: { id: fileId },
+      });
+
+      if (!file) {
+        throw new NotFoundException('File not found');
+      }
+
+      if (file.optimizationStatus === OptimizationStatus.READY) {
+        return file;
+      }
+
+      if (file.optimizationStatus === OptimizationStatus.FAILED) {
+        throw new ConflictException('Image optimization failed');
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+
+    throw new ConflictException('Image optimization timeout');
+  }
+
+  private async optimizeImage(fileId: string): Promise<void> {
+    try {
+      const file = await (this.prismaService as any).file.findUnique({
+        where: { id: fileId },
+      });
+
+      if (!file || !file.originalS3Key || !file.originalMimeType) {
+        throw new Error('File or original not found');
+      }
+
+      this.logger.info({ fileId }, 'Starting image optimization');
+
+      const originalBuffer = await this.storageService.downloadFile(file.originalS3Key);
+
+      const result = await this.imageOptimizer.compressImage(
+        originalBuffer,
+        file.originalMimeType,
+        {},
+        true,
+      );
+
+      const checksum = this.calculateChecksum(result.buffer);
+      const finalKey = this.generateS3Key(checksum, result.format);
+
+      await this.storageService.uploadFile(finalKey, result.buffer, result.format);
+
+      await (this.prismaService as any).file.update({
+        where: { id: fileId },
+        data: {
+          s3Key: finalKey,
+          mimeType: result.format,
+          size: BigInt(result.size),
+          checksum,
+          optimizationStatus: OptimizationStatus.READY,
+          optimizationCompletedAt: new Date(),
+        },
+      });
+
+      await this.storageService.deleteFile(file.originalS3Key);
+
+      this.logger.info(
+        {
+          fileId,
+          originalSize: originalBuffer.length,
+          optimizedSize: result.size,
+          savings: `${((1 - result.size / originalBuffer.length) * 100).toFixed(1)}%`,
+        },
+        'Image optimization completed',
+      );
+    } catch (error) {
+      this.logger.error({ err: error, fileId }, 'Image optimization failed');
+
+      await (this.prismaService as any).file.update({
+        where: { id: fileId },
+        data: {
+          optimizationStatus: OptimizationStatus.FAILED,
+          optimizationError: error instanceof Error ? error.message : 'Unknown error',
+          optimizationCompletedAt: new Date(),
+        },
+      });
+
+      throw error;
     }
   }
 }

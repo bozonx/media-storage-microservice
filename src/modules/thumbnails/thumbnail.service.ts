@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  forwardRef,
+  Inject,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { createHash } from 'crypto';
@@ -7,6 +13,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { ThumbnailParamsDto } from '../files/dto/thumbnail-params.dto.js';
 import { FileStatus } from '../files/file-status.js';
+import { OptimizationStatus } from '../files/optimization-status.js';
+import type { FilesService } from '../files/files.service.js';
 
 interface ThumbnailConfig {
   enabled: boolean;
@@ -44,6 +52,8 @@ export class ThumbnailService {
     private readonly configService: ConfigService,
     private readonly prismaService: PrismaService,
     private readonly storageService: StorageService,
+    @Inject(forwardRef(() => import('../files/files.service.js').then(m => m.FilesService)))
+    private readonly filesService: FilesService,
   ) {
     this.config = this.configService.get<ThumbnailConfig>('thumbnail')!;
     this.bucket = this.configService.get<string>('storage.bucket')!;
@@ -54,7 +64,7 @@ export class ThumbnailService {
       throw new BadRequestException('Thumbnail generation is disabled');
     }
 
-    const file = await (this.prismaService as any).file.findFirst({
+    let file = await (this.prismaService as any).file.findFirst({
       where: { id: fileId, status: FileStatus.READY },
     });
 
@@ -62,8 +72,25 @@ export class ThumbnailService {
       throw new NotFoundException('File not found');
     }
 
-    if (!this.isImageMimeType(file.mimeType)) {
+    const fileMimeType = file.mimeType || file.originalMimeType;
+    if (!fileMimeType || !this.isImageMimeType(fileMimeType)) {
       throw new BadRequestException('File is not an image');
+    }
+
+    if (
+      file.optimizationStatus === OptimizationStatus.PENDING ||
+      file.optimizationStatus === OptimizationStatus.PROCESSING
+    ) {
+      file = await (this.filesService as any).ensureOptimized(fileId);
+    }
+
+    if (file.optimizationStatus === OptimizationStatus.FAILED) {
+      throw new BadRequestException('Image optimization failed');
+    }
+
+    const fileS3Key = file.s3Key || file.originalS3Key;
+    if (!fileS3Key) {
+      throw new BadRequestException('File has no valid S3 key');
     }
 
     const width = Math.min(params.width, this.config.maxWidth);
@@ -102,13 +129,13 @@ export class ThumbnailService {
 
     this.logger.info({ fileId, paramsHash }, 'Generating new thumbnail');
 
-    const originalBuffer = await this.storageService.downloadFile(file.s3Key);
+    const originalBuffer = await this.storageService.downloadFile(fileS3Key);
     const thumbnailBuffer = await this.generateThumbnail(originalBuffer, width, height, quality);
 
-    const mimeType = format === 'webp' ? 'image/webp' : 'image/avif';
-    const s3Key = this.generateThumbnailS3Key(fileId, paramsHash, format);
+    const thumbnailMimeType = format === 'webp' ? 'image/webp' : 'image/avif';
+    const thumbnailS3Key = this.generateThumbnailS3Key(fileId, paramsHash, format);
 
-    await this.storageService.uploadFile(s3Key, thumbnailBuffer, mimeType);
+    await this.storageService.uploadFile(thumbnailS3Key, thumbnailBuffer, thumbnailMimeType);
 
     thumbnail = await (this.prismaService as any).thumbnail.create({
       data: {
@@ -117,10 +144,10 @@ export class ThumbnailService {
         height,
         quality,
         paramsHash,
-        s3Key,
+        s3Key: thumbnailS3Key,
         s3Bucket: this.bucket,
         size: BigInt(thumbnailBuffer.length),
-        mimeType,
+        mimeType: thumbnailMimeType,
         lastAccessedAt: new Date(),
       },
     });
@@ -137,7 +164,7 @@ export class ThumbnailService {
 
     return {
       buffer: thumbnailBuffer,
-      mimeType,
+      mimeType: thumbnailMimeType,
       size: thumbnailBuffer.length,
       cacheMaxAge: this.config.cacheMaxAge,
     };

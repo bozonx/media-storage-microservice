@@ -16,27 +16,50 @@ enum FileStatus {
   missing
 }
 
+enum OptimizationStatus {
+  pending
+  processing
+  ready
+  failed
+}
+
 model File {
-  id                 String     @id @default(uuid()) @db.Uuid
-  filename           String     @db.VarChar(255)
-  mimeType           String     @map("mime_type") @db.VarChar(100)
-  size               BigInt?
-  originalSize       BigInt?    @map("original_size")
-  checksum           String?    @db.VarChar(100)
-  s3Key              String     @map("s3_key") @db.VarChar(500)
-  s3Bucket           String     @map("s3_bucket") @db.VarChar(100)
-  status             FileStatus @default(uploading)
-  optimizationParams Json?      @map("optimization_params")
-  metadata           Json?
-  uploadedAt         DateTime?  @map("uploaded_at") @db.Timestamp(6)
-  deletedAt          DateTime?  @map("deleted_at") @db.Timestamp(6)
-  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamp(6)
+  id                      String              @id @default(uuid()) @db.Uuid
+  filename                String              @db.VarChar(255)
+  
+  // Original (temporary, for optimization only)
+  originalS3Key           String?             @map("original_s3_key") @db.VarChar(500)
+  originalMimeType        String?             @map("original_mime_type") @db.VarChar(100)
+  originalSize            BigInt?             @map("original_size")
+  originalChecksum        String?             @map("original_checksum") @db.VarChar(100)
+  
+  // Optimized (final version to serve)
+  s3Key                   String              @map("s3_key") @db.VarChar(500)
+  mimeType                String              @map("mime_type") @db.VarChar(100)
+  size                    BigInt?
+  checksum                String?             @db.VarChar(100)
+  
+  s3Bucket                String              @map("s3_bucket") @db.VarChar(100)
+  status                  FileStatus          @default(uploading)
+  
+  // Optimization tracking
+  optimizationStatus      OptimizationStatus? @map("optimization_status")
+  optimizationParams      Json?               @map("optimization_params")
+  optimizationError       String?             @map("optimization_error") @db.Text
+  optimizationStartedAt   DateTime?           @map("optimization_started_at") @db.Timestamp(6)
+  optimizationCompletedAt DateTime?           @map("optimization_completed_at") @db.Timestamp(6)
+  
+  metadata                Json?
+  uploadedAt              DateTime?           @map("uploaded_at") @db.Timestamp(6)
+  deletedAt               DateTime?           @map("deleted_at") @db.Timestamp(6)
+  createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt               DateTime            @updatedAt @map("updated_at") @db.Timestamp(6)
 
   @@index([status, uploadedAt])
   @@index([mimeType])
   @@index([checksum])
   @@index([s3Key])
+  @@index([optimizationStatus])
   @@unique([checksum, mimeType, status])
   @@map("files")
 }
