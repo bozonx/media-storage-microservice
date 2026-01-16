@@ -17,4 +17,20 @@ else
   echo "Bucket 'media-files' created successfully"
 fi
 
+echo "Configuring bucket lifecycle rules (expire tmp/ and originals/ after 2 days)..."
+
+if mc ilm rule ls local/media-files 2>/dev/null | grep -q "tmp/"; then
+  echo "Lifecycle rule for 'tmp/' already exists"
+else
+  mc ilm rule add local/media-files --prefix "tmp/" --expire-days 2
+  echo "Lifecycle rule for 'tmp/' added"
+fi
+
+if mc ilm rule ls local/media-files 2>/dev/null | grep -q "originals/"; then
+  echo "Lifecycle rule for 'originals/' already exists"
+else
+  mc ilm rule add local/media-files --prefix "originals/" --expire-days 2
+  echo "Lifecycle rule for 'originals/' added"
+fi
+
 echo "MinIO initialization complete"

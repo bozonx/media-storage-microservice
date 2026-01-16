@@ -247,10 +247,7 @@ describe('CleanupService (unit)', () => {
         },
       ]);
 
-      prismaMock.file.updateMany
-        .mockResolvedValueOnce({ count: 1 })
-        .mockResolvedValueOnce({ count: 1 });
-
+      prismaMock.file.updateMany.mockResolvedValueOnce({ count: 1 });
       prismaMock.thumbnail.findMany.mockResolvedValue([]);
 
       storageMock.deleteFiles.mockResolvedValue({
@@ -273,7 +270,7 @@ describe('CleanupService (unit)', () => {
 
       await service.runCleanup();
 
-      expect(prismaMock.file.updateMany).toHaveBeenCalled();
+      expect(prismaMock.file.updateMany).toHaveBeenCalledTimes(1);
       expect(storageMock.deleteFiles).toHaveBeenCalledWith(['k1', 'ok1']);
       expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
 
@@ -294,10 +291,7 @@ describe('CleanupService (unit)', () => {
         },
       ]);
 
-      prismaMock.file.updateMany
-        .mockResolvedValueOnce({ count: 1 })
-        .mockResolvedValueOnce({ count: 1 });
-
+      prismaMock.file.updateMany.mockResolvedValueOnce({ count: 1 });
       prismaMock.thumbnail.findMany.mockResolvedValue([]);
 
       storageMock.deleteFiles.mockRejectedValueOnce(new Error('S3 outage'));
@@ -320,7 +314,7 @@ describe('CleanupService (unit)', () => {
         },
       ]);
 
-      prismaMock.file.updateMany.mockResolvedValue({ count: 0 });
+      prismaMock.file.updateMany.mockResolvedValueOnce({ count: 0 });
 
       await service.runCleanup();
 

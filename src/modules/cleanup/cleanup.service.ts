@@ -62,7 +62,6 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     await this.cleanupSoftDeletedFiles();
     await this.cleanupCorruptedRecords();
     await this.cleanupBadStatusFiles();
-    await this.cleanupOrphanedTemporaryFiles();
     await this.cleanupOldThumbnails();
 
     this.logger.info('Cleanup job completed');
@@ -231,50 +230,6 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
       const claimed = await this.claimFileForDeletion({
         fileId: file.id,
         expectedStatuses: [PrismaFileStatus.ready, PrismaFileStatus.deleting],
-      });
-
-      if (!claimed) {
-        continue;
-      }
-
-      await this.deleteFileCompletely(file.id, file.s3Key, file.originalS3Key);
-    }
-  }
-
-  private async cleanupOrphanedTemporaryFiles() {
-    this.logger.info('Starting orphaned temporary files cleanup');
-
-    const ttlHours = 24;
-    const cutoffTime = new Date(Date.now() - ttlHours * 60 * 60 * 1000);
-
-    const orphanedFiles = await this.prismaService.$queryRaw<
-      Array<{ id: string; s3Key: string | null; originalS3Key: string | null }>
-    >(Prisma.sql`
-      SELECT
-        id,
-        s3_key AS "s3Key",
-        original_s3_key AS "originalS3Key"
-      FROM files
-      WHERE
-        (
-          (status = ${PrismaFileStatus.uploading} AND created_at < ${cutoffTime})
-          OR
-          (status = ${PrismaFileStatus.failed} AND (s3_key LIKE 'tmp/%' OR original_s3_key LIKE 'originals/%'))
-        )
-      LIMIT ${this.config.batchSize}
-    `);
-
-    if (orphanedFiles.length === 0) {
-      this.logger.info('No orphaned temporary files found');
-      return;
-    }
-
-    this.logger.info({ count: orphanedFiles.length }, 'Found orphaned temporary files');
-
-    for (const file of orphanedFiles) {
-      const claimed = await this.claimFileForDeletion({
-        fileId: file.id,
-        expectedStatuses: [PrismaFileStatus.uploading, PrismaFileStatus.failed],
       });
 
       if (!claimed) {

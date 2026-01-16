@@ -201,6 +201,8 @@ curl -X DELETE http://localhost:8080/api/v1/files/550e8400-e29b-41d4-a716-446655
 - **Восстановление удалённых файлов не предусмотрено** — удаление необратимо
 - Повторный DELETE на уже удалённый файл возвращает `204 No Content` (идемпотентность)
 
+**Примечание:** Временные объекты `tmp/` и `originals/` удаляются политикой lifecycle на стороне MinIO (см. `scripts/init-minio.sh`).
+
 #### List Files
 ```bash
 GET /api/v1/files?limit=50&offset=0&sortBy=uploadedAt&order=desc&q=search&mimeType=image/jpeg
@@ -378,6 +380,8 @@ pnpm prisma migrate status
 Автоматическая очистка orphan-файлов:
 - Файлы со статусом `uploading` старше N минут → удаление
 - Файлы со статусом `deleting` старше N минут → повторная попытка удаления
+
+Временные объекты в S3 (`tmp/`, `originals/`) очищаются на стороне MinIO lifecycle policy.
 
 ### Оптимизация изображений
 - Автоматическое сжатие и изменение размера

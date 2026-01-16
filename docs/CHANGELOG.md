@@ -12,10 +12,10 @@
   - Unified cleanup pipeline: corrupted records, bad status files, and old thumbnails.
 - Files: harden download headers and improve deduplication behavior.
   - **Fix**: Handle deduplication race conditions in image optimization pipeline (`optimizeImage`).
-  - **Fix**: Proper cleanup of orphaned temporary files (`tmp/`, `originals/`) on upload failures.
+  - **Fix**: Expire temporary objects (`tmp/`, `originals/`) via MinIO lifecycle policy to reduce cleanup service load.
   - **Enhancement**: Pre-check for existing optimized content before upload to avoid duplicate work.
   - **Enhancement**: Graceful handling of P2002 unique constraint violations during concurrent uploads.
   - **Enhancement**: Improved error logging for deduplication and cleanup operations.
-- Cleanup: add orphaned temporary files cleanup (24-hour TTL for stuck `UPLOADING` files).
+- Cleanup: rely on MinIO lifecycle expiration for `tmp/` and `originals/` objects.
 - Prisma: upgrade to Prisma v7 and add `prisma.config.ts`.
 - Env: unify Prisma CLI and NestJS env loading via `dotenv-cli` and `.env.*` files.
