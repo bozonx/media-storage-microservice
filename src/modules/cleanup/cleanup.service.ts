@@ -3,7 +3,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { CronJob } from 'cron';
-import { FileStatus as PrismaFileStatus, Prisma } from '@prisma/client';
+import { FileStatus as PrismaFileStatus, Prisma } from '../../generated/prisma/client.js';
 import { StorageService } from '../storage/storage.service.js';
 import { CleanupConfig } from '../../config/cleanup.config.js';
 import { PrismaService } from '../prisma/prisma.service.js';

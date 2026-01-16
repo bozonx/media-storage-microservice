@@ -390,6 +390,8 @@ pnpm prisma generate
 pnpm prisma migrate status
 ```
 
+**Примечание:** Prisma CLI использует конфигурацию из `prisma.config.ts`.
+
 ## Архитектура
 
 ### Streaming Upload
@@ -492,6 +494,8 @@ prisma/
 ├── schema.prisma       # Prisma schema (File, Thumbnail)
 └── migrations/         # Миграции БД
 ```
+
+`prisma.config.ts` находится в корне проекта и используется Prisma CLI.
 
 ## Roadmap
 

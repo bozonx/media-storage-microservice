@@ -2,7 +2,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { jest } from '@jest/globals';
 import type { PinoLogger } from 'nestjs-pino';
 import { getLoggerToken } from 'nestjs-pino';
-import { FileStatus as PrismaFileStatus } from '@prisma/client';
+import { FileStatus as PrismaFileStatus } from '../../src/generated/prisma/client.js';
 import { CleanupService } from '../../src/modules/cleanup/cleanup.service.js';
 import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
