@@ -8,8 +8,8 @@ if [ ! -f .env.development ]; then
   cp .env.development.example .env.development
 fi
 
-echo "Starting PostgreSQL and MinIO..."
-docker compose -f docker/docker-compose.yml up -d postgres minio
+echo "Starting PostgreSQL and Garage..."
+docker compose -f docker-compose.yml up -d --remove-orphans postgres garage
 
 echo "Waiting for services to be healthy..."
 sleep 5
@@ -17,19 +17,16 @@ sleep 5
 echo "Installing dependencies..."
 pnpm install
 
-echo "Initializing MinIO bucket..."
-bash scripts/init-minio.sh
-
-echo "Applying database migrations..."
-dotenv -e .env.development -- prisma migrate deploy
+echo "Initializing Garage bucket and key..."
+bash scripts/init-garage.sh
 
 echo ""
 echo "✅ Development environment is ready!"
 echo ""
 echo "Services:"
 echo "  - PostgreSQL: localhost:5432"
-echo "  - MinIO API: http://localhost:9000"
-echo "  - MinIO Console: http://localhost:9001"
+echo "  - Garage S3 API: http://localhost:3900"
+echo "  - Garage Admin API: http://localhost:3903"
 echo ""
 echo "To start the application:"
 echo "  pnpm start:dev"

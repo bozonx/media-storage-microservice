@@ -19,23 +19,18 @@ services:
       timeout: 3s
       retries: 3
 
-  minio:
-    image: minio/minio:latest
-    container_name: media-storage-minio-dev
-    hostname: minio
+  garage:
+    image: dxflrs/garage:v2.1.0
+    container_name: garaged
+    hostname: garage
     restart: unless-stopped
+    user: '1000:1000'
     ports:
-      - '9000:9000'
-      - '9001:9001'
-    environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
-      - TZ=UTC
+      - '3900:3900'
+      - '3901:3901'
+      - '3902:3902'
+      - '3903:3903'
     volumes:
-      - ./test-data/storage:/data
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ['CMD', 'mc', 'ready', 'local']
-      interval: 10s
-      timeout: 3s
-      retries: 3
+      - ./garage.toml:/etc/garage.toml
+      - ./test-data/garage/meta:/var/lib/garage/meta
+      - ./test-data/garage/data:/var/lib/garage/data

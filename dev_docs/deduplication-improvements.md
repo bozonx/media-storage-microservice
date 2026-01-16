@@ -12,7 +12,7 @@ This document describes improvements made to the file deduplication system to en
 
 **Impact**: 
 - False failures in optimization
-- Potential duplicate objects in S3/MinIO
+- Potential duplicate objects in S3-compatible storage
 - Inconsistent state between DB and storage
 
 ### 2. Orphaned Temporary Objects

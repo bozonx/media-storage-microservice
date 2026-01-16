@@ -7,7 +7,7 @@
 ### Phase 1 (MVP) ✅
 - 📁 **Загрузка файлов** с поддержкой multipart/form-data
 - 🖼️ **Оптимизация изображений** с использованием Sharp (сжатие, изменение размера, конвертация форматов)
-- 💾 **S3-совместимое хранилище** (Garage, MinIO, AWS S3)
+- 💾 **S3-совместимое хранилище** (Garage, AWS S3)
 - 🗄️ **PostgreSQL 18** с Prisma ORM для хранения метаданных файлов
 - 🔄 **Транзакционная загрузка/удаление** для минимизации orphan-файлов
 - 🚀 **Streaming upload/download** для эффективной работы с большими файлами
@@ -17,7 +17,7 @@
 - 📊 **Пагинация, фильтрация и поиск** по списку файлов
 - 🏥 **Health check** с проверкой S3 и БД
 - 📝 **Логирование** через Pino
-- 🐳 **Docker Compose** с PostgreSQL и MinIO
+- 🐳 **Docker Compose** с PostgreSQL и Garage
 
 ### Phase 2 (Implemented) ✅
 - 🖼️ **Динамическая генерация миниатюр** с параметрами из query string
@@ -47,10 +47,9 @@ pnpm start:dev
 
 Скрипт `setup:dev` автоматически:
 - Создаст `.env.development` из примера
-- Запустит PostgreSQL и MinIO в Docker
+- Запустит PostgreSQL и Garage в Docker
 - Установит зависимости
-- Выполнит миграции Prisma
-- Создаст bucket в MinIO
+- Создаст bucket в Garage и выведет S3 ключи
 
 ### Ручная настройка
 
@@ -61,37 +60,30 @@ pnpm install
 # 2. Настройка окружения
 cp .env.development.example .env.development
 
-# 3. Запуск PostgreSQL и MinIO через docker-compose.dev.yml
-docker compose -f docker-compose.dev.yml up -d
+# 3. Запуск PostgreSQL и Garage через docker-compose.yml
+docker compose -f docker-compose.yml up -d
 
-# 4. Выполнение миграций Prisma
-pnpm prisma:migrate:deploy
+# 4. Инициализация Garage bucket и ключа доступа (выведет ключи для .env.development)
+bash scripts/init-garage.sh
 
-# 5. Инициализация MinIO bucket
-# Если MinIO запущен в Docker контейнере:
-docker exec media-storage-minio-dev sh -c "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb local/media-files --ignore-existing"
-
-# Если MinIO запущен локально:
-bash scripts/init-minio.sh
-
-# 6. Запуск приложения
+# 5. Запуск приложения
 pnpm start:dev
 ```
 
 #### Альтернативный способ с docker/docker-compose.yml
 
 ```bash
-# 3. Запуск PostgreSQL и MinIO через docker/docker-compose.yml
-docker compose -f docker/docker-compose.yml up -d postgres minio
+# 3. Запуск PostgreSQL и Garage через docker/docker-compose.yml
+docker compose -f docker/docker-compose.yml up -d postgres garage
 
-# 5. Инициализация MinIO bucket (внутри контейнера)
-docker exec media-storage-minio sh -c "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb local/media-files --ignore-existing"
+# 5. Инициализация Garage bucket и ключа доступа
+bash scripts/init-garage.sh
 
-# 4, 6. Те же шаги, что и выше
+# 4. Те же шаги, что и выше
 ```
 
 **Различия между docker-compose файлами:**
-- `docker-compose.dev.yml` — для локальной разработки, данные монтируются в `./test-data/`
+- `docker-compose.yml` — для локальной разработки, данные монтируются в `./test-data/`
 - `docker/docker-compose.yml` — для production, использует Docker volumes
 
 API доступен по адресу: `http://localhost:8080/api/v1`
@@ -100,7 +92,8 @@ API доступен по адресу: `http://localhost:8080/api/v1`
 
 - **API**: http://localhost:8080/api/v1
 - **UI**: http://localhost:8080/ui
-- **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
+- **Garage S3 API**: http://localhost:3900
+- **Garage Admin API**: http://localhost:3903
 - **PostgreSQL**: localhost:5432 (media_user/media_password)
 
 ## API Endpoints
@@ -216,7 +209,7 @@ curl -X DELETE http://localhost:8080/api/v1/files/550e8400-e29b-41d4-a716-446655
 - **Восстановление удалённых файлов не предусмотрено** — удаление необратимо
 - Повторный DELETE на уже удалённый файл возвращает `204 No Content` (идемпотентность)
 
-**Примечание:** Временные объекты `tmp/` и `originals/` удаляются политикой lifecycle на стороне MinIO (см. `scripts/init-minio.sh`).
+**Примечание:** Временные объекты `tmp/` и `originals/` очищаются cleanup job на основе TTL.
 
 #### List Files
 ```bash
@@ -307,7 +300,7 @@ curl http://localhost:8080/api/v1/health
 - `S3_ACCESS_KEY_ID` — ключ доступа
 - `S3_SECRET_ACCESS_KEY` — секретный ключ
 - `S3_BUCKET` — имя bucket
-- `S3_FORCE_PATH_STYLE` — использовать path-style URLs (true для MinIO/Garage)
+- `S3_FORCE_PATH_STYLE` — использовать path-style URLs (обычно true для Garage)
 
 ### Загрузка файлов
 - `MAX_FILE_SIZE_MB` — максимальный размер файла в мегабайтах (по умолчанию 100)
@@ -372,26 +365,6 @@ docker compose -f docker/docker-compose.yml up -d
 curl http://localhost:8080/api/v1/health
 ```
 
-**Примечание:** Docker entrypoint автоматически выполняет `prisma migrate deploy` при старте контейнера.
-
-### Миграции базы данных
-
-```bash
-# Создание новой миграции (development)
-pnpm prisma:migrate:dev --name migration_name
-
-# Применение миграций (production)
-pnpm prisma migrate deploy
-
-# Генерация Prisma Client
-pnpm prisma generate
-
-# Просмотр статуса миграций
-pnpm prisma migrate status
-```
-
-**Примечание:** Prisma CLI использует конфигурацию из `prisma.config.ts`.
-
 ## Архитектура
 
 ### Streaming Upload
@@ -420,7 +393,7 @@ pnpm prisma migrate status
 - Файлы со статусом `uploading` старше N минут → удаление
 - Файлы со статусом `deleting` старше N минут → повторная попытка удаления
 
-Временные объекты в S3 (`tmp/`, `originals/`) очищаются на стороне MinIO lifecycle policy.
+Временные объекты в S3 (`tmp/`, `originals/`) очищаются cleanup job.
 
 ### Оптимизация изображений
 - Автоматическое сжатие и изменение размера

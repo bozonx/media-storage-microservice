@@ -22,10 +22,10 @@ describe('StorageService (unit)', () => {
       get: jest.fn((key: string) => {
         if (key === 'storage') {
           return {
-            endpoint: 'http://localhost:9000',
-            region: 'us-east-1',
-            accessKeyId: 'minio',
-            secretAccessKey: 'minio123',
+            endpoint: 'http://localhost:3900',
+            region: 'garage',
+            accessKeyId: 'garage',
+            secretAccessKey: 'garage123',
             forcePathStyle: true,
             bucket: 'test-bucket',
           };

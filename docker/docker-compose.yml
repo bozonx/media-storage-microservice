@@ -19,26 +19,25 @@ services:
       timeout: 3s
       retries: 3
 
-  minio:
-    image: minio/minio:latest
-    container_name: media-storage-minio
-    hostname: minio
+  garage:
+    image: dxflrs/garage:v2.1.0
+    container_name: media-storage-garage
+    hostname: garage
     restart: unless-stopped
     ports:
-      - '9000:9000'
-      - '9001:9001'
-    environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
-      - TZ=UTC
+      - '3900:3900'
+      - '3901:3901'
+      - '3902:3902'
+      - '3903:3903'
     volumes:
-      - minio-data:/data
-    command: server /data --console-address ":9001"
+      - ../garage.toml:/etc/garage.toml
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
     healthcheck:
-      test: ['CMD', 'mc', 'ready', 'local']
+      test: ['CMD', '/garage', 'status']
       interval: 10s
       timeout: 3s
-      retries: 3
+      retries: 5
 
   microservice:
     build:
@@ -54,7 +53,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
+      garage:
         condition: service_healthy
     environment:
       - NODE_ENV=production
@@ -70,10 +69,10 @@ services:
       - DATABASE_USER=media_user
       - DATABASE_PASSWORD=media_password
       - DATABASE_SSL=false
-      - S3_ENDPOINT=http://minio:9000
-      - S3_REGION=us-east-1
-      - S3_ACCESS_KEY_ID=minioadmin
-      - S3_SECRET_ACCESS_KEY=minioadmin
+      - S3_ENDPOINT=http://garage:3900
+      - S3_REGION=garage
+      - S3_ACCESS_KEY_ID=
+      - S3_SECRET_ACCESS_KEY=
       - S3_BUCKET=media-files
       - S3_FORCE_PATH_STYLE=true
       - MAX_FILE_SIZE_MB=100
@@ -90,4 +89,5 @@ services:
 
 volumes:
   postgres-data:
-  minio-data:
+  garage-meta:
+  garage-data:

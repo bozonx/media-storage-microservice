@@ -6,6 +6,4 @@ if [ -z "${DATABASE_URL:-}" ]; then
   exit 1
 fi
 
-pnpm prisma migrate deploy
-
 exec node dist/src/main.js

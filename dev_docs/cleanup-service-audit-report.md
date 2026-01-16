@@ -288,16 +288,10 @@ TypeScript compilation errors indicate Prisma client types don't match the schem
 
 **Required Actions:**
 ```bash
-# 1. Check if migrations are applied
-pnpm prisma migrate status
-
-# 2. Apply pending migrations
-pnpm prisma migrate deploy
-
-# 3. Regenerate Prisma client
+# Regenerate Prisma client
 pnpm prisma generate
 
-# 4. Restart TypeScript server in IDE
+# Restart TypeScript server in IDE
 ```
 
 **Impact:**

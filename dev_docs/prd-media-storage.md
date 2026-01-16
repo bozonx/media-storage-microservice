@@ -476,7 +476,7 @@ ACCESS_TOKEN_DEFAULT_TTL=86400  # 24 hours in seconds
    - Настройка PostgreSQL 17 + TypeORM/Prisma
    - Конфигурация S3 клиента (AWS SDK v3)
    - Валидация environment variables
-   - Docker compose с PostgreSQL и Garage/MinIO
+   - Docker compose с PostgreSQL и Garage
 
 2. **Загрузка файлов с оптимизацией** (4-5 дней)
    - Multipart file upload endpoint
@@ -672,7 +672,7 @@ ACCESS_TOKEN_DEFAULT_TTL=86400  # 24 hours in seconds
 - Оптимизация изображений
 
 ### Integration тесты
-- S3 операции с LocalStack/MinIO
+- S3 операции с LocalStack/Garage
 - Операции с БД (test database)
 - Транзакционные сценарии
 - Cleanup job
@@ -693,7 +693,7 @@ ACCESS_TOKEN_DEFAULT_TTL=86400  # 24 hours in seconds
 ### Docker
 - Multi-stage build
 - PostgreSQL 17 контейнер
-- Garage/MinIO для локальной разработки
+- Garage для локальной разработки
 - Health checks
 - Volume mounts для разработки
 
