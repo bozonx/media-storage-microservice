@@ -65,21 +65,14 @@ describe('ThumbnailService (unit)', () => {
             get: jest.fn((key: string) => {
               if (key === 'thumbnail') {
                 return {
-                  enabled: true,
                   format: 'webp',
                   maxWidth: 2048,
                   maxHeight: 2048,
                   minWidth: 10,
                   minHeight: 10,
-                  cacheMaxAge: 31536000,
-                  webp: {
-                    quality: 80,
-                    effort: 6,
-                  },
-                  avif: {
-                    quality: 60,
-                    effort: 6,
-                  },
+                  cacheMaxAgeSeconds: 31536000,
+                  quality: 80,
+                  effort: 6,
                 };
               }
               if (key === 'storage.bucket') {

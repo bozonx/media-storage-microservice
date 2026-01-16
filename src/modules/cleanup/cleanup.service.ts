@@ -3,10 +3,12 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { CronJob } from 'cron';
+import { FileStatus as PrismaFileStatus, Prisma } from '@prisma/client';
 import { StorageService } from '../storage/storage.service.js';
 import { CleanupConfig } from '../../config/cleanup.config.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { FileStatus } from '../files/file-status.js';
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class CleanupService implements OnModuleInit, OnModuleDestroy {
@@ -62,31 +64,20 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
   private async cleanupCorruptedRecords() {
     this.logger.info('Starting corrupted records cleanup');
 
-    const corruptedFiles = await this.prismaService.file.findMany({
-      where: {
-        OR: [
-          {
-            status: FileStatus.DELETING,
-            deletedAt: null,
-          },
-          {
-            status: FileStatus.READY,
-            OR: [
-              { s3Key: { equals: null } },
-              { s3Key: { equals: '' } },
-              { mimeType: { equals: null } },
-              { mimeType: { equals: '' } },
-            ],
-          },
-        ],
-      },
-      select: {
-        id: true,
-        s3Key: true,
-        originalS3Key: true,
-      },
-      take: this.config.batchSize,
-    });
+    const corruptedFiles = await this.prismaService.$queryRaw<
+      Array<{ id: string; s3Key: string | null; originalS3Key: string | null }>
+    >(Prisma.sql`
+      SELECT
+        id,
+        s3_key AS "s3Key",
+        original_s3_key AS "originalS3Key"
+      FROM files
+      WHERE
+        (status = ${PrismaFileStatus.deleting} AND deleted_at IS NULL)
+        OR
+        (status = ${PrismaFileStatus.ready} AND (s3_key = '' OR mime_type = ''))
+      LIMIT ${this.config.batchSize}
+    `);
 
     if (corruptedFiles.length === 0) {
       this.logger.info('No corrupted records found');
@@ -96,6 +87,15 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     this.logger.info({ count: corruptedFiles.length }, 'Found corrupted records');
 
     for (const file of corruptedFiles) {
+      const claimed = await this.claimFileForDeletion({
+        fileId: file.id,
+        expectedStatuses: [PrismaFileStatus.ready, PrismaFileStatus.deleting],
+      });
+
+      if (!claimed) {
+        continue;
+      }
+
       await this.deleteFileCompletely(file.id, file.s3Key, file.originalS3Key);
     }
   }
@@ -104,12 +104,17 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     this.logger.info('Starting bad status files cleanup');
 
     const ttlDays = this.config.badStatusTtlDays;
-    const cutoffTime = new Date(Date.now() - ttlDays * 24 * 60 * 60 * 1000);
+    const cutoffTime = new Date(Date.now() - ttlDays * MS_PER_DAY);
 
     const badFiles = await this.prismaService.file.findMany({
       where: {
         status: {
-          in: [FileStatus.UPLOADING, FileStatus.DELETING, FileStatus.FAILED, FileStatus.MISSING],
+          in: [
+            PrismaFileStatus.uploading,
+            PrismaFileStatus.deleting,
+            PrismaFileStatus.failed,
+            PrismaFileStatus.missing,
+          ],
         },
         statusChangedAt: {
           lt: cutoffTime,
@@ -132,9 +137,27 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     this.logger.info({ count: badFiles.length }, 'Found bad status files');
 
     for (const file of badFiles) {
-      if (file.status === FileStatus.DELETING) {
+      if (file.status === PrismaFileStatus.deleting) {
+        const claimed = await this.claimFileForRetryDeletion({
+          fileId: file.id,
+          cutoffTime,
+        });
+        if (!claimed) {
+          continue;
+        }
+
         await this.retryDeletion(file.id, file.s3Key);
       } else {
+        const claimed = await this.claimFileForDeletion({
+          fileId: file.id,
+          expectedStatuses: [file.status],
+          cutoffTime,
+        });
+
+        if (!claimed) {
+          continue;
+        }
+
         await this.deleteFileCompletely(file.id, file.s3Key, file.originalS3Key);
       }
     }
@@ -144,7 +167,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     this.logger.info('Starting old thumbnails cleanup');
 
     const ttlDays = this.config.thumbnailsTtlDays;
-    const cutoffTime = new Date(Date.now() - ttlDays * 24 * 60 * 60 * 1000);
+    const cutoffTime = new Date(Date.now() - ttlDays * MS_PER_DAY);
 
     const oldThumbnails = await this.prismaService.thumbnail.findMany({
       where: {
@@ -179,11 +202,65 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      await this.prismaService.thumbnail.delete({
-        where: { id: thumbnail.id },
+      await this.prismaService.thumbnail.deleteMany({
+        where: {
+          id: thumbnail.id,
+          lastAccessedAt: {
+            lt: cutoffTime,
+          },
+        },
       });
       this.logger.info({ thumbnailId: thumbnail.id }, 'Removed thumbnail record');
     }
+  }
+
+  private async claimFileForRetryDeletion(params: {
+    fileId: string;
+    cutoffTime: Date;
+  }): Promise<boolean> {
+    const result = await this.prismaService.file.updateMany({
+      where: {
+        id: params.fileId,
+        status: PrismaFileStatus.deleting,
+        statusChangedAt: {
+          lt: params.cutoffTime,
+        },
+      },
+      data: {
+        statusChangedAt: new Date(),
+      },
+    });
+
+    return result.count === 1;
+  }
+
+  private async claimFileForDeletion(params: {
+    fileId: string;
+    expectedStatuses: PrismaFileStatus[];
+    cutoffTime?: Date;
+  }): Promise<boolean> {
+    const result = await this.prismaService.file.updateMany({
+      where: {
+        id: params.fileId,
+        status: {
+          in: params.expectedStatuses,
+        },
+        ...(params.cutoffTime
+          ? {
+              statusChangedAt: {
+                lt: params.cutoffTime,
+              },
+            }
+          : {}),
+      },
+      data: {
+        status: PrismaFileStatus.deleting,
+        deletedAt: new Date(),
+        statusChangedAt: new Date(),
+      },
+    });
+
+    return result.count === 1;
   }
 
   private async retryDeletion(fileId: string, s3Key: string) {
@@ -193,7 +270,8 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
       await this.prismaService.file.update({
         where: { id: fileId },
         data: {
-          status: FileStatus.DELETED,
+          status: PrismaFileStatus.deleted,
+          statusChangedAt: new Date(),
         },
       });
 
@@ -203,7 +281,8 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
         await this.prismaService.file.update({
           where: { id: fileId },
           data: {
-            status: FileStatus.DELETED,
+            status: PrismaFileStatus.deleted,
+            statusChangedAt: new Date(),
           },
         });
 
@@ -237,13 +316,6 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    if (thumbnails.length > 0) {
-      await this.prismaService.thumbnail.deleteMany({
-        where: { fileId },
-      });
-      this.logger.info({ fileId, count: thumbnails.length }, 'Deleted thumbnails');
-    }
-
     if (s3Key) {
       try {
         await this.storageService.deleteFile(s3Key);
@@ -269,9 +341,26 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    await this.prismaService.file.delete({
-      where: { id: fileId },
-    });
-    this.logger.info({ fileId }, 'Removed file record');
+    try {
+      await this.prismaService.$transaction(async tx => {
+        if (thumbnails.length > 0) {
+          await tx.thumbnail.deleteMany({
+            where: { fileId },
+          });
+        }
+
+        await tx.file.delete({
+          where: { id: fileId },
+        });
+      });
+
+      if (thumbnails.length > 0) {
+        this.logger.info({ fileId, count: thumbnails.length }, 'Deleted thumbnails');
+      }
+
+      this.logger.info({ fileId }, 'Removed file record');
+    } catch (error) {
+      this.logger.error({ err: error, fileId }, 'Failed to remove records from database');
+    }
   }
 }
