@@ -15,6 +15,8 @@ interface CompressionConfig {
   defaultFormat: 'webp' | 'avif';
   maxWidth: number;
   maxHeight: number;
+  stripMetadataDefault: boolean;
+  losslessDefault: boolean;
   webp: {
     quality: number;
     effort: number;
@@ -65,8 +67,12 @@ export class ImageOptimizerService {
         ? this.compressionConfig.maxHeight
         : Math.min(params.maxHeight ?? Number.POSITIVE_INFINITY, this.compressionConfig.maxHeight);
 
-      const stripMetadata = forceCompress ? true : (params.stripMetadata ?? true);
-      const lossless = forceCompress ? false : (params.lossless ?? false);
+      const stripMetadata = forceCompress
+        ? true
+        : (params.stripMetadata ?? this.compressionConfig.stripMetadataDefault);
+      const lossless = forceCompress
+        ? false
+        : (params.lossless ?? this.compressionConfig.losslessDefault);
 
       let pipeline = sharp(buffer).autoOrient();
 

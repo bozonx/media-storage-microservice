@@ -31,6 +31,8 @@ describe('ImageOptimizerService (unit)', () => {
                   defaultFormat: 'webp',
                   maxWidth: 3840,
                   maxHeight: 2160,
+                  stripMetadataDefault: false,
+                  losslessDefault: false,
                   webp: {
                     quality: 80,
                     effort: 6,
@@ -246,7 +248,7 @@ describe('ImageOptimizerService (unit)', () => {
       );
     });
 
-    it('should strip metadata by default', async () => {
+    it('should preserve metadata by default', async () => {
       const inputBuffer = await sharp({
         create: {
           width: 100,
@@ -268,7 +270,7 @@ describe('ImageOptimizerService (unit)', () => {
       expect(result.buffer).toBeInstanceOf(Buffer);
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
-          stripMetadata: true,
+          stripMetadata: false,
         }),
         'Image compressed',
       );

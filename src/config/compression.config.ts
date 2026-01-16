@@ -4,6 +4,8 @@ export default () => ({
     defaultFormat: (process.env.IMAGE_COMPRESSION_DEFAULT_FORMAT || 'webp') as 'webp' | 'avif',
     maxWidth: parseInt(process.env.IMAGE_COMPRESSION_MAX_WIDTH || '3840', 10),
     maxHeight: parseInt(process.env.IMAGE_COMPRESSION_MAX_HEIGHT || '2160', 10),
+    stripMetadataDefault: process.env.IMAGE_COMPRESSION_STRIP_METADATA_DEFAULT === 'true',
+    losslessDefault: process.env.IMAGE_COMPRESSION_LOSSLESS_DEFAULT === 'true',
     webp: {
       quality: parseInt(process.env.IMAGE_COMPRESSION_WEBP_QUALITY || '80', 10),
       effort: parseInt(process.env.IMAGE_COMPRESSION_WEBP_EFFORT || '6', 10),
