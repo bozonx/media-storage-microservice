@@ -18,6 +18,11 @@ function getBasePathPrefix() {
     return path.substring(0, idx);
 }
 
+function buildApiUrl(pathname) {
+    const basePathPrefix = getBasePathPrefix();
+    return `${basePathPrefix}${pathname}`;
+}
+
 function buildThumbnailUrl(fileId, params) {
     const basePathPrefix = getBasePathPrefix();
     const search = new URLSearchParams({
@@ -129,7 +134,7 @@ async function uploadFile(file) {
     formData.append('file', file);
     
     try {
-        const response = await fetch('/api/v1/files', {
+        const response = await fetch(buildApiUrl('/api/v1/files'), {
             method: 'POST',
             body: formData
         });

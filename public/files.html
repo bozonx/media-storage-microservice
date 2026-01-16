@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Storage - Files</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📁 Media Storage</h1>
+            <p>Browse and search uploaded files</p>
+            <nav class="nav">
+                <a class="nav-link" href="./">Upload</a>
+                <a class="nav-link active" href="files.html">Files</a>
+            </nav>
+        </header>
+
+        <main>
+            <div class="files-controls">
+                <div class="control-group">
+                    <label class="control-label" for="searchInput">Search by filename</label>
+                    <input class="control-input" type="text" id="searchInput" placeholder="Type to search..." autocomplete="off">
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label" for="mimeInput">Filter by MIME type</label>
+                    <input class="control-input" type="text" id="mimeInput" placeholder="e.g. image/png" autocomplete="off">
+                </div>
+
+                <div class="control-actions">
+                    <button type="button" class="btn btn-primary" id="refreshBtn">Refresh</button>
+                    <button type="button" class="btn btn-secondary" id="clearFiltersBtn">Clear</button>
+                </div>
+
+                <div class="hint">Showing up to 10 items. No pagination.</div>
+            </div>
+
+            <div class="files-status" id="status"></div>
+            <div class="files-list" id="filesList"></div>
+        </main>
+    </div>
+
+    <script src="files.js"></script>
+</body>
+</html>
