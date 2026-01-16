@@ -25,8 +25,9 @@ function resolveMaxFileSize(): number {
 function validateSharpAvifSupport(): void {
   const formats = sharp.format;
   if (!formats.avif || !formats.avif.input || !formats.avif.output) {
-    throw new Error(
-      'Sharp is not compiled with AVIF support. Please rebuild sharp with libheif/libaom support.',
+    // eslint-disable-next-line no-console
+    console.warn(
+      'Sharp is not compiled with AVIF support. AVIF compression will be unavailable. Consider rebuilding sharp with libheif/libaom support.',
     );
   }
 }

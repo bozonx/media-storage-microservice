@@ -1,5 +1,5 @@
 ARG NODE_MAJOR=22
-FROM node:${NODE_MAJOR}-alpine
+FROM node:${NODE_MAJOR}-bookworm-slim
 
 WORKDIR /app
 
@@ -8,6 +8,14 @@ ENV LISTEN_HOST=0.0.0.0
 ENV LISTEN_PORT=8080
 ENV TZ=UTC
 ENV LOG_LEVEL=warn
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    wget \
+    libheif1 \
+    libaom3 \
+  && rm -rf /var/lib/apt/lists/*
 
 # Install pnpm
 RUN corepack enable
