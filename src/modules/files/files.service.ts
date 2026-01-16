@@ -12,6 +12,7 @@ import { Transform, type Readable } from 'stream';
 import { StorageService } from '../storage/storage.service.js';
 import { ImageOptimizerService } from '../optimization/image-optimizer.service.js';
 import { OptimizeParamsDto } from './dto/optimize-params.dto.js';
+import { CompressParamsDto } from './dto/compress-params.dto.js';
 import { ListFilesDto } from './dto/list-files.dto.js';
 import { FileResponseDto } from './dto/file-response.dto.js';
 import { ListFilesResponseDto } from './dto/list-files-response.dto.js';
@@ -34,12 +35,14 @@ function isPrismaKnownRequestError(error: unknown): error is {
 /**
  * Parameters for uploading a file from an in-memory buffer.
  *
- * `optimizeParams` is supported only for image uploads.
+ * `compressParams` is supported only for image uploads.
+ * `optimizeParams` is deprecated, use `compressParams` instead.
  */
 export interface UploadFileParams {
   buffer: Buffer;
   filename: string;
   mimeType: string;
+  compressParams?: CompressParamsDto;
   optimizeParams?: OptimizeParamsDto;
   metadata?: Record<string, any>;
 }
@@ -192,17 +195,41 @@ export class FilesService {
   /**
    * Uploads a file from a buffer.
    *
-   * If `optimizeParams` is provided, the image may be optimized first. The resulting content is
-   * then deduplicated by checksum.
+   * If `compressParams` is provided or force compression is enabled, the image will be compressed.
+   * The resulting content is then deduplicated by checksum.
    */
   async uploadFile(params: UploadFileParams): Promise<FileResponseDto> {
-    const { buffer, filename, mimeType, optimizeParams, metadata } = params;
+    const { buffer, filename, mimeType, compressParams, optimizeParams, metadata } = params;
 
     let processedBuffer = buffer;
     let processedMimeType = mimeType;
     let originalSize: number | null = null;
 
-    if (optimizeParams) {
+    const forceCompress = this.configService.get<boolean>('compression.forceEnabled') ?? false;
+    const shouldCompress = forceCompress || (compressParams && this.isImage(mimeType));
+
+    if (shouldCompress && this.isImage(mimeType)) {
+      const result = await this.imageOptimizer.compressImage(
+        buffer,
+        mimeType,
+        compressParams ?? {},
+        forceCompress,
+      );
+      if (result.size < buffer.length) {
+        processedBuffer = result.buffer;
+        processedMimeType = result.format;
+        originalSize = buffer.length;
+        this.logger.info(
+          {
+            filename,
+            beforeBytes: buffer.length,
+            afterBytes: result.size,
+            savings: `${((1 - result.size / buffer.length) * 100).toFixed(1)}%`,
+          },
+          'Image compressed',
+        );
+      }
+    } else if (optimizeParams) {
       const result = await this.imageOptimizer.optimizeImage(buffer, mimeType, optimizeParams);
       if (result.size < buffer.length) {
         processedBuffer = result.buffer;
@@ -210,7 +237,7 @@ export class FilesService {
         originalSize = buffer.length;
         this.logger.info(
           { filename, beforeBytes: buffer.length, afterBytes: result.size },
-          'Image optimized',
+          'Image optimized (deprecated)',
         );
       }
     }
@@ -242,9 +269,10 @@ export class FilesService {
           s3Key,
           s3Bucket: this.bucket,
           status: FileStatus.UPLOADING,
-          optimizationParams: optimizeParams
-            ? (optimizeParams as unknown as Record<string, any>)
-            : null,
+          optimizationParams:
+            compressParams || optimizeParams
+              ? ((compressParams || optimizeParams) as unknown as Record<string, any>)
+              : null,
           metadata: metadata ?? null,
           uploadedAt: null,
         },
@@ -507,6 +535,7 @@ export class FilesService {
       'image/png': '.png',
       'image/gif': '.gif',
       'image/webp': '.webp',
+      'image/avif': '.avif',
       'image/svg+xml': '.svg',
       'application/pdf': '.pdf',
       'text/plain': '.txt',
@@ -516,6 +545,10 @@ export class FilesService {
     };
 
     return mimeToExt[mimeType] || '';
+  }
+
+  private isImage(mimeType: string): boolean {
+    return mimeType.startsWith('image/');
   }
 
   private isUniqueConstraintViolation(error: unknown): boolean {

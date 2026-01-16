@@ -8,15 +8,18 @@
 
 1. **Dynamic Thumbnails**: Генерация thumbnail по запросу с параметрами из query params
 2. **Original Compression**: Пережатие оригиналов при загрузке с настраиваемыми ограничениями
-3. **WebP Format**: Использование WebP для thumbnail и опционально для оригиналов
-4. **Environment Configuration**: Гибкая настройка через переменные окружения
+3. **WebP/AVIF Format**: Использование WebP для thumbnail, WebP/AVIF для оригиналов
+4. **Metadata Stripping**: Очистка EXIF/metadata для thumbnail (всегда) и оригиналов (опционально)
+5. **Environment Configuration**: Гибкая настройка через переменные окружения
 
 ## Technical Stack
 
-- **Image Processing**: Sharp
-- **Format**: WebP (thumbnail), WebP/JPEG/PNG (originals)
+- **Image Processing**: Sharp (с поддержкой AVIF)
+- **Format**: WebP (thumbnail), WebP/AVIF (compressed originals)
+- **Storage**: Единое S3 хранилище для оригиналов и thumbnails
 - **Caching**: S3 storage + DB metadata
 - **CDN-Ready**: Cache-Control headers для Cloudflare
+- **Metadata**: Автоматическая очистка EXIF/metadata
 
 ---
 
@@ -30,10 +33,12 @@ GET /api/v1/files/:id/thumbnail?width=300&height=200&quality=80&fit=cover
 ```
 
 #### Query Parameters
-- `width` (required): ширина в пикселях (1-4096)
-- `height` (required): высота в пикселях (1-4096)
+- `width` (required): ширина в пикселях (10-4096)
+- `height` (required): высота в пикселях (10-4096)
 - `quality` (optional): качество WebP, берется из env если не указано
 - `fit` (optional): режим resize - `cover`, `contain`, `fill`, `inside`, `outside` (default: `cover`)
+
+**Note**: Metadata (EXIF, ICC profile, etc.) всегда удаляется из thumbnail для уменьшения размера.
 
 #### Response
 ```
@@ -61,9 +66,9 @@ THUMBNAIL_ENABLED=true
 THUMBNAIL_DEFAULT_QUALITY=80
 THUMBNAIL_MAX_WIDTH=2048
 THUMBNAIL_MAX_HEIGHT=2048
-THUMBNAIL_MIN_WIDTH=1
-THUMBNAIL_MIN_HEIGHT=1
 THUMBNAIL_CACHE_MAX_AGE=31536000
+
+# Note: Minimum width/height hardcoded to 10px in constants
 ```
 
 ### 1.3 Database Schema
@@ -104,14 +109,17 @@ model Thumbnail {
 **File**: `src/config/thumbnail.config.ts`
 
 ```typescript
+// Hardcoded constants
+const THUMBNAIL_MIN_SIZE = 10; // pixels
+
 export default () => ({
   thumbnail: {
     enabled: process.env.THUMBNAIL_ENABLED === 'true',
     defaultQuality: parseInt(process.env.THUMBNAIL_DEFAULT_QUALITY || '80', 10),
     maxWidth: parseInt(process.env.THUMBNAIL_MAX_WIDTH || '2048', 10),
     maxHeight: parseInt(process.env.THUMBNAIL_MAX_HEIGHT || '2048', 10),
-    minWidth: parseInt(process.env.THUMBNAIL_MIN_WIDTH || '1', 10),
-    minHeight: parseInt(process.env.THUMBNAIL_MIN_HEIGHT || '1', 10),
+    minWidth: THUMBNAIL_MIN_SIZE,
+    minHeight: THUMBNAIL_MIN_SIZE,
     cacheMaxAge: parseInt(process.env.THUMBNAIL_CACHE_MAX_AGE || '31536000', 10),
   },
 });
@@ -127,13 +135,13 @@ import { Type } from 'class-transformer';
 export class ThumbnailParamsDto {
   @Type(() => Number)
   @IsInt()
-  @Min(1)
+  @Min(10)
   @Max(4096)
   width: number;
 
   @Type(() => Number)
   @IsInt()
-  @Min(1)
+  @Min(10)
   @Max(4096)
   height: number;
 
@@ -198,17 +206,39 @@ async generateThumbnail(buffer: Buffer, params: ThumbnailParams): Promise<Buffer
       fit: params.fit as keyof sharp.FitEnum,
       withoutEnlargement: true,
     })
+    .rotate() // Auto-rotate based on EXIF orientation
+    .withMetadata(false) // Strip all metadata (EXIF, ICC profile, etc.)
     .webp({ quality: params.quality })
     .toBuffer();
 }
 ```
 
-### 1.5 Caching Strategy
+### 1.5 Storage Strategy
+
+**Single S3 Bucket**: Thumbnails и оригиналы хранятся в одном S3 bucket.
+
+**S3 Key Structure**:
+- Оригиналы: `{prefix}/{middle}/{hash}.{ext}` (например: `ab/cd/abcd1234...jpg`)
+- Thumbnails: `thumbs/{fileId}/{paramsHash}.webp` (например: `thumbs/550e8400-e29b-41d4-a716-446655440000/abc123.webp`)
+
+**Преимущества единого bucket**:
+- Упрощенная конфигурация (один endpoint, одни credentials)
+- Единая политика backup и retention
+- Проще управление правами доступа
+- Меньше накладных расходов на подключения
+
+**Альтернатива** (отдельный bucket для thumbnails):
+- Можно настроить отдельный bucket с другим retention policy
+- Полезно если нужна разная географическая репликация
+- Не рекомендуется для текущей реализации (избыточная сложность)
+
+### 1.6 Caching Strategy
 
 1. **First Request**: Generate → Save to S3 → Save metadata to DB → Return
 2. **Subsequent Requests**: Check DB → Stream from S3 → Update lastAccessedAt
 3. **CDN Layer**: Cloudflare caches based on Cache-Control headers
 4. **ETag Support**: Use paramsHash as ETag for 304 Not Modified responses
+5. **S3 Path**: `thumbs/{fileId}/{paramsHash}.webp` for easy cleanup
 
 ---
 
@@ -225,22 +255,44 @@ Fields:
 - file: binary data (required)
 - compress: JSON string (optional)
   {
-    "quality": 85,        // 1-100, optional (uses env default if not set)
-    "maxWidth": 1920,     // optional (uses env max if not set)
-    "maxHeight": 1080,    // optional (uses env max if not set)
-    "format": "webp"      // optional: "webp", "jpeg", "png", "original"
+    "quality": 85,        // 1-100, optional (uses env default if compress specified)
+    "maxWidth": 1920,     // optional (uses env max if compress specified)
+    "maxHeight": 1080,    // optional (uses env max if compress specified)
+    "format": "webp",     // optional: "webp" or "avif" (required if compress specified)
+    "stripMetadata": true // optional: remove EXIF/metadata (default: false)
   }
 ```
 
 #### Compression Logic
-1. Если `compress` не указан И env переменные не заданы → сохранить оригинал без изменений
-2. Если `compress` указан → использовать параметры из запроса (с учетом env ограничений)
-3. Если `compress` не указан НО env переменные заданы → применить env параметры
-4. Формат:
-   - `webp` → конвертировать в WebP
-   - `jpeg` → конвертировать в JPEG
-   - `png` → конвертировать в PNG
-   - `original` или не указан → сохранить оригинальный формат
+
+**Сценарий 1: Force Compression (FORCE_IMAGE_COMPRESSION_ENABLED=true)**
+- Всегда применяется сжатие независимо от наличия `compress` параметра
+- Используются env переменные как параметры сжатия:
+  - `IMAGE_COMPRESSION_DEFAULT_QUALITY`
+  - `IMAGE_COMPRESSION_MAX_WIDTH`
+  - `IMAGE_COMPRESSION_MAX_HEIGHT`
+  - `IMAGE_COMPRESSION_DEFAULT_FORMAT` (webp или avif)
+- Если `compress` указан в запросе - игнорируется (force режим приоритетнее)
+
+**Сценарий 2: Optional Compression (FORCE_IMAGE_COMPRESSION_ENABLED=false, compress указан)**
+- Применяется сжатие с параметрами из `compress`
+- Env переменные выступают как defaults и ограничения:
+  - `quality`: используется из `compress.quality` или `IMAGE_COMPRESSION_DEFAULT_QUALITY`
+  - `maxWidth`: `min(compress.maxWidth, IMAGE_COMPRESSION_MAX_WIDTH)`
+  - `maxHeight`: `min(compress.maxHeight, IMAGE_COMPRESSION_MAX_HEIGHT)`
+  - `format`: используется из `compress.format` или `IMAGE_COMPRESSION_DEFAULT_FORMAT`
+
+**Сценарий 3: No Compression (FORCE_IMAGE_COMPRESSION_ENABLED=false, compress не указан)**
+- Сохраняется оригинал без изменений
+- Env переменные не влияют
+
+**Форматы:**
+- `webp` → конвертировать в WebP
+- `avif` → конвертировать в AVIF (лучшее сжатие, но медленнее)
+
+**Metadata:**
+- Если `stripMetadata: true` → удалить все EXIF/ICC/XMP данные
+- Если `stripMetadata: false` или не указан → сохранить metadata
 
 ### 2.2 Environment Variables
 
@@ -248,11 +300,14 @@ Fields:
 
 ```bash
 ###### Image Compression (Upload)
-IMAGE_COMPRESSION_ENABLED=true
+# Force compression for all uploads (ignores compress parameter in request)
+FORCE_IMAGE_COMPRESSION_ENABLED=false
+
+# Default/max values used when compression is applied
 IMAGE_COMPRESSION_DEFAULT_QUALITY=85
 IMAGE_COMPRESSION_MAX_WIDTH=3840
 IMAGE_COMPRESSION_MAX_HEIGHT=2160
-IMAGE_COMPRESSION_DEFAULT_FORMAT=original  # webp, jpeg, png, original
+IMAGE_COMPRESSION_DEFAULT_FORMAT=webp  # webp or avif
 ```
 
 ### 2.3 Implementation Steps
@@ -263,11 +318,14 @@ IMAGE_COMPRESSION_DEFAULT_FORMAT=original  # webp, jpeg, png, original
 ```typescript
 export default () => ({
   compression: {
-    enabled: process.env.IMAGE_COMPRESSION_ENABLED === 'true',
+    // Force compression for all uploads
+    forceEnabled: process.env.FORCE_IMAGE_COMPRESSION_ENABLED === 'true',
+    
+    // Default/max values
     defaultQuality: parseInt(process.env.IMAGE_COMPRESSION_DEFAULT_QUALITY || '85', 10),
     maxWidth: parseInt(process.env.IMAGE_COMPRESSION_MAX_WIDTH || '3840', 10),
     maxHeight: parseInt(process.env.IMAGE_COMPRESSION_MAX_HEIGHT || '2160', 10),
-    defaultFormat: process.env.IMAGE_COMPRESSION_DEFAULT_FORMAT || 'original',
+    defaultFormat: (process.env.IMAGE_COMPRESSION_DEFAULT_FORMAT || 'webp') as 'webp' | 'avif',
   },
 });
 ```
@@ -301,9 +359,13 @@ export class CompressParamsDto {
   @IsOptional()
   maxHeight?: number;
 
-  @IsIn(['webp', 'jpeg', 'png', 'original'])
+  @IsIn(['webp', 'avif'])
   @IsOptional()
-  format?: string;
+  format?: 'webp' | 'avif';
+
+  @Type(() => Boolean)
+  @IsOptional()
+  stripMetadata?: boolean;
 }
 ```
 
@@ -318,19 +380,37 @@ async optimizeImage(
   originalMimeType: string,
   params: CompressParamsDto,
   envDefaults: CompressionConfig,
+  forceCompress: boolean,
 ): Promise<{ buffer: Buffer; format: string; size: number }> {
-  // Merge params with env defaults
-  const quality = params.quality ?? envDefaults.defaultQuality;
-  const maxWidth = Math.min(params.maxWidth ?? Infinity, envDefaults.maxWidth);
-  const maxHeight = Math.min(params.maxHeight ?? Infinity, envDefaults.maxHeight);
-  const format = params.format ?? envDefaults.defaultFormat;
+  // Determine compression parameters based on mode
+  let quality: number;
+  let maxWidth: number;
+  let maxHeight: number;
+  let format: 'webp' | 'avif';
+  let stripMetadata: boolean;
+
+  if (forceCompress) {
+    // Force mode: use only env defaults, ignore params
+    quality = envDefaults.defaultQuality;
+    maxWidth = envDefaults.maxWidth;
+    maxHeight = envDefaults.maxHeight;
+    format = envDefaults.defaultFormat;
+    stripMetadata = false; // Can be configured via env if needed
+  } else {
+    // Optional mode: merge params with env defaults
+    quality = params.quality ?? envDefaults.defaultQuality;
+    maxWidth = Math.min(params.maxWidth ?? Infinity, envDefaults.maxWidth);
+    maxHeight = Math.min(params.maxHeight ?? Infinity, envDefaults.maxHeight);
+    format = params.format ?? envDefaults.defaultFormat;
+    stripMetadata = params.stripMetadata ?? false;
+  }
 
   // Get original dimensions
   const metadata = await sharp(buffer).metadata();
   
   // Calculate resize dimensions (preserve aspect ratio)
-  let resizeWidth = metadata.width;
-  let resizeHeight = metadata.height;
+  let resizeWidth = metadata.width ?? 0;
+  let resizeHeight = metadata.height ?? 0;
   
   if (resizeWidth > maxWidth || resizeHeight > maxHeight) {
     const aspectRatio = resizeWidth / resizeHeight;
@@ -347,6 +427,9 @@ async optimizeImage(
   // Build Sharp pipeline
   let pipeline = sharp(buffer);
   
+  // Auto-rotate based on EXIF orientation
+  pipeline = pipeline.rotate();
+
   // Resize if needed
   if (resizeWidth !== metadata.width || resizeHeight !== metadata.height) {
     pipeline = pipeline.resize(resizeWidth, resizeHeight, {
@@ -355,27 +438,28 @@ async optimizeImage(
     });
   }
 
+  // Strip metadata if requested
+  if (stripMetadata) {
+    pipeline = pipeline.withMetadata(false);
+  }
+
   // Apply format conversion
-  let outputMimeType = originalMimeType;
+  let outputMimeType: string;
   
   if (format === 'webp') {
-    pipeline = pipeline.webp({ quality });
+    pipeline = pipeline.webp({ 
+      quality,
+      effort: 4, // Balance between speed and compression
+    });
     outputMimeType = 'image/webp';
-  } else if (format === 'jpeg') {
-    pipeline = pipeline.jpeg({ quality, progressive: true });
-    outputMimeType = 'image/jpeg';
-  } else if (format === 'png') {
-    pipeline = pipeline.png({ quality, progressive: true });
-    outputMimeType = 'image/png';
+  } else if (format === 'avif') {
+    pipeline = pipeline.avif({ 
+      quality,
+      effort: 4, // 0-9, higher = slower but better compression
+    });
+    outputMimeType = 'image/avif';
   } else {
-    // original format - apply quality based on detected format
-    if (originalMimeType === 'image/jpeg') {
-      pipeline = pipeline.jpeg({ quality, progressive: true });
-    } else if (originalMimeType === 'image/png') {
-      pipeline = pipeline.png({ quality });
-    } else if (originalMimeType === 'image/webp') {
-      pipeline = pipeline.webp({ quality });
-    }
+    throw new Error(`Unsupported format: ${format}`);
   }
 
   const resultBuffer = await pipeline.toBuffer();
@@ -402,9 +486,8 @@ async uploadFile(params: UploadFileParams): Promise<FileResponseDto> {
   let originalSize: number | null = null;
 
   // Check if compression should be applied
-  const shouldCompress = 
-    compressParams || 
-    (this.configService.get('compression.enabled') && this.isImage(mimeType));
+  const forceCompress = this.configService.get('compression.forceEnabled');
+  const shouldCompress = forceCompress || (compressParams && this.isImage(mimeType));
 
   if (shouldCompress && this.isImage(mimeType)) {
     const envDefaults = this.configService.get('compression');
@@ -413,6 +496,7 @@ async uploadFile(params: UploadFileParams): Promise<FileResponseDto> {
       mimeType,
       compressParams ?? {},
       envDefaults,
+      forceCompress,
     );
     
     // Only use compressed version if it's smaller

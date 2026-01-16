@@ -1,6 +1,9 @@
 import { IsBoolean, IsInt, IsOptional, IsString, Min, Max, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
+/**
+ * @deprecated Use CompressParamsDto instead. This DTO is kept for backward compatibility.
+ */
 export class OptimizeParamsDto {
   @IsOptional()
   @IsBoolean()

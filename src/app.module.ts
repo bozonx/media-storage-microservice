@@ -15,6 +15,8 @@ import appConfig from './config/app.config.js';
 import databaseConfig from './config/database.config.js';
 import storageConfig from './config/storage.config.js';
 import optimizationConfig from './config/optimization.config.js';
+import compressionConfig from './config/compression.config.js';
+import thumbnailConfig from './config/thumbnail.config.js';
 import cleanupConfig from './config/cleanup.config.js';
 import type { AppConfig } from './config/app.config.js';
 import pkg from '../package.json' with { type: 'json' };
@@ -23,7 +25,15 @@ import pkg from '../package.json' with { type: 'json' };
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, storageConfig, optimizationConfig, cleanupConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        storageConfig,
+        optimizationConfig,
+        compressionConfig,
+        thumbnailConfig,
+        cleanupConfig,
+      ],
       envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}`, '.env'],
       cache: true,
     }),
