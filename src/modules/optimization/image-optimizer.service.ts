@@ -68,10 +68,10 @@ export class ImageOptimizerService {
         : Math.min(params.maxHeight ?? Number.POSITIVE_INFINITY, this.compressionConfig.maxHeight);
 
       const stripMetadata = forceCompress
-        ? true
+        ? this.compressionConfig.stripMetadataDefault
         : (params.stripMetadata ?? this.compressionConfig.stripMetadataDefault);
       const lossless = forceCompress
-        ? false
+        ? this.compressionConfig.losslessDefault
         : (params.lossless ?? this.compressionConfig.losslessDefault);
 
       let pipeline = sharp(buffer).autoOrient();

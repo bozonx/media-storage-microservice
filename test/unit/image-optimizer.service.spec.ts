@@ -191,6 +191,8 @@ describe('ImageOptimizerService (unit)', () => {
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
           format: 'webp',
+          stripMetadata: false,
+          lossless: false,
         }),
         'Image compressed',
       );
