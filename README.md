@@ -252,12 +252,6 @@ curl http://localhost:8080/api/v1/health
 
 ### База данных (Prisma)
 - `DATABASE_URL` — строка подключения PostgreSQL (формат: `postgresql://user:password@host:port/dbname`)
-- Альтернативно можно использовать отдельные переменные:
-  - `DATABASE_HOST` — хост PostgreSQL
-  - `DATABASE_PORT` — порт PostgreSQL (5432)
-  - `DATABASE_NAME` — имя БД
-  - `DATABASE_USER` — пользователь
-  - `DATABASE_PASSWORD` — пароль
 
 ### S3 Storage
 - `S3_ENDPOINT` — URL S3 API
@@ -304,7 +298,11 @@ curl http://localhost:8080/api/v1/health
 ### Cleanup Job
 - `CLEANUP_ENABLED` — включить cleanup job (true/false)
 - `CLEANUP_CRON` — расписание cron (по умолчанию: каждые 6 часов)
-- `CLEANUP_ORPHAN_TIMEOUT_MINUTES` — таймаут для orphan-файлов (минуты)
+
+### Base path
+- `BASE_PATH` — префикс пути для API и UI (например, `media`, без ведущих/замыкающих `/`)
+
+`url` в ответах API возвращается как относительный путь с учетом `BASE_PATH` (например: `/api/v1/files/:id/download` или `/media/api/v1/files/:id/download`).
 
 ## Production Deployment
 

@@ -96,7 +96,7 @@ describe('FilesController (unit)', () => {
         size: 0,
         checksum: 'sha256:x',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
-        url: 'http://localhost:3000/api/v1/files/id/download',
+        url: '/api/v1/files/id/download',
       });
 
       const req: any = {
@@ -111,7 +111,15 @@ describe('FilesController (unit)', () => {
       };
 
       const res = await controller.uploadFile(req);
-      expect(res).toEqual({ id: 'id' });
+      expect(res).toEqual({
+        id: 'id',
+        filename: 'a.txt',
+        mimeType: 'text/plain',
+        size: 0,
+        checksum: 'sha256:x',
+        uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
+        url: '/api/v1/files/id/download',
+      });
       expect(filesServiceMock.uploadFileStream).toHaveBeenCalledWith({
         stream,
         filename: 'a.txt',
@@ -129,7 +137,7 @@ describe('FilesController (unit)', () => {
         size: 0,
         checksum: 'sha256:x',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
-        url: 'http://localhost:3000/api/v1/files/id/download',
+        url: '/api/v1/files/id/download',
       });
 
       const req: any = {

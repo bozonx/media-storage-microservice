@@ -57,8 +57,11 @@ describe('FilesService (unit)', () => {
       if (key === 'storage.bucket') {
         return 'test-bucket';
       }
+      if (key === 'app.basePath') {
+        return '';
+      }
       if (key === 'BASE_PATH') {
-        return 'http://localhost:3000';
+        return undefined;
       }
       if (key === 'compression.forceEnabled') {
         return false;
@@ -162,6 +165,75 @@ describe('FilesService (unit)', () => {
   });
 
   describe('uploadFile', () => {
+    it('includes base path in url when app.basePath is set', async () => {
+      const basePathConfigServiceMock: any = {
+        get: jest.fn((key: string) => {
+          if (key === 'storage.bucket') {
+            return 'test-bucket';
+          }
+          if (key === 'app.basePath') {
+            return 'media';
+          }
+          if (key === 'BASE_PATH') {
+            return undefined;
+          }
+          if (key === 'compression.forceEnabled') {
+            return false;
+          }
+          if (key === 'IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS') {
+            return '30000';
+          }
+          return undefined;
+        }),
+      };
+
+      const moduleWithBasePath = await Test.createTestingModule({
+        providers: [
+          FilesService,
+          {
+            provide: getLoggerToken(FilesService.name),
+            useValue: {
+              info: jest.fn(),
+              warn: jest.fn(),
+              error: jest.fn(),
+              debug: jest.fn(),
+              trace: jest.fn(),
+              fatal: jest.fn(),
+            },
+          },
+          { provide: PrismaService, useValue: prismaMock },
+          { provide: StorageService, useValue: storageMock },
+          { provide: ImageOptimizerService, useValue: imageOptimizerMock },
+          { provide: ConfigService, useValue: basePathConfigServiceMock },
+        ],
+      }).compile();
+
+      const serviceWithBasePath = moduleWithBasePath.get<FilesService>(FilesService);
+
+      const existing = {
+        id: 'file-id',
+        filename: 'a.png',
+        mimeType: 'image/png',
+        size: 3n,
+        originalSize: null,
+        checksum: 'sha256:abc',
+        uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
+        status: FileStatus.READY,
+      };
+
+      (prismaMock as any).file.findFirst.mockResolvedValue(existing);
+
+      const res = await serviceWithBasePath.uploadFile({
+        buffer: Buffer.from('abc'),
+        filename: 'a.png',
+        mimeType: 'image/png',
+      });
+
+      expect(res.url).toBe('/media/api/v1/files/file-id/download');
+
+      await moduleWithBasePath.close();
+    });
+
     it('returns existing file (dedup) without uploading to storage', async () => {
       const existing = {
         id: 'file-id',
@@ -190,7 +262,7 @@ describe('FilesService (unit)', () => {
         originalSize: undefined,
         checksum: 'sha256:abc',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
-        url: 'http://localhost:3000/api/v1/files/file-id/download',
+        url: '/api/v1/files/file-id/download',
       });
 
       expect((storageMock.uploadFile as jest.Mock).mock.calls).toHaveLength(0);
@@ -236,7 +308,7 @@ describe('FilesService (unit)', () => {
       });
 
       expect(res.id).toBe('new-id');
-      expect(res.url).toBe('http://localhost:3000/api/v1/files/new-id/download');
+      expect(res.url).toBe('/api/v1/files/new-id/download');
     });
 
     it('marks FAILED when storage upload throws', async () => {
@@ -327,8 +399,8 @@ describe('FilesService (unit)', () => {
         if (key === 'storage.bucket') {
           return 'test-bucket';
         }
-        if (key === 'BASE_PATH') {
-          return 'http://localhost:3000';
+        if (key === 'app.basePath') {
+          return '';
         }
         if (key === 'compression.forceEnabled') {
           return true;

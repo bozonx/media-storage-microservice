@@ -4,7 +4,7 @@ import type { FastifyReply } from 'fastify';
 import { ThumbnailService } from './thumbnail.service.js';
 import { ThumbnailParamsDto } from '../files/dto/thumbnail-params.dto.js';
 
-@Controller('files')
+@Controller('api/v1/files')
 export class ThumbnailController {
   constructor(
     @InjectPinoLogger(ThumbnailController.name)

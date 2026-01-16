@@ -1,5 +1,5 @@
 import { IsInt, Min, Max, IsOptional, IsIn, IsBoolean } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class CompressParamsDto {
   @Type(() => Number)
@@ -27,12 +27,12 @@ export class CompressParamsDto {
   @IsOptional()
   format?: 'webp' | 'avif';
 
-  @Type(() => Boolean)
+  @Transform(({ value }) => value === true || value === 'true')
   @IsBoolean()
   @IsOptional()
   lossless?: boolean;
 
-  @Type(() => Boolean)
+  @Transform(({ value }) => value === true || value === 'true')
   @IsBoolean()
   @IsOptional()
   stripMetadata?: boolean;

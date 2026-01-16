@@ -85,7 +85,10 @@ export class FilesService {
     private readonly configService: ConfigService,
   ) {
     this.bucket = this.configService.get<string>('storage.bucket')!;
-    this.basePath = this.configService.get<string>('BASE_PATH') || '';
+    this.basePath =
+      this.configService.get<string>('app.basePath') ||
+      this.configService.get<string>('BASE_PATH') ||
+      '';
     this.optimizationWaitTimeout = parseInt(
       this.configService.get<string>('IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS') || '30000',
       10,
@@ -543,7 +546,7 @@ export class FilesService {
     dto.checksum = file.checksum ?? '';
     dto.uploadedAt = file.uploadedAt ?? new Date(0);
 
-    dto.url = `${this.basePath}/api/v1/files/${file.id}/download`;
+    dto.url = `${this.basePath ? `/${this.basePath}` : ''}/api/v1/files/${file.id}/download`;
 
     return dto;
   }

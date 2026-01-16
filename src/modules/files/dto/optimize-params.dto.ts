@@ -1,5 +1,5 @@
 import { IsBoolean, IsInt, IsOptional, IsString, Min, Max, IsIn } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 /**
  * @deprecated Use CompressParamsDto instead. This DTO is kept for backward compatibility.
@@ -7,7 +7,7 @@ import { Type } from 'class-transformer';
 export class OptimizeParamsDto {
   @IsOptional()
   @IsBoolean()
-  @Type(() => Boolean)
+  @Transform(({ value }) => value === true || value === 'true')
   compress?: boolean;
 
   @IsOptional()
