@@ -147,6 +147,8 @@ export class FilesService {
       },
     });
 
+    let tmpKeyToCleanup: string | null = originalKey;
+
     try {
       await this.storageService.uploadStream({
         key: originalKey,
@@ -168,6 +170,8 @@ export class FilesService {
           },
         });
 
+        tmpKeyToCleanup = null;
+
         this.logger.info(
           { fileId: file.id, needsOptimization: true },
           'File uploaded, optimization pending',
@@ -186,7 +190,14 @@ export class FilesService {
       });
 
       if (existing) {
+        this.logger.info(
+          { fileId: file.id, existingFileId: existing.id, checksum },
+          'File already exists (deduplication)',
+        );
+
         await this.storageService.deleteFile(originalKey);
+        tmpKeyToCleanup = null;
+
         await (this.prismaService as any).file.delete({
           where: { id: file.id },
         });
@@ -198,7 +209,9 @@ export class FilesService {
         destinationKey: finalKey,
         contentType: mimeType,
       });
+
       await this.storageService.deleteFile(originalKey);
+      tmpKeyToCleanup = null;
 
       const updated = await this.promoteUploadedFileToReady({
         fileId: file.id,
@@ -210,13 +223,38 @@ export class FilesService {
 
       return this.toResponseDto(updated);
     } catch (error) {
-      await (this.prismaService as any).file.update({
-        where: { id: file.id },
-        data: {
-          status: FileStatus.FAILED,
-          statusChangedAt: new Date(),
-        },
-      });
+      this.logger.error({ err: error, fileId: file.id }, 'File upload stream failed');
+
+      try {
+        await (this.prismaService as any).file.update({
+          where: { id: file.id },
+          data: {
+            status: FileStatus.FAILED,
+            statusChangedAt: new Date(),
+          },
+        });
+      } catch (markError) {
+        this.logger.error(
+          { err: markError, fileId: file.id },
+          'Failed to mark file as failed (file may have been deleted)',
+        );
+      }
+
+      if (tmpKeyToCleanup) {
+        try {
+          await this.storageService.deleteFile(tmpKeyToCleanup);
+          this.logger.info(
+            { fileId: file.id, key: tmpKeyToCleanup },
+            'Cleaned up orphaned tmp/original file after upload failure',
+          );
+        } catch (cleanupError) {
+          this.logger.error(
+            { err: cleanupError, fileId: file.id, key: tmpKeyToCleanup },
+            'Failed to cleanup orphaned tmp/original file',
+          );
+        }
+      }
+
       throw error;
     }
   }
