@@ -688,6 +688,8 @@ export class FilesService {
   }
 
   private async optimizeImage(fileId: string): Promise<void> {
+    let originalS3KeyToCleanup: string | null = null;
+
     try {
       const file = await (this.prismaService as any).file.findUnique({
         where: { id: fileId },
@@ -696,6 +698,8 @@ export class FilesService {
       if (!file || !file.originalS3Key || !file.originalMimeType) {
         throw new Error('File or original not found');
       }
+
+      originalS3KeyToCleanup = file.originalS3Key;
 
       this.logger.info({ fileId }, 'Starting image optimization');
 
@@ -711,21 +715,69 @@ export class FilesService {
       const checksum = this.calculateChecksum(result.buffer);
       const finalKey = this.generateS3Key(checksum, result.format);
 
-      await this.storageService.uploadFile(finalKey, result.buffer, result.format);
-
-      await (this.prismaService as any).file.update({
-        where: { id: fileId },
-        data: {
-          s3Key: finalKey,
-          mimeType: result.format,
-          size: BigInt(result.size),
-          checksum,
-          optimizationStatus: OptimizationStatus.READY,
-          optimizationCompletedAt: new Date(),
-        },
+      const existingOptimized = await this.findReadyByChecksum({
+        checksum,
+        mimeType: result.format,
       });
 
+      if (existingOptimized) {
+        this.logger.info(
+          { fileId, existingFileId: existingOptimized.id, checksum },
+          'Optimized content already exists (deduplication)',
+        );
+
+        await (this.prismaService as any).file.delete({ where: { id: fileId } });
+        await this.storageService.deleteFile(file.originalS3Key);
+
+        this.logger.info(
+          { fileId, dedupedToFileId: existingOptimized.id },
+          'File deduplicated during optimization',
+        );
+        return;
+      }
+
+      await this.storageService.uploadFile(finalKey, result.buffer, result.format);
+
+      try {
+        await (this.prismaService as any).file.update({
+          where: { id: fileId },
+          data: {
+            s3Key: finalKey,
+            mimeType: result.format,
+            size: BigInt(result.size),
+            checksum,
+            optimizationStatus: OptimizationStatus.READY,
+            optimizationCompletedAt: new Date(),
+          },
+        });
+      } catch (updateError) {
+        if (this.isUniqueConstraintViolation(updateError)) {
+          this.logger.warn(
+            { fileId, checksum },
+            'Race condition during optimization: duplicate checksum detected',
+          );
+
+          const raceExisting = await this.findReadyByChecksum({
+            checksum,
+            mimeType: result.format,
+          });
+
+          if (raceExisting) {
+            await (this.prismaService as any).file.delete({ where: { id: fileId } });
+            await this.storageService.deleteFile(file.originalS3Key);
+
+            this.logger.info(
+              { fileId, dedupedToFileId: raceExisting.id },
+              'File deduplicated after race condition',
+            );
+            return;
+          }
+        }
+        throw updateError;
+      }
+
       await this.storageService.deleteFile(file.originalS3Key);
+      originalS3KeyToCleanup = null;
 
       this.logger.info(
         {
@@ -739,14 +791,36 @@ export class FilesService {
     } catch (error) {
       this.logger.error({ err: error, fileId }, 'Image optimization failed');
 
-      await (this.prismaService as any).file.update({
-        where: { id: fileId },
-        data: {
-          optimizationStatus: OptimizationStatus.FAILED,
-          optimizationError: error instanceof Error ? error.message : 'Unknown error',
-          optimizationCompletedAt: new Date(),
-        },
-      });
+      try {
+        await (this.prismaService as any).file.update({
+          where: { id: fileId },
+          data: {
+            optimizationStatus: OptimizationStatus.FAILED,
+            optimizationError: error instanceof Error ? error.message : 'Unknown error',
+            optimizationCompletedAt: new Date(),
+          },
+        });
+      } catch (markError) {
+        this.logger.error(
+          { err: markError, fileId },
+          'Failed to mark optimization as failed (file may have been deleted)',
+        );
+      }
+
+      if (originalS3KeyToCleanup) {
+        try {
+          await this.storageService.deleteFile(originalS3KeyToCleanup);
+          this.logger.info(
+            { fileId, key: originalS3KeyToCleanup },
+            'Cleaned up orphaned original after optimization failure',
+          );
+        } catch (cleanupError) {
+          this.logger.error(
+            { err: cleanupError, fileId, key: originalS3KeyToCleanup },
+            'Failed to cleanup orphaned original',
+          );
+        }
+      }
 
       throw error;
     }

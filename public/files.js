@@ -31,6 +31,10 @@ function buildApiUrl(pathname, searchParams) {
     return url.toString();
 }
 
+function buildThumbnailUrl(fileId, params) {
+    return buildApiUrl(`/api/v1/files/${encodeURIComponent(fileId)}/thumbnail`, params);
+}
+
 function formatFileSize(bytes) {
     if (!Number.isFinite(bytes) || bytes <= 0) {
         return '0 Bytes';
@@ -78,8 +82,23 @@ function renderFiles(items) {
             const uploadedAt = item.uploadedAt ? new Date(item.uploadedAt).toLocaleString() : '';
             const url = escapeHtml(item.url);
 
+            const isImage = typeof item.mimeType === 'string' && item.mimeType.startsWith('image/');
+            const thumbnailUrl = isImage
+                ? buildThumbnailUrl(item.id, {
+                      width: 96,
+                      height: 96,
+                  })
+                : null;
+
             return `
                 <div class="file-row">
+                    <div class="file-row-thumb">
+                        ${
+                            isImage
+                                ? `<img class="file-thumb" src="${thumbnailUrl}" alt="Thumbnail" loading="lazy" onerror="this.closest('.file-row-thumb').classList.add('failed')">`
+                                : `<div class="file-thumb-placeholder">—</div>`
+                        }
+                    </div>
                     <div class="file-row-main">
                         <div class="file-row-title">${filename}</div>
                         <div class="file-row-meta">

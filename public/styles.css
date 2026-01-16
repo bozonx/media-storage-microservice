@@ -160,6 +160,46 @@ main {
     border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
+.file-row-thumb {
+    width: 96px;
+    height: 96px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.file-thumb {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.file-thumb-placeholder {
+    color: #718096;
+    font-weight: 700;
+}
+
+.file-row-thumb.failed {
+    background: #edf2f7;
+}
+
+.file-row-thumb.failed .file-thumb {
+    display: none;
+}
+
+.file-row-thumb.failed::after {
+    content: 'No preview';
+    color: #718096;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
 .file-row-title {
     font-weight: 700;
     color: #2d3748;
