@@ -40,3 +40,24 @@ model File {
   @@unique([checksum, mimeType, status])
   @@map("files")
 }
+
+model Thumbnail {
+  id             String   @id @default(uuid()) @db.Uuid
+  fileId         String   @map("file_id") @db.Uuid
+  width          Int
+  height         Int
+  quality        Int
+  paramsHash     String   @map("params_hash") @db.VarChar(64)
+  s3Key          String   @map("s3_key") @db.VarChar(500)
+  s3Bucket       String   @map("s3_bucket") @db.VarChar(100)
+  size           BigInt
+  mimeType       String   @map("mime_type") @db.VarChar(100)
+  lastAccessedAt DateTime @default(now()) @map("last_accessed_at") @db.Timestamp(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@unique([fileId, paramsHash])
+  @@index([fileId])
+  @@index([paramsHash])
+  @@index([lastAccessedAt])
+  @@map("thumbnails")
+}

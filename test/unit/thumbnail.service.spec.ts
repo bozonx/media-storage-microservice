@@ -1,0 +1,326 @@
+import { Test, type TestingModule } from '@nestjs/testing';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { jest } from '@jest/globals';
+import { ThumbnailService } from '../../src/modules/thumbnails/thumbnail.service.js';
+import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
+import { StorageService } from '../../src/modules/storage/storage.service.js';
+import { getLoggerToken } from 'nestjs-pino';
+import { FileStatus } from '../../src/modules/files/file-status.js';
+import sharp from 'sharp';
+
+describe('ThumbnailService (unit)', () => {
+  let service: ThumbnailService;
+  let prismaService: PrismaService;
+  let storageService: StorageService;
+
+  const mockLogger = {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  };
+
+  const prismaMock = {
+    file: {
+      findFirst: jest.fn(),
+    },
+    thumbnail: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+  } as unknown as PrismaService;
+
+  const storageMock = {
+    downloadFile: jest.fn(),
+    uploadFile: jest.fn(),
+  } as unknown as StorageService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ThumbnailService,
+        {
+          provide: PrismaService,
+          useValue: prismaMock,
+        },
+        {
+          provide: StorageService,
+          useValue: storageMock,
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === 'thumbnail') {
+                return {
+                  enabled: true,
+                  defaultQuality: 80,
+                  maxWidth: 2048,
+                  maxHeight: 2048,
+                  minWidth: 10,
+                  minHeight: 10,
+                  cacheMaxAge: 31536000,
+                };
+              }
+              if (key === 'storage.bucket') {
+                return 'test-bucket';
+              }
+              return null;
+            }),
+          },
+        },
+        {
+          provide: getLoggerToken(ThumbnailService.name),
+          useValue: mockLogger,
+        },
+      ],
+    }).compile();
+
+    service = module.get<ThumbnailService>(ThumbnailService);
+    prismaService = module.get<PrismaService>(PrismaService);
+    storageService = module.get<StorageService>(StorageService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('getThumbnail', () => {
+    const fileId = 'test-file-id';
+    const mockFile = {
+      id: fileId,
+      mimeType: 'image/jpeg',
+      s3Key: 'test/file.jpg',
+      status: FileStatus.READY,
+    };
+
+    it('should throw NotFoundException when file does not exist', async () => {
+      (prismaMock.file.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.getThumbnail(fileId, { width: 100, height: 100 })).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw BadRequestException when file is not an image', async () => {
+      (prismaMock.file.findFirst as jest.Mock).mockResolvedValue({
+        ...mockFile,
+        mimeType: 'application/pdf',
+      });
+
+      await expect(service.getThumbnail(fileId, { width: 100, height: 100 })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should return cached thumbnail if exists', async () => {
+      const cachedThumbnail = {
+        id: 'thumb-id',
+        fileId,
+        width: 100,
+        height: 100,
+        quality: 80,
+        s3Key: 'thumbs/test-file-id/hash.webp',
+        size: BigInt(1000),
+        mimeType: 'image/webp',
+      };
+
+      const thumbnailBuffer = Buffer.from('cached thumbnail');
+
+      (prismaMock.file.findFirst as jest.Mock).mockResolvedValue(mockFile);
+      (prismaMock.thumbnail.findUnique as jest.Mock).mockResolvedValue(cachedThumbnail);
+      (prismaMock.thumbnail.update as jest.Mock).mockResolvedValue(cachedThumbnail);
+      (storageMock.downloadFile as jest.Mock).mockResolvedValue(thumbnailBuffer);
+
+      const result = await service.getThumbnail(fileId, { width: 100, height: 100 });
+
+      expect(result.buffer).toBe(thumbnailBuffer);
+      expect(result.mimeType).toBe('image/webp');
+      expect(result.size).toBe(1000);
+      expect(result.cacheMaxAge).toBe(31536000);
+      expect(prismaMock.thumbnail.update).toHaveBeenCalledWith({
+        where: { id: 'thumb-id' },
+        data: { lastAccessedAt: expect.any(Date) },
+      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.objectContaining({ fileId }),
+        'Thumbnail cache hit',
+      );
+    });
+
+    it('should generate new thumbnail when not cached', async () => {
+      const originalBuffer = await sharp({
+        create: {
+          width: 500,
+          height: 500,
+          channels: 3,
+          background: { r: 255, g: 0, b: 0 },
+        },
+      })
+        .jpeg()
+        .toBuffer();
+
+      (prismaMock.file.findFirst as jest.Mock).mockResolvedValue(mockFile);
+      (prismaMock.thumbnail.findUnique as jest.Mock).mockResolvedValue(null);
+      (storageMock.downloadFile as jest.Mock).mockResolvedValue(originalBuffer);
+      (storageMock.uploadFile as jest.Mock).mockResolvedValue(undefined);
+      (prismaMock.thumbnail.create as jest.Mock).mockResolvedValue({
+        id: 'new-thumb-id',
+        fileId,
+        width: 100,
+        height: 100,
+        quality: 80,
+        s3Key: 'thumbs/test-file-id/hash.webp',
+        size: BigInt(500),
+        mimeType: 'image/webp',
+      });
+
+      const result = await service.getThumbnail(fileId, { width: 100, height: 100 });
+
+      expect(result.buffer).toBeInstanceOf(Buffer);
+      expect(result.mimeType).toBe('image/webp');
+      expect(result.size).toBeGreaterThan(0);
+      expect(storageMock.uploadFile).toHaveBeenCalledWith(
+        expect.stringContaining('thumbs/'),
+        expect.any(Buffer),
+        'image/webp',
+      );
+      expect(prismaMock.thumbnail.create).toHaveBeenCalled();
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.objectContaining({ fileId }),
+        'Generating new thumbnail',
+      );
+    });
+
+    it('should use default quality when not provided', async () => {
+      const originalBuffer = await sharp({
+        create: {
+          width: 500,
+          height: 500,
+          channels: 3,
+          background: { r: 255, g: 0, b: 0 },
+        },
+      })
+        .jpeg()
+        .toBuffer();
+
+      (prismaMock.file.findFirst as jest.Mock).mockResolvedValue(mockFile);
+      (prismaMock.thumbnail.findUnique as jest.Mock).mockResolvedValue(null);
+      (storageMock.downloadFile as jest.Mock).mockResolvedValue(originalBuffer);
+      (storageMock.uploadFile as jest.Mock).mockResolvedValue(undefined);
+      (prismaMock.thumbnail.create as jest.Mock).mockResolvedValue({
+        id: 'new-thumb-id',
+        fileId,
+        width: 100,
+        height: 100,
+        quality: 80,
+        s3Key: 'thumbs/test-file-id/hash.webp',
+        size: BigInt(500),
+        mimeType: 'image/webp',
+      });
+
+      await service.getThumbnail(fileId, { width: 100, height: 100 });
+
+      expect(prismaMock.thumbnail.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            quality: 80,
+          }),
+        }),
+      );
+    });
+
+    it('should use custom quality when provided', async () => {
+      const originalBuffer = await sharp({
+        create: {
+          width: 500,
+          height: 500,
+          channels: 3,
+          background: { r: 255, g: 0, b: 0 },
+        },
+      })
+        .jpeg()
+        .toBuffer();
+
+      (prismaMock.file.findFirst as jest.Mock).mockResolvedValue(mockFile);
+      (prismaMock.thumbnail.findUnique as jest.Mock).mockResolvedValue(null);
+      (storageMock.downloadFile as jest.Mock).mockResolvedValue(originalBuffer);
+      (storageMock.uploadFile as jest.Mock).mockResolvedValue(undefined);
+      (prismaMock.thumbnail.create as jest.Mock).mockResolvedValue({
+        id: 'new-thumb-id',
+        fileId,
+        width: 100,
+        height: 100,
+        quality: 90,
+        s3Key: 'thumbs/test-file-id/hash.webp',
+        size: BigInt(500),
+        mimeType: 'image/webp',
+      });
+
+      await service.getThumbnail(fileId, { width: 100, height: 100, quality: 90 });
+
+      expect(prismaMock.thumbnail.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            quality: 90,
+          }),
+        }),
+      );
+    });
+
+    it('should resize image maintaining aspect ratio', async () => {
+      const originalBuffer = await sharp({
+        create: {
+          width: 1000,
+          height: 500,
+          channels: 3,
+          background: { r: 255, g: 0, b: 0 },
+        },
+      })
+        .jpeg()
+        .toBuffer();
+
+      (prismaMock.file.findFirst as jest.Mock).mockResolvedValue(mockFile);
+      (prismaMock.thumbnail.findUnique as jest.Mock).mockResolvedValue(null);
+      (storageMock.downloadFile as jest.Mock).mockResolvedValue(originalBuffer);
+      (storageMock.uploadFile as jest.Mock).mockResolvedValue(undefined);
+      (prismaMock.thumbnail.create as jest.Mock).mockResolvedValue({
+        id: 'new-thumb-id',
+        fileId,
+        width: 200,
+        height: 200,
+        quality: 80,
+        s3Key: 'thumbs/test-file-id/hash.webp',
+        size: BigInt(500),
+        mimeType: 'image/webp',
+      });
+
+      const result = await service.getThumbnail(fileId, { width: 200, height: 200 });
+
+      const metadata = await sharp(result.buffer).metadata();
+      expect(metadata.width).toBeLessThanOrEqual(200);
+      expect(metadata.height).toBeLessThanOrEqual(200);
+    });
+
+    it('should throw BadRequestException on thumbnail generation error', async () => {
+      const invalidBuffer = Buffer.from('invalid image data');
+
+      (prismaMock.file.findFirst as jest.Mock).mockResolvedValue(mockFile);
+      (prismaMock.thumbnail.findUnique as jest.Mock).mockResolvedValue(null);
+      (storageMock.downloadFile as jest.Mock).mockResolvedValue(invalidBuffer);
+
+      await expect(service.getThumbnail(fileId, { width: 100, height: 100 })).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          err: expect.any(Error),
+        }),
+        'Failed to generate thumbnail',
+      );
+    });
+  });
+});
