@@ -9,6 +9,25 @@ const results = document.getElementById('results');
 
 let selectedFiles = [];
 
+function getBasePathPrefix() {
+    const path = window.location.pathname;
+    const idx = path.indexOf('/ui');
+    if (idx <= 0) {
+        return '';
+    }
+    return path.substring(0, idx);
+}
+
+function buildThumbnailUrl(fileId, params) {
+    const basePathPrefix = getBasePathPrefix();
+    const search = new URLSearchParams({
+        width: String(params.width),
+        height: String(params.height),
+        ...(typeof params.quality === 'number' ? { quality: String(params.quality) } : {}),
+    });
+    return `${basePathPrefix}/files/${encodeURIComponent(fileId)}/thumbnail?${search.toString()}`;
+}
+
 browseBtn.addEventListener('click', () => {
     fileInput.click();
 });
@@ -132,6 +151,8 @@ function showResult(fileName, data, success) {
     resultItem.className = `result-item ${success ? 'success' : 'error'}`;
     
     if (success) {
+        const isImage = typeof data.mimeType === 'string' && data.mimeType.startsWith('image/');
+        const thumbnailUrl = isImage ? buildThumbnailUrl(data.id, { width: 320, height: 320 }) : null;
         resultItem.innerHTML = `
             <span class="result-icon">✓</span>
             <div class="result-message">
@@ -140,8 +161,28 @@ function showResult(fileName, data, success) {
                     ID: ${data.id} | 
                     <a href="${data.url}" target="_blank">View file</a>
                 </div>
+                ${
+                    isImage
+                        ? `
+                    <div class="result-preview">
+                        <div class="result-preview-label">Thumbnail preview</div>
+                        <img class="result-preview-image" src="${thumbnailUrl}" alt="Thumbnail preview" loading="lazy">
+                    </div>
+                `
+                        : ''
+                }
             </div>
         `;
+
+        if (isImage) {
+            const img = resultItem.querySelector('.result-preview-image');
+            const label = resultItem.querySelector('.result-preview-label');
+            if (img && label) {
+                img.addEventListener('error', () => {
+                    label.textContent = 'Thumbnail preview (failed to load)';
+                });
+            }
+        }
     } else {
         resultItem.innerHTML = `
             <span class="result-icon">✗</span>

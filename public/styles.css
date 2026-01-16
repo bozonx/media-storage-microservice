@@ -261,3 +261,22 @@ main {
 .result-url a:hover {
     text-decoration: underline;
 }
+
+.result-preview {
+    margin-top: 10px;
+}
+
+.result-preview-label {
+    font-size: 0.875rem;
+    color: #2d3748;
+    margin-bottom: 6px;
+}
+
+.result-preview-image {
+    display: block;
+    max-width: 240px;
+    max-height: 240px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(0, 0, 0, 0.03);
+}
