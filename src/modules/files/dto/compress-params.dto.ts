@@ -36,4 +36,9 @@ export class CompressParamsDto {
   @IsBoolean()
   @IsOptional()
   stripMetadata?: boolean;
+
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  @IsOptional()
+  autoOrient?: boolean;
 }

@@ -118,8 +118,13 @@ curl -X POST http://localhost:8080/api/v1/files \
 
 # С метаданными
 curl -X POST http://localhost:8080/api/v1/files \
-  -F "file=@document.pdf" \
-  -F 'metadata={"description":"Invoice","tags":["2024","invoice"]}'
+  -F "file=@./my-image.jpg" \
+  -F 'optimize={"format":"webp","quality":80,"maxWidth":1920,"maxHeight":1080}'
+
+# Отключить авто-ориентацию (по умолчанию true)
+curl -X POST http://localhost:8080/api/v1/files \
+  -F "file=@./my-image.jpg" \
+  -F 'optimize={"format":"webp","quality":80,"autoOrient":false}'
 
 # С метками
 curl -X POST http://localhost:8080/api/v1/files \

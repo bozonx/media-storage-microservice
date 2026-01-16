@@ -15,9 +15,12 @@ import {
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { basename } from 'path';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
 import { FilesService } from './files.service.js';
 import { ListFilesDto } from './dto/list-files.dto.js';
 import { BulkDeleteFilesDto } from './dto/bulk-delete-files.dto.js';
+import { CompressParamsDto } from './dto/compress-params.dto.js';
 
 function sanitizeFilename(filename: string): string {
   const normalized = (filename ?? '').normalize('NFKC');
@@ -167,12 +170,45 @@ export class FilesController {
     const userId = this.getOptionalMultipartField(data, 'userId');
     const purpose = this.getOptionalMultipartField(data, 'purpose');
 
+    let compressParams: CompressParamsDto | undefined;
+    const optimizeField = data.fields.optimize as any;
+    if (optimizeField?.value) {
+      try {
+        const raw = JSON.parse(optimizeField.value);
+        const instance = plainToInstance(CompressParamsDto, raw);
+        const errors = validateSync(instance, {
+          whitelist: true,
+          forbidNonWhitelisted: true,
+        });
+        if (errors.length > 0) {
+          throw new Error('Validation failed');
+        }
+        compressParams = instance;
+      } catch {
+        throw new BadRequestException('Invalid optimize parameter');
+      }
+    }
+
     if (isExecutableMimeType(data.mimetype)) {
       throw new UnsupportedMediaTypeException('Executable file types are not allowed');
     }
 
     if (isArchiveMimeType(data.mimetype)) {
       throw new UnsupportedMediaTypeException('Archive file types are not allowed');
+    }
+
+    if (compressParams) {
+      const buffer = await data.toBuffer();
+      return this.filesService.uploadFile({
+        buffer,
+        filename: sanitizeFilename(data.filename),
+        mimeType: data.mimetype,
+        compressParams,
+        metadata,
+        appId,
+        userId,
+        purpose,
+      });
     }
 
     return this.filesService.uploadFileStream({

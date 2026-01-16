@@ -74,7 +74,12 @@ export class ImageOptimizerService {
         ? this.compressionConfig.losslessDefault
         : (params.lossless ?? this.compressionConfig.losslessDefault);
 
-      let pipeline = sharp(buffer).autoOrient();
+      const autoOrient = params.autoOrient ?? true;
+
+      let pipeline = sharp(buffer);
+      if (autoOrient) {
+        pipeline = pipeline.autoOrient();
+      }
 
       pipeline = pipeline.resize(maxWidth, maxHeight, {
         fit: sharp.fit.inside,
@@ -126,6 +131,7 @@ export class ImageOptimizerService {
           quality,
           lossless,
           stripMetadata,
+          autoOrient,
         },
         'Image compressed',
       );

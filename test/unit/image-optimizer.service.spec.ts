@@ -91,6 +91,7 @@ describe('ImageOptimizerService (unit)', () => {
           beforeBytes: inputBuffer.length,
           afterBytes: result.size,
           format: 'webp',
+          autoOrient: true,
         }),
         'Image compressed',
       );
@@ -163,6 +164,7 @@ describe('ImageOptimizerService (unit)', () => {
         expect.objectContaining({
           format: 'webp',
           quality: 80,
+          autoOrient: true,
         }),
         'Image compressed',
       );
@@ -193,6 +195,7 @@ describe('ImageOptimizerService (unit)', () => {
           format: 'webp',
           stripMetadata: false,
           lossless: false,
+          autoOrient: true,
         }),
         'Image compressed',
       );
@@ -245,6 +248,7 @@ describe('ImageOptimizerService (unit)', () => {
         expect.objectContaining({
           stripMetadata: false,
           lossless: false,
+          autoOrient: true,
         }),
         'Image compressed',
       );
@@ -273,6 +277,55 @@ describe('ImageOptimizerService (unit)', () => {
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
           stripMetadata: false,
+          autoOrient: true,
+        }),
+        'Image compressed',
+      );
+    });
+
+    it('should call autoOrient by default', async () => {
+      const autoOrientSpy = jest.spyOn(sharp.prototype, 'autoOrient');
+      const inputBuffer = await sharp({
+        create: {
+          width: 100,
+          height: 100,
+          channels: 3,
+          background: { r: 255, g: 0, b: 0 },
+        },
+      })
+        .png()
+        .toBuffer();
+
+      await service.compressImage(inputBuffer, 'image/png', {}, false);
+
+      expect(autoOrientSpy).toHaveBeenCalled();
+    });
+
+    it('should allow disabling autoOrient', async () => {
+      const autoOrientSpy = jest.spyOn(sharp.prototype, 'autoOrient');
+      const inputBuffer = await sharp({
+        create: {
+          width: 100,
+          height: 100,
+          channels: 3,
+          background: { r: 255, g: 0, b: 0 },
+        },
+      })
+        .png()
+        .toBuffer();
+
+      const result = await service.compressImage(
+        inputBuffer,
+        'image/png',
+        { format: 'webp', quality: 80, autoOrient: false },
+        false,
+      );
+
+      expect(result.format).toBe('image/webp');
+      expect(autoOrientSpy).not.toHaveBeenCalled();
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          autoOrient: false,
         }),
         'Image compressed',
       );
