@@ -26,6 +26,9 @@ enum OptimizationStatus {
 model File {
   id                      String              @id @default(uuid()) @db.Uuid
   filename                String              @db.VarChar(255)
+  appId                   String?             @map("app_id") @db.VarChar(100)
+  userId                  String?             @map("user_id") @db.VarChar(100)
+  purpose                 String?             @db.VarChar(50)
   
   // Original (temporary, for optimization only)
   originalS3Key           String?             @map("original_s3_key") @db.VarChar(500)
@@ -63,6 +66,10 @@ model File {
   @@index([s3Key])
   @@index([optimizationStatus])
   @@index([deletedAt])
+  @@index([appId])
+  @@index([userId])
+  @@index([purpose])
+  @@index([appId, userId])
   @@unique([checksum, mimeType, status])
   @@map("files")
 }

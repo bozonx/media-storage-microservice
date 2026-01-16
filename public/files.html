@@ -29,9 +29,25 @@
                     <input class="control-input" type="text" id="mimeInput" placeholder="e.g. image/png" autocomplete="off">
                 </div>
 
+                <div class="control-group">
+                    <label class="control-label" for="appIdInput">Filter by appId</label>
+                    <input class="control-input" type="text" id="appIdInput" placeholder="e.g. my-app" autocomplete="off">
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label" for="userIdInput">Filter by userId</label>
+                    <input class="control-input" type="text" id="userIdInput" placeholder="e.g. user-123" autocomplete="off">
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label" for="purposeInput">Filter by purpose</label>
+                    <input class="control-input" type="text" id="purposeInput" placeholder="e.g. avatar" autocomplete="off">
+                </div>
+
                 <div class="control-actions">
                     <button type="button" class="btn btn-primary" id="refreshBtn">Refresh</button>
                     <button type="button" class="btn btn-secondary" id="clearFiltersBtn">Clear</button>
+                    <button type="button" class="btn btn-danger" id="bulkDeleteBtn">Bulk delete</button>
                 </div>
 
                 <div class="hint">Showing up to 10 items. No pagination.</div>

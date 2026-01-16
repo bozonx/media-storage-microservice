@@ -2,8 +2,32 @@ const filesList = document.getElementById('filesList');
 const statusEl = document.getElementById('status');
 const searchInput = document.getElementById('searchInput');
 const mimeInput = document.getElementById('mimeInput');
+const appIdInput = document.getElementById('appIdInput');
+const userIdInput = document.getElementById('userIdInput');
+const purposeInput = document.getElementById('purposeInput');
 const refreshBtn = document.getElementById('refreshBtn');
 const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+
+async function bulkDeleteFiles(filters) {
+    const url = buildApiUrl('/api/v1/files/bulk-delete');
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(filters || {}),
+    });
+
+    if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const message = typeof body.message === 'string' ? body.message : 'Bulk delete request failed';
+        throw new Error(message);
+    }
+
+    return response.json().catch(() => ({}));
+}
 
 function getBasePathPrefix() {
     const path = window.location.pathname;
@@ -95,6 +119,9 @@ function renderFiles(items) {
             const size = formatFileSize(item.size);
             const uploadedAt = item.uploadedAt ? new Date(item.uploadedAt).toLocaleString() : '';
             const url = escapeHtml(item.url);
+            const appId = escapeHtml(item.appId || '—');
+            const userId = escapeHtml(item.userId || '—');
+            const purpose = escapeHtml(item.purpose || '—');
 
             const isImage = typeof item.mimeType === 'string' && item.mimeType.startsWith('image/');
             const thumbnailUrl = isImage
@@ -117,6 +144,9 @@ function renderFiles(items) {
                         <div class="file-row-title">${filename}</div>
                         <div class="file-row-meta">
                             <span><strong>ID:</strong> ${id}</span>
+                            <span><strong>appId:</strong> ${appId}</span>
+                            <span><strong>userId:</strong> ${userId}</span>
+                            <span><strong>purpose:</strong> ${purpose}</span>
                             <span><strong>MIME:</strong> ${mimeType}</span>
                             <span><strong>Size:</strong> ${size}</span>
                             <span><strong>Uploaded:</strong> ${escapeHtml(uploadedAt)}</span>
@@ -176,6 +206,9 @@ async function loadFiles() {
 
     const q = searchInput.value;
     const mimeType = mimeInput.value;
+    const appId = appIdInput.value;
+    const userId = userIdInput.value;
+    const purpose = purposeInput.value;
 
     const url = buildApiUrl('/api/v1/files', {
         limit: 10,
@@ -184,6 +217,9 @@ async function loadFiles() {
         order: 'desc',
         q: q,
         mimeType: mimeType,
+        appId: appId,
+        userId: userId,
+        purpose: purpose,
     });
 
     try {
@@ -221,6 +257,9 @@ refreshBtn.addEventListener('click', () => {
 clearFiltersBtn.addEventListener('click', () => {
     searchInput.value = '';
     mimeInput.value = '';
+    appIdInput.value = '';
+    userIdInput.value = '';
+    purposeInput.value = '';
     loadFiles();
 });
 
@@ -230,6 +269,55 @@ searchInput.addEventListener('input', () => {
 
 mimeInput.addEventListener('input', () => {
     debounceLoad();
+});
+
+appIdInput.addEventListener('input', () => {
+    debounceLoad();
+});
+
+userIdInput.addEventListener('input', () => {
+    debounceLoad();
+});
+
+purposeInput.addEventListener('input', () => {
+    debounceLoad();
+});
+
+bulkDeleteBtn.addEventListener('click', async () => {
+    const appId = appIdInput.value;
+    const userId = userIdInput.value;
+    const purpose = purposeInput.value;
+
+    if (!appId.trim() && !userId.trim() && !purpose.trim()) {
+        setStatus('Provide at least one tag filter (appId, userId or purpose) for bulk delete', 'error');
+        return;
+    }
+
+    const confirmed = window.confirm('Soft delete files matching current tag filters?');
+    if (!confirmed) {
+        return;
+    }
+
+    bulkDeleteBtn.disabled = true;
+    setStatus('Bulk deleting...', 'info');
+
+    try {
+        const result = await bulkDeleteFiles({
+            appId: appId,
+            userId: userId,
+            purpose: purpose,
+        });
+
+        const deleted = typeof result.deleted === 'number' ? result.deleted : 0;
+        const matched = typeof result.matched === 'number' ? result.matched : 0;
+
+        await loadFiles();
+        setStatus(`Bulk delete completed. Matched: ${matched}, deleted: ${deleted}`, 'success');
+    } catch (error) {
+        setStatus(error?.message || 'Bulk delete failed', 'error');
+    } finally {
+        bulkDeleteBtn.disabled = false;
+    }
 });
 
 loadFiles();

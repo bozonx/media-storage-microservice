@@ -12,6 +12,7 @@ import { Transform, type Readable } from 'stream';
 import { StorageService } from '../storage/storage.service.js';
 import { ImageOptimizerService } from '../optimization/image-optimizer.service.js';
 import { CompressParamsDto } from './dto/compress-params.dto.js';
+import { BulkDeleteFilesDto } from './dto/bulk-delete-files.dto.js';
 import { ListFilesDto } from './dto/list-files.dto.js';
 import { FileResponseDto } from './dto/file-response.dto.js';
 import { ListFilesResponseDto } from './dto/list-files-response.dto.js';
@@ -43,6 +44,9 @@ export interface UploadFileParams {
   mimeType: string;
   compressParams?: CompressParamsDto;
   metadata?: Record<string, any>;
+  appId?: string;
+  userId?: string;
+  purpose?: string;
 }
 
 function cryptoRandomId(): string {
@@ -110,8 +114,11 @@ export class FilesService {
     filename: string;
     mimeType: string;
     metadata?: Record<string, any>;
+    appId?: string;
+    userId?: string;
+    purpose?: string;
   }): Promise<FileResponseDto> {
-    const { stream, filename, mimeType, metadata } = params;
+    const { stream, filename, mimeType, metadata, appId, userId, purpose } = params;
 
     const needsOptimization = this.forceCompression && this.isImage(mimeType);
     const originalKey = needsOptimization
@@ -121,6 +128,9 @@ export class FilesService {
     const file = await (this.prismaService as any).file.create({
       data: {
         filename,
+        appId: appId ?? null,
+        userId: userId ?? null,
+        purpose: purpose ?? null,
         originalMimeType: needsOptimization ? mimeType : null,
         originalSize: null,
         originalChecksum: null,
@@ -293,7 +303,7 @@ export class FilesService {
    * The resulting content is then deduplicated by checksum.
    */
   async uploadFile(params: UploadFileParams): Promise<FileResponseDto> {
-    const { buffer, filename, mimeType, compressParams, metadata } = params;
+    const { buffer, filename, mimeType, compressParams, metadata, appId, userId, purpose } = params;
 
     let processedBuffer = buffer;
     let processedMimeType = mimeType;
@@ -345,6 +355,9 @@ export class FilesService {
       file = await (this.prismaService as any).file.create({
         data: {
           filename,
+          appId: appId ?? null,
+          userId: userId ?? null,
+          purpose: purpose ?? null,
           mimeType: processedMimeType,
           size: BigInt(processedBuffer.length),
           originalSize: originalSize === null ? null : BigInt(originalSize),
@@ -515,12 +528,85 @@ export class FilesService {
     this.logger.info({ fileId: id }, 'File marked for deletion (soft delete)');
   }
 
+  async bulkDeleteFiles(params: BulkDeleteFilesDto): Promise<{ matched: number; deleted: number }> {
+    const appId = typeof params.appId === 'string' ? params.appId.trim() : '';
+    const userId = typeof params.userId === 'string' ? params.userId.trim() : '';
+    const purpose = typeof params.purpose === 'string' ? params.purpose.trim() : '';
+
+    if (appId.length === 0 && userId.length === 0 && purpose.length === 0) {
+      throw new BadRequestException('At least one tag filter is required: appId, userId, purpose');
+    }
+
+    const limit =
+      typeof params.limit === 'number' && Number.isFinite(params.limit) ? params.limit : 1000;
+    const dryRun = Boolean(params.dryRun);
+
+    const where: any = {
+      status: FileStatus.READY,
+      deletedAt: null,
+    };
+    if (appId.length > 0) {
+      where.appId = appId;
+    }
+    if (userId.length > 0) {
+      where.userId = userId;
+    }
+    if (purpose.length > 0) {
+      where.purpose = purpose;
+    }
+
+    const candidates = (await (this.prismaService as any).file.findMany({
+      where,
+      take: limit,
+      select: { id: true },
+    })) as Array<{ id: string }>;
+
+    if (candidates.length === 0) {
+      return { matched: 0, deleted: 0 };
+    }
+
+    if (dryRun) {
+      return { matched: candidates.length, deleted: 0 };
+    }
+
+    const ids = candidates.map(v => v.id);
+    const updated = await (this.prismaService as any).file.updateMany({
+      where: { id: { in: ids }, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+
+    const deleted = updated?.count ?? 0;
+
+    this.logger.info(
+      {
+        matched: candidates.length,
+        deleted,
+        appId: appId || undefined,
+        userId: userId || undefined,
+        purpose: purpose || undefined,
+      },
+      'Bulk delete completed (soft delete)',
+    );
+
+    return { matched: candidates.length, deleted };
+  }
+
   /**
    * Lists READY files with optional search by filename and filter by MIME type.
    * Excludes soft-deleted files.
    */
   async listFiles(params: ListFilesDto): Promise<ListFilesResponseDto> {
-    const { limit = 50, offset = 0, sortBy = 'uploadedAt', order = 'desc', q, mimeType } = params;
+    const {
+      limit = 50,
+      offset = 0,
+      sortBy = 'uploadedAt',
+      order = 'desc',
+      q,
+      mimeType,
+      appId,
+      userId,
+      purpose,
+    } = params;
 
     const where: any = { status: FileStatus.READY, deletedAt: null };
     if (typeof q === 'string' && q.trim().length > 0) {
@@ -531,6 +617,15 @@ export class FilesService {
     }
     if (typeof mimeType === 'string' && mimeType.trim().length > 0) {
       where.mimeType = mimeType.trim();
+    }
+    if (typeof appId === 'string' && appId.trim().length > 0) {
+      where.appId = appId.trim();
+    }
+    if (typeof userId === 'string' && userId.trim().length > 0) {
+      where.userId = userId.trim();
+    }
+    if (typeof purpose === 'string' && purpose.trim().length > 0) {
+      where.purpose = purpose.trim();
     }
     const [items, total] = await (this.prismaService as any).$transaction([
       (this.prismaService as any).file.findMany({
@@ -555,6 +650,9 @@ export class FilesService {
   private toResponseDto(file: {
     id: string;
     filename: string;
+    appId?: string | null;
+    userId?: string | null;
+    purpose?: string | null;
     mimeType: string;
     size: bigint | null;
     originalSize: bigint | null;
@@ -569,6 +667,9 @@ export class FilesService {
     dto.originalSize = file.originalSize === null ? undefined : Number(file.originalSize);
     dto.checksum = file.checksum ?? '';
     dto.uploadedAt = file.uploadedAt ?? new Date(0);
+    dto.appId = file.appId ?? undefined;
+    dto.userId = file.userId ?? undefined;
+    dto.purpose = file.purpose ?? undefined;
 
     dto.url = `${this.basePath ? `/${this.basePath}` : ''}/api/v1/files/${file.id}/download`;
 

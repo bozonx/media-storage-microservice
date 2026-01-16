@@ -5,6 +5,7 @@ import {
   Delete,
   Param,
   Query,
+  Body,
   Res,
   Req,
   HttpStatus,
@@ -16,6 +17,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { basename } from 'path';
 import { FilesService } from './files.service.js';
 import { ListFilesDto } from './dto/list-files.dto.js';
+import { BulkDeleteFilesDto } from './dto/bulk-delete-files.dto.js';
 
 function sanitizeFilename(filename: string): string {
   const normalized = (filename ?? '').normalize('NFKC');
@@ -119,6 +121,12 @@ function isArchiveMimeType(mimeType: string): boolean {
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
+  private getOptionalMultipartField(data: any, fieldName: string): string | undefined {
+    const field = data?.fields?.[fieldName] as any;
+    const value = typeof field?.value === 'string' ? field.value.trim() : '';
+    return value.length > 0 ? value : undefined;
+  }
+
   /**
    * Uploads a file using multipart/form-data.
    *
@@ -126,6 +134,9 @@ export class FilesController {
    * - `file` (required)
    * - `optimize` (optional JSON string, images only)
    * - `metadata` (optional JSON string)
+   * - `appId` (optional string)
+   * - `userId` (optional string)
+   * - `purpose` (optional string)
    *
    * Depending on `optimize` presence, the controller either:
    * - reads the whole file into memory and performs optional image optimization, or
@@ -152,6 +163,10 @@ export class FilesController {
       }
     }
 
+    const appId = this.getOptionalMultipartField(data, 'appId');
+    const userId = this.getOptionalMultipartField(data, 'userId');
+    const purpose = this.getOptionalMultipartField(data, 'purpose');
+
     if (isExecutableMimeType(data.mimetype)) {
       throw new UnsupportedMediaTypeException('Executable file types are not allowed');
     }
@@ -165,7 +180,15 @@ export class FilesController {
       filename: sanitizeFilename(data.filename),
       mimeType: data.mimetype,
       metadata,
+      appId,
+      userId,
+      purpose,
     });
+  }
+
+  @Post('bulk-delete')
+  async bulkDelete(@Body() body: BulkDeleteFilesDto) {
+    return this.filesService.bulkDeleteFiles(body);
   }
 
   @Get(':id')

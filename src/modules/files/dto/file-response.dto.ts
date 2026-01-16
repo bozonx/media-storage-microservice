@@ -9,6 +9,15 @@ export class FileResponseDto {
   filename!: string;
 
   @Expose()
+  appId?: string;
+
+  @Expose()
+  userId?: string;
+
+  @Expose()
+  purpose?: string;
+
+  @Expose()
   mimeType!: string;
 
   @Expose()

@@ -535,6 +535,9 @@ describe('FilesService (unit)', () => {
         {
           id: 'id1',
           filename: 'a.txt',
+          appId: 'app-1',
+          userId: 'user-1',
+          purpose: 'avatar',
           mimeType: 'text/plain',
           size: 1n,
           originalSize: null,
@@ -555,6 +558,55 @@ describe('FilesService (unit)', () => {
       expect(res.total).toBe(1);
       expect(res.items).toHaveLength(1);
       expect(res.items[0]?.id).toBe('id1');
+      expect(res.items[0]?.appId).toBe('app-1');
+      expect(res.items[0]?.userId).toBe('user-1');
+      expect(res.items[0]?.purpose).toBe('avatar');
+    });
+  });
+
+  describe('bulkDeleteFiles', () => {
+    it('requires at least one tag filter', async () => {
+      await expect(service.bulkDeleteFiles({} as any)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('supports dryRun and does not update records', async () => {
+      (prismaMock as any).file.findMany.mockResolvedValue([{ id: 'id1' }, { id: 'id2' }]);
+
+      const res = await service.bulkDeleteFiles({
+        appId: 'app-1',
+        dryRun: true,
+        limit: 100,
+      } as any);
+
+      expect(res).toEqual({ matched: 2, deleted: 0 });
+      expect((prismaMock as any).file.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('soft deletes up to limit and returns counters', async () => {
+      (prismaMock as any).file.findMany.mockResolvedValue([{ id: 'id1' }, { id: 'id2' }]);
+      (prismaMock as any).file.updateMany.mockResolvedValue({ count: 2 });
+
+      const res = await service.bulkDeleteFiles({
+        appId: 'app-1',
+        userId: 'user-1',
+        limit: 10,
+      } as any);
+
+      expect((prismaMock as any).file.findMany).toHaveBeenCalledWith({
+        where: {
+          status: FileStatus.READY,
+          deletedAt: null,
+          appId: 'app-1',
+          userId: 'user-1',
+        },
+        take: 10,
+        select: { id: true },
+      });
+      expect((prismaMock as any).file.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['id1', 'id2'] }, deletedAt: null },
+        data: { deletedAt: expect.any(Date) },
+      });
+      expect(res).toEqual({ matched: 2, deleted: 2 });
     });
   });
 });

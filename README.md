@@ -121,6 +121,13 @@ curl -X POST http://localhost:8080/api/v1/files \
   -F "file=@document.pdf" \
   -F 'metadata={"description":"Invoice","tags":["2024","invoice"]}'
 
+# С метками
+curl -X POST http://localhost:8080/api/v1/files \
+  -F "file=@image.jpg" \
+  -F "appId=my-app" \
+  -F "userId=user-123" \
+  -F "purpose=avatar"
+
 # Примечание: Оптимизация изображений применяется автоматически при включенном
 # FORCE_IMAGE_COMPRESSION_ENABLED=true. Оптимизация выполняется лениво при первом
 # запросе download, если файл еще не оптимизирован.
@@ -131,6 +138,9 @@ curl -X POST http://localhost:8080/api/v1/files \
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
   "filename": "image.jpg",
+  "appId": "my-app",
+  "userId": "user-123",
+  "purpose": "avatar",
   "mimeType": "image/webp",
   "size": 45678,
   "originalSize": 123456,
@@ -212,6 +222,9 @@ curl "http://localhost:8080/api/v1/files?limit=10&sortBy=size&order=asc"
 
 # С фильтрацией
 curl "http://localhost:8080/api/v1/files?q=invoice&mimeType=application/pdf"
+
+# Фильтр по меткам
+curl "http://localhost:8080/api/v1/files?appId=my-app&userId=user-123&purpose=avatar"
 ```
 
 **Query параметры:**
@@ -221,6 +234,9 @@ curl "http://localhost:8080/api/v1/files?q=invoice&mimeType=application/pdf"
 - `order` — порядок: `asc`, `desc` (по умолчанию `desc`)
 - `q` — поиск по имени файла (case-insensitive)
 - `mimeType` — фильтр по MIME типу
+- `appId` — фильтр по appId
+- `userId` — фильтр по userId
+- `purpose` — фильтр по purpose
 
 **Response:**
 ```json
@@ -231,6 +247,22 @@ curl "http://localhost:8080/api/v1/files?q=invoice&mimeType=application/pdf"
   "offset": 0
 }
 ```
+
+#### Bulk Delete Files (by tags)
+```bash
+POST /api/v1/files/bulk-delete
+Content-Type: application/json
+
+curl -X POST http://localhost:8080/api/v1/files/bulk-delete \
+  -H 'Content-Type: application/json' \
+  -d '{"appId":"my-app","userId":"user-123","purpose":"avatar","limit":1000}'
+```
+
+**Правила bulk delete:**
+- Требуется хотя бы один фильтр: `appId` или `userId` или `purpose`
+- Удаление soft delete: выставляется `deletedAt`, физическое удаление делает cleanup job
+- Максимум `limit` файлов за один запрос (по умолчанию 1000, макс 5000)
+- Поддерживается `dryRun: true` для предпросмотра без удаления
 
 ### Health Check
 ```bash
