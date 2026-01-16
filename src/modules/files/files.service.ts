@@ -60,6 +60,7 @@ export interface DownloadFileResult {
  * Result of a streaming download.
  *
  * `etag` can be used by the HTTP layer for conditional requests (If-None-Match / 304).
+ * `isPartial` and `contentRange` support HTTP Range requests (206 Partial Content).
  */
 export interface DownloadFileStreamResult {
   stream: Readable;
@@ -67,6 +68,8 @@ export interface DownloadFileStreamResult {
   mimeType: string;
   size?: number;
   etag?: string;
+  isPartial?: boolean;
+  contentRange?: string;
 }
 
 @Injectable()
@@ -137,25 +140,49 @@ export class FilesService {
 
     const hash = createHash('sha256');
     let size = 0;
+    let hashFinalized = false;
 
     const hasher = new Transform({
       transform: (chunk, _encoding, callback) => {
         const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
         size += buf.length;
-        hash.update(buf);
+        if (!hashFinalized) {
+          hash.update(buf);
+        }
         callback(null, buf);
       },
     });
 
     let tmpKeyToCleanup: string | null = originalKey;
 
+    const onAbort = async () => {
+      this.logger.warn({ fileId: file.id, key: originalKey }, 'Upload aborted by client');
+      try {
+        if (tmpKeyToCleanup) {
+          await this.storageService.deleteFile(tmpKeyToCleanup);
+        }
+        await (this.prismaService as any).file.update({
+          where: { id: file.id },
+          data: {
+            status: FileStatus.FAILED,
+            statusChangedAt: new Date(),
+          },
+        });
+      } catch (err) {
+        this.logger.error({ err, fileId: file.id }, 'Failed to cleanup after abort');
+      }
+    };
+
     try {
       await this.storageService.uploadStream({
         key: originalKey,
         body: stream.pipe(hasher),
         mimeType,
+        contentLength: undefined,
+        onAbort,
       });
 
+      hashFinalized = true;
       const checksum = `sha256:${hash.digest('hex')}`;
 
       if (needsOptimization) {
@@ -392,51 +419,18 @@ export class FilesService {
   }
 
   /**
-   * Downloads the full file contents into memory.
-   *
-   * Prefer `downloadFileStream` for large files.
-   *
-   * @throws {NotFoundException} If the file does not exist.
-   * @throws {GoneException} If the file was deleted.
-   * @throws {ConflictException} If the file is not READY.
-   */
-  async downloadFile(id: string): Promise<DownloadFileResult> {
-    const file = await (this.prismaService as any).file.findUnique({
-      where: { id },
-    });
-
-    if (!file) {
-      throw new NotFoundException('File not found');
-    }
-
-    if (file.status === FileStatus.DELETED) {
-      throw new GoneException('File has been deleted');
-    }
-
-    if (file.status !== FileStatus.READY) {
-      throw new ConflictException('File is not ready for download');
-    }
-
-    const buffer = await this.storageService.downloadFile(file.s3Key);
-
-    return {
-      buffer,
-      filename: file.filename,
-      mimeType: file.mimeType,
-      size: Number(file.size ?? 0n),
-    };
-  }
-
-  /**
    * Downloads file as a stream.
    *
-   * Returned `etag` is derived from the stored checksum when available.
+   * Always returns optimized file if optimization was requested.
+   * ETag is derived from the stored checksum (sha256) for cache consistency.
    *
+   * @param id File ID
+   * @param rangeHeader Optional Range header for partial content requests
    * @throws {NotFoundException} If the file does not exist.
    * @throws {GoneException} If the file was deleted.
-   * @throws {ConflictException} If the file is not READY.
+   * @throws {ConflictException} If the file is not READY or optimization failed.
    */
-  async downloadFileStream(id: string): Promise<DownloadFileStreamResult> {
+  async downloadFileStream(id: string, rangeHeader?: string): Promise<DownloadFileStreamResult> {
     let file = await (this.prismaService as any).file.findUnique({
       where: { id },
     });
@@ -464,21 +458,28 @@ export class FilesService {
       file = await this.ensureOptimized(id);
     }
 
-    const s3Key = file.s3Key || file.originalS3Key;
+    const s3Key = file.s3Key;
     if (!s3Key) {
       throw new ConflictException('File has no valid S3 key');
     }
 
-    const { stream, etag, contentLength } = await this.storageService.downloadStream(s3Key);
+    const result = await this.storageService.downloadStreamWithRange({
+      key: s3Key,
+      range: rangeHeader,
+    });
+
+    const etag = (file.checksum ?? '').startsWith('sha256:')
+      ? (file.checksum ?? '').replace('sha256:', '')
+      : undefined;
 
     return {
-      stream,
+      stream: result.stream,
       filename: file.filename,
-      mimeType: file.mimeType || file.originalMimeType,
-      size: file.size ? Number(file.size) : contentLength,
-      etag: (file.checksum ?? '').startsWith('sha256:')
-        ? (file.checksum ?? '').replace('sha256:', '')
-        : etag,
+      mimeType: file.mimeType,
+      size: file.size ? Number(file.size) : result.contentLength,
+      etag,
+      isPartial: result.isPartial,
+      contentRange: result.contentRange,
     };
   }
 
@@ -741,7 +742,12 @@ export class FilesService {
 
       this.logger.info({ fileId }, 'Starting image optimization');
 
-      const originalBuffer = await this.storageService.downloadFile(file.originalS3Key);
+      const { stream } = await this.storageService.downloadStream(file.originalS3Key);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(Buffer.from(chunk));
+      }
+      const originalBuffer = Buffer.concat(chunks);
 
       const result = await this.imageOptimizer.compressImage(
         originalBuffer,

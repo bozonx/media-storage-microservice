@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { jest } from '@jest/globals';
 import { FilesService } from '../../src/modules/files/files.service.js';
 import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
 import { StorageService } from '../../src/modules/storage/storage.service.js';
@@ -39,7 +40,7 @@ describe('FilesService - Deduplication', () => {
       providers: [
         FilesService,
         {
-          provide: 'PinoLogger',
+          provide: 'PinoLogger:FilesService',
           useValue: mockLogger,
         },
         {
@@ -61,7 +62,7 @@ describe('FilesService - Deduplication', () => {
             uploadFile: jest.fn(),
             copyObject: jest.fn(),
             deleteFile: jest.fn(),
-            downloadFile: jest.fn(),
+            downloadStream: jest.fn(),
           },
         },
         {
@@ -293,7 +294,11 @@ describe('FilesService - Deduplication', () => {
       };
 
       (prismaService.file.findUnique as jest.Mock).mockResolvedValue(fileToOptimize);
-      (storageService.downloadFile as jest.Mock).mockResolvedValue(Buffer.from('original'));
+      (storageService.downloadStream as jest.Mock).mockResolvedValue({
+        stream: (async function* () {
+          yield Buffer.from('original');
+        })(),
+      });
       (imageOptimizer.compressImage as jest.Mock).mockResolvedValue({
         buffer: Buffer.from('optimized'),
         format: 'image/webp',
@@ -337,7 +342,11 @@ describe('FilesService - Deduplication', () => {
       };
 
       (prismaService.file.findUnique as jest.Mock).mockResolvedValue(fileToOptimize);
-      (storageService.downloadFile as jest.Mock).mockResolvedValue(Buffer.from('original'));
+      (storageService.downloadStream as jest.Mock).mockResolvedValue({
+        stream: (async function* () {
+          yield Buffer.from('original');
+        })(),
+      });
       (imageOptimizer.compressImage as jest.Mock).mockResolvedValue({
         buffer: Buffer.from('optimized'),
         format: 'image/webp',
@@ -376,7 +385,7 @@ describe('FilesService - Deduplication', () => {
       };
 
       (prismaService.file.findUnique as jest.Mock).mockResolvedValue(fileToOptimize);
-      (storageService.downloadFile as jest.Mock).mockRejectedValue(new Error('Download failed'));
+      (storageService.downloadStream as jest.Mock).mockRejectedValue(new Error('Download failed'));
       (prismaService.file.update as jest.Mock).mockResolvedValue(undefined);
       (storageService.deleteFile as jest.Mock).mockResolvedValue(undefined);
 

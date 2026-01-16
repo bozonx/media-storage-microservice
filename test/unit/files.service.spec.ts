@@ -42,8 +42,8 @@ describe('FilesService (unit)', () => {
   const storageMock: any = {
     uploadFile: jest.fn(),
     uploadStream: jest.fn(),
-    downloadFile: jest.fn(),
     downloadStream: jest.fn(),
+    downloadStreamWithRange: jest.fn(),
     deleteFile: jest.fn(),
     copyObject: jest.fn(),
   };
@@ -479,43 +479,6 @@ describe('FilesService (unit)', () => {
       });
 
       expect(res.id).toBe('created-id');
-    });
-  });
-
-  describe('downloadFile', () => {
-    it('throws NotFound when db record missing', async () => {
-      (prismaMock as any).file.findUnique.mockResolvedValue(null);
-      await expect(service.downloadFile('id')).rejects.toBeInstanceOf(NotFoundException);
-    });
-
-    it('throws Gone when status deleted', async () => {
-      (prismaMock as any).file.findUnique.mockResolvedValue({ status: FileStatus.DELETED });
-      await expect(service.downloadFile('id')).rejects.toBeInstanceOf(GoneException);
-    });
-
-    it('throws Conflict when status not READY', async () => {
-      (prismaMock as any).file.findUnique.mockResolvedValue({ status: FileStatus.UPLOADING });
-      await expect(service.downloadFile('id')).rejects.toBeInstanceOf(ConflictException);
-    });
-
-    it('downloads from storage when READY', async () => {
-      (prismaMock as any).file.findUnique.mockResolvedValue({
-        id: 'id',
-        filename: 'a.txt',
-        mimeType: 'text/plain',
-        size: 3n,
-        status: FileStatus.READY,
-        s3Key: 'aa/bb/cc.txt',
-      });
-      (storageMock.downloadFile as any).mockResolvedValue(Buffer.from('abc'));
-
-      const res = await service.downloadFile('id');
-      expect(res).toEqual({
-        buffer: Buffer.from('abc'),
-        filename: 'a.txt',
-        mimeType: 'text/plain',
-        size: 3,
-      });
     });
   });
 

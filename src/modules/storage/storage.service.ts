@@ -103,19 +103,33 @@ export class StorageService implements OnModuleDestroy {
     mimeType: string;
     contentLength?: number;
     metadata?: Record<string, string>;
+    onAbort?: () => void;
   }): Promise<void> {
+    const uploader = new Upload({
+      client: this.s3Client,
+      params: {
+        Bucket: this.bucket,
+        Key: params.key,
+        Body: params.body,
+        ContentType: params.mimeType,
+        ...(params.contentLength !== undefined && { ContentLength: params.contentLength }),
+        Metadata: params.metadata,
+      },
+    });
+
     try {
-      const uploader = new Upload({
-        client: this.s3Client,
-        params: {
-          Bucket: this.bucket,
-          Key: params.key,
-          Body: params.body,
-          ContentType: params.mimeType,
-          ...(params.contentLength !== undefined && { ContentLength: params.contentLength }),
-          Metadata: params.metadata,
-        },
-      });
+      if (params.onAbort) {
+        params.body.once('error', () => {
+          uploader.abort().catch(() => {});
+          params.onAbort?.();
+        });
+        params.body.once('close', () => {
+          if (!params.body.readableEnded) {
+            uploader.abort().catch(() => {});
+            params.onAbort?.();
+          }
+        });
+      }
 
       await uploader.done();
       this.logger.info({ key: params.key }, 'File uploaded successfully');
@@ -125,40 +139,18 @@ export class StorageService implements OnModuleDestroy {
     }
   }
 
-  async downloadFile(key: string): Promise<Buffer> {
+  async downloadStreamWithRange(params: { key: string; range?: string }): Promise<{
+    stream: Readable;
+    contentLength?: number;
+    contentRange?: string;
+    etag?: string;
+    isPartial: boolean;
+  }> {
     try {
       const command = new GetObjectCommand({
         Bucket: this.bucket,
-        Key: key,
-      });
-
-      const response = await this.s3Client.send(command);
-
-      if (!response.Body) {
-        throw new Error('Empty response body');
-      }
-
-      const stream = response.Body as Readable;
-      const chunks: Buffer[] = [];
-
-      for await (const chunk of stream) {
-        chunks.push(Buffer.from(chunk));
-      }
-
-      return Buffer.concat(chunks);
-    } catch (error) {
-      this.logger.error({ err: error, key }, 'Failed to download file from storage');
-      throw this.mapS3Error(error, 'Failed to download file from storage');
-    }
-  }
-
-  async downloadStream(
-    key: string,
-  ): Promise<{ stream: Readable; contentLength?: number; etag?: string }> {
-    try {
-      const command = new GetObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
+        Key: params.key,
+        ...(params.range && { Range: params.range }),
       });
 
       const response = await this.s3Client.send(command);
@@ -171,12 +163,25 @@ export class StorageService implements OnModuleDestroy {
         stream: response.Body as Readable,
         contentLength:
           typeof response.ContentLength === 'number' ? response.ContentLength : undefined,
+        contentRange: response.ContentRange,
         etag: response.ETag ? response.ETag.replace(/\"/g, '') : undefined,
+        isPartial: response.ContentRange !== undefined,
       };
     } catch (error) {
-      this.logger.error({ err: error, key }, 'Failed to download file from storage');
+      this.logger.error({ err: error, key: params.key }, 'Failed to download file from storage');
       throw this.mapS3Error(error, 'Failed to download file from storage');
     }
+  }
+
+  async downloadStream(
+    key: string,
+  ): Promise<{ stream: Readable; contentLength?: number; etag?: string }> {
+    const result = await this.downloadStreamWithRange({ key });
+    return {
+      stream: result.stream,
+      contentLength: result.contentLength,
+      etag: result.etag,
+    };
   }
 
   async headObject(

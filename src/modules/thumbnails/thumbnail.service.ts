@@ -106,7 +106,12 @@ export class ThumbnailService {
 
       this.logger.info({ fileId, paramsHash }, 'Thumbnail cache hit');
 
-      const buffer = await this.storageService.downloadFile(thumbnail.s3Key);
+      const { stream } = await this.storageService.downloadStream(thumbnail.s3Key);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(Buffer.from(chunk));
+      }
+      const buffer = Buffer.concat(chunks);
 
       return {
         buffer,
@@ -119,7 +124,12 @@ export class ThumbnailService {
 
     this.logger.info({ fileId, paramsHash }, 'Generating new thumbnail');
 
-    const originalBuffer = await this.storageService.downloadFile(fileS3Key);
+    const { stream } = await this.storageService.downloadStream(fileS3Key);
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.from(chunk));
+    }
+    const originalBuffer = Buffer.concat(chunks);
     const thumbnailBuffer = await this.generateThumbnail(originalBuffer, width, height, quality);
 
     const thumbnailMimeType = format === 'webp' ? 'image/webp' : 'image/avif';

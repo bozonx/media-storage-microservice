@@ -176,7 +176,9 @@ export class FilesController {
   /**
    * Downloads a file by streaming it from storage.
    *
-   * If the service provides an `etag`, the handler supports conditional GET via `If-None-Match`.
+   * Supports:
+   * - Conditional GET via `If-None-Match` (304 Not Modified)
+   * - Range requests via `Range` header (206 Partial Content)
    */
   @Get(':id/download')
   async downloadFile(
@@ -184,7 +186,8 @@ export class FilesController {
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    const result = await this.filesService.downloadFileStream(id);
+    const rangeHeader = request.headers['range'];
+    const result = await this.filesService.downloadFileStream(id, rangeHeader);
 
     const ifNoneMatch = request.headers['if-none-match'];
     if (
@@ -195,14 +198,20 @@ export class FilesController {
       return reply.status(HttpStatus.NOT_MODIFIED).header('ETag', `"${result.etag}"`).send();
     }
 
+    const statusCode = result.isPartial ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK;
+
     const response = reply
-      .status(HttpStatus.OK)
+      .status(statusCode)
       .header('Content-Type', result.mimeType)
       .header('Content-Disposition', buildContentDispositionHeader(result.filename))
+      .header('Accept-Ranges', 'bytes')
       .header('Cache-Control', 'public, max-age=31536000, immutable');
 
     if (result.etag) {
       response.header('ETag', `"${result.etag}"`);
+    }
+    if (result.contentRange) {
+      response.header('Content-Range', result.contentRange);
     }
     if (typeof result.size === 'number') {
       response.header('Content-Length', result.size.toString());
