@@ -106,11 +106,6 @@ Content-Type: multipart/form-data
 curl -X POST http://localhost:8080/api/v1/files \
   -F "file=@image.jpg"
 
-# С оптимизацией
-curl -X POST http://localhost:8080/api/v1/files \
-  -F "file=@image.jpg" \
-  -F 'optimize={"quality":85,"maxWidth":1920,"format":"webp"}'
-
 # С метаданными
 curl -X POST http://localhost:8080/api/v1/files \
   -F "file=@document.pdf" \
@@ -144,6 +139,10 @@ GET /api/v1/files/:id/download
 
 curl -O http://localhost:8080/api/v1/files/550e8400-e29b-41d4-a716-446655440000/download
 ```
+
+Если для изображения требуется оптимизация (например, включён `FORCE_IMAGE_COMPRESSION_ENABLED=true`),
+она будет запущена лениво при первом запросе download. Запрос будет ожидать завершения оптимизации
+до таймаута `IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS`. При превышении таймаута сервис вернёт `409 Conflict`.
 
 #### Delete File
 ```bash
@@ -235,6 +234,7 @@ curl http://localhost:8080/api/v1/health
 
 ### Компрессия изображений
 - `FORCE_IMAGE_COMPRESSION_ENABLED` — принудительная компрессия для всех загрузок (true/false)
+- `IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS` — максимальное время ожидания ленивой оптимизации (мс)
 - `IMAGE_COMPRESSION_DEFAULT_FORMAT` — формат по умолчанию (webp/avif)
 - `IMAGE_COMPRESSION_MAX_WIDTH` — максимальная ширина (px, по умолчанию 3840)
 - `IMAGE_COMPRESSION_MAX_HEIGHT` — максимальная высота (px, по умолчанию 2160)
@@ -314,11 +314,11 @@ pnpm prisma migrate status
 3. Копирование из временного ключа в финальный (content-addressed storage)
 4. Обновление статуса на `ready` при успехе
 
-### Buffer Upload (с оптимизацией)
-1. Создание записи в БД со статусом `uploading`
-2. Оптимизация изображения в памяти (Sharp)
-3. Загрузка оптимизированного файла в S3
-4. Обновление статуса на `ready` при успехе
+### Streaming Upload + Lazy Optimization (изображения)
+1. Загрузка оригинала через stream в S3 (временный ключ)
+2. Создание записи в БД и перевод статуса на `ready`
+3. Оптимизация изображения запускается лениво при первом запросе download или thumbnail
+4. После успешной оптимизации оригинал удаляется, а оптимизированная версия становится основной
 
 ### Транзакционное удаление файлов
 1. Обновление статуса на `deleting` в БД

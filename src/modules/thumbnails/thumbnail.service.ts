@@ -14,7 +14,7 @@ import { StorageService } from '../storage/storage.service.js';
 import { ThumbnailParamsDto } from '../files/dto/thumbnail-params.dto.js';
 import { FileStatus } from '../files/file-status.js';
 import { OptimizationStatus } from '../files/optimization-status.js';
-import type { FilesService } from '../files/files.service.js';
+import { FilesService } from '../files/files.service.js';
 
 interface ThumbnailConfig {
   enabled: boolean;
@@ -52,7 +52,7 @@ export class ThumbnailService {
     private readonly configService: ConfigService,
     private readonly prismaService: PrismaService,
     private readonly storageService: StorageService,
-    @Inject(forwardRef(() => import('../files/files.service.js').then(m => m.FilesService)))
+    @Inject(forwardRef(() => FilesService))
     private readonly filesService: FilesService,
   ) {
     this.config = this.configService.get<ThumbnailConfig>('thumbnail')!;
