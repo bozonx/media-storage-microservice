@@ -62,7 +62,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
   private async cleanupCorruptedRecords() {
     this.logger.info('Starting corrupted records cleanup');
 
-    const corruptedFiles = await (this.prismaService as any).file.findMany({
+    const corruptedFiles = await this.prismaService.file.findMany({
       where: {
         OR: [
           {
@@ -71,7 +71,12 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
           },
           {
             status: FileStatus.READY,
-            OR: [{ s3Key: null }, { s3Key: '' }, { mimeType: null }, { mimeType: '' }],
+            OR: [
+              { s3Key: { equals: null } },
+              { s3Key: { equals: '' } },
+              { mimeType: { equals: null } },
+              { mimeType: { equals: '' } },
+            ],
           },
         ],
       },
@@ -101,7 +106,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     const ttlDays = this.config.badStatusTtlDays;
     const cutoffTime = new Date(Date.now() - ttlDays * 24 * 60 * 60 * 1000);
 
-    const badFiles = await (this.prismaService as any).file.findMany({
+    const badFiles = await this.prismaService.file.findMany({
       where: {
         status: {
           in: [FileStatus.UPLOADING, FileStatus.DELETING, FileStatus.FAILED, FileStatus.MISSING],
@@ -141,7 +146,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     const ttlDays = this.config.thumbnailsTtlDays;
     const cutoffTime = new Date(Date.now() - ttlDays * 24 * 60 * 60 * 1000);
 
-    const oldThumbnails = await (this.prismaService as any).thumbnail.findMany({
+    const oldThumbnails = await this.prismaService.thumbnail.findMany({
       where: {
         lastAccessedAt: {
           lt: cutoffTime,
@@ -174,7 +179,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      await (this.prismaService as any).thumbnail.delete({
+      await this.prismaService.thumbnail.delete({
         where: { id: thumbnail.id },
       });
       this.logger.info({ thumbnailId: thumbnail.id }, 'Removed thumbnail record');
@@ -185,7 +190,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.storageService.deleteFile(s3Key);
 
-      await (this.prismaService as any).file.update({
+      await this.prismaService.file.update({
         where: { id: fileId },
         data: {
           status: FileStatus.DELETED,
@@ -195,7 +200,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
       this.logger.info({ fileId }, 'Successfully deleted file on retry');
     } catch (error) {
       if (error instanceof NotFoundException) {
-        await (this.prismaService as any).file.update({
+        await this.prismaService.file.update({
           where: { id: fileId },
           data: {
             status: FileStatus.DELETED,
@@ -214,7 +219,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     s3Key: string | null,
     originalS3Key: string | null,
   ) {
-    const thumbnails = await (this.prismaService as any).thumbnail.findMany({
+    const thumbnails = await this.prismaService.thumbnail.findMany({
       where: { fileId },
       select: { id: true, s3Key: true },
     });
@@ -233,7 +238,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (thumbnails.length > 0) {
-      await (this.prismaService as any).thumbnail.deleteMany({
+      await this.prismaService.thumbnail.deleteMany({
         where: { fileId },
       });
       this.logger.info({ fileId, count: thumbnails.length }, 'Deleted thumbnails');
@@ -264,7 +269,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    await (this.prismaService as any).file.delete({
+    await this.prismaService.file.delete({
       where: { id: fileId },
     });
     this.logger.info({ fileId }, 'Removed file record');
