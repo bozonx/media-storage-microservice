@@ -249,19 +249,14 @@ curl http://localhost:8080/api/v1/health
 - `IMAGE_COMPRESSION_AVIF_CHROMA_SUBSAMPLING` — субдискретизация цветности (4:2:0 или 4:4:4)
 
 ### Миниатюры (Thumbnails)
-- `THUMBNAIL_ENABLED` — включить генерацию миниатюр (true/false)
 - `THUMBNAIL_FORMAT` — формат миниатюр (webp/avif, по умолчанию webp)
 - `THUMBNAIL_MAX_WIDTH` — максимальная ширина (px, по умолчанию 2048)
 - `THUMBNAIL_MAX_HEIGHT` — максимальная высота (px, по умолчанию 2048)
-- `THUMBNAIL_CACHE_MAX_AGE` — время кеширования в секундах (по умолчанию 31536000 = 1 год)
+- `THUMBNAIL_CACHE_MAX_AGE_DAYS` — время кеширования в днях (по умолчанию 365)
 
-**WebP настройки для миниатюр:**
-- `THUMBNAIL_WEBP_QUALITY` — качество WebP (1-100, по умолчанию 80)
-- `THUMBNAIL_WEBP_EFFORT` — усилие сжатия WebP (0-6, по умолчанию 6)
-
-**AVIF настройки для миниатюр:**
-- `THUMBNAIL_AVIF_QUALITY` — качество AVIF (1-100, по умолчанию 60)
-- `THUMBNAIL_AVIF_EFFORT` — усилие сжатия AVIF (0-9, по умолчанию 6)
+**Настройки качества для миниатюр:**
+- `THUMBNAIL_QUALITY` — качество (1-100, по умолчанию 80)
+- `THUMBNAIL_EFFORT` — усилие сжатия (по умолчанию 6)
 
 ### Cleanup Job
 - `CLEANUP_ENABLED` — включить cleanup job (true/false)

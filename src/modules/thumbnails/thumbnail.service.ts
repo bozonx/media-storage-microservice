@@ -17,21 +17,14 @@ import { OptimizationStatus } from '../files/optimization-status.js';
 import { FilesService } from '../files/files.service.js';
 
 interface ThumbnailConfig {
-  enabled: boolean;
   format: 'webp' | 'avif';
   maxWidth: number;
   maxHeight: number;
   minWidth: number;
   minHeight: number;
-  cacheMaxAge: number;
-  webp: {
-    quality: number;
-    effort: number;
-  };
-  avif: {
-    quality: number;
-    effort: number;
-  };
+  cacheMaxAgeSeconds: number;
+  quality: number;
+  effort: number;
 }
 
 export interface ThumbnailResult {
@@ -39,6 +32,7 @@ export interface ThumbnailResult {
   mimeType: string;
   size: number;
   cacheMaxAge: number;
+  etag: string;
 }
 
 @Injectable()
@@ -60,10 +54,6 @@ export class ThumbnailService {
   }
 
   async getThumbnail(fileId: string, params: ThumbnailParamsDto): Promise<ThumbnailResult> {
-    if (!this.config.enabled) {
-      throw new BadRequestException('Thumbnail generation is disabled');
-    }
-
     let file = await (this.prismaService as any).file.findFirst({
       where: { id: fileId, status: FileStatus.READY },
     });
@@ -96,8 +86,7 @@ export class ThumbnailService {
     const width = Math.min(params.width, this.config.maxWidth);
     const height = Math.min(params.height, this.config.maxHeight);
     const format = this.config.format;
-    const quality =
-      params.quality ?? (format === 'webp' ? this.config.webp.quality : this.config.avif.quality);
+    const quality = params.quality ?? this.config.quality;
     const paramsHash = this.calculateParamsHash(width, height, quality, format);
 
     let thumbnail = await (this.prismaService as any).thumbnail.findUnique({
@@ -123,7 +112,8 @@ export class ThumbnailService {
         buffer,
         mimeType: thumbnail.mimeType,
         size: Number(thumbnail.size),
-        cacheMaxAge: this.config.cacheMaxAge,
+        cacheMaxAge: this.config.cacheMaxAgeSeconds,
+        etag: paramsHash,
       };
     }
 
@@ -166,7 +156,8 @@ export class ThumbnailService {
       buffer: thumbnailBuffer,
       mimeType: thumbnailMimeType,
       size: thumbnailBuffer.length,
-      cacheMaxAge: this.config.cacheMaxAge,
+      cacheMaxAge: this.config.cacheMaxAgeSeconds,
+      etag: paramsHash,
     };
   }
 
@@ -186,12 +177,12 @@ export class ThumbnailService {
       if (format === 'webp') {
         pipeline = pipeline.webp({
           quality,
-          effort: this.config.webp.effort,
+          effort: this.config.effort,
         });
       } else {
         pipeline = pipeline.avif({
           quality,
-          effort: this.config.avif.effort,
+          effort: this.config.effort,
         });
       }
 

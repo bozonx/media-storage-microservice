@@ -24,7 +24,7 @@ export class ThumbnailController {
       .type(result.mimeType)
       .header('Content-Length', result.size)
       .header('Cache-Control', `public, max-age=${result.cacheMaxAge}, immutable`)
-      .header('ETag', `"${id}-${params.width}x${params.height}q${params.quality ?? 80}"`)
+      .header('ETag', `"${result.etag}"`)
       .send(result.buffer);
   }
 }
