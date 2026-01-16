@@ -160,6 +160,7 @@ export class FilesService {
             originalChecksum: checksum,
             originalSize: BigInt(size),
             status: FileStatus.READY,
+            statusChangedAt: new Date(),
             uploadedAt: new Date(),
           },
         });
@@ -210,6 +211,7 @@ export class FilesService {
         where: { id: file.id },
         data: {
           status: FileStatus.FAILED,
+          statusChangedAt: new Date(),
         },
       });
       throw error;
@@ -308,6 +310,7 @@ export class FilesService {
         where: { id: file.id },
         data: {
           status: FileStatus.READY,
+          statusChangedAt: new Date(),
           uploadedAt: new Date(),
         },
       });
@@ -322,6 +325,7 @@ export class FilesService {
         where: { id: file.id },
         data: {
           status: FileStatus.FAILED,
+          statusChangedAt: new Date(),
         },
       });
 
@@ -460,6 +464,7 @@ export class FilesService {
       where: { id },
       data: {
         status: FileStatus.DELETING,
+        statusChangedAt: new Date(),
         deletedAt: new Date(),
       },
     });
@@ -473,6 +478,7 @@ export class FilesService {
         where: { id },
         data: {
           status: FileStatus.DELETED,
+          statusChangedAt: new Date(),
         },
       });
 
@@ -614,6 +620,7 @@ export class FilesService {
           size: BigInt(size),
           s3Key: finalKey,
           status: FileStatus.READY,
+          statusChangedAt: new Date(),
           uploadedAt: new Date(),
         },
       });

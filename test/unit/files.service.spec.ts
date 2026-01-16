@@ -228,7 +228,11 @@ describe('FilesService (unit)', () => {
       expect(storageMock.uploadFile).toHaveBeenCalledTimes(1);
       expect((prismaMock as any).file.update).toHaveBeenCalledWith({
         where: { id: 'new-id' },
-        data: { status: FileStatus.READY, uploadedAt: expect.any(Date) },
+        data: {
+          status: FileStatus.READY,
+          statusChangedAt: expect.any(Date),
+          uploadedAt: expect.any(Date),
+        },
       });
 
       expect(res.id).toBe('new-id');
@@ -261,7 +265,10 @@ describe('FilesService (unit)', () => {
 
       expect((prismaMock as any).file.update).toHaveBeenCalledWith({
         where: { id: 'new-id' },
-        data: { status: FileStatus.FAILED },
+        data: {
+          status: FileStatus.FAILED,
+          statusChangedAt: expect.any(Date),
+        },
       });
     });
   });
@@ -394,6 +401,7 @@ describe('FilesService (unit)', () => {
           originalChecksum: expect.stringContaining('sha256:'),
           originalSize: BigInt(3),
           status: FileStatus.READY,
+          statusChangedAt: expect.any(Date),
           uploadedAt: expect.any(Date),
         },
       });
@@ -464,12 +472,19 @@ describe('FilesService (unit)', () => {
 
       expect((prismaMock as any).file.update).toHaveBeenNthCalledWith(1, {
         where: { id: 'id' },
-        data: { status: FileStatus.DELETING, deletedAt: expect.any(Date) },
+        data: {
+          status: FileStatus.DELETING,
+          statusChangedAt: expect.any(Date),
+          deletedAt: expect.any(Date),
+        },
       });
       expect(storageMock.deleteFile).toHaveBeenCalledWith('aa/bb');
       expect((prismaMock as any).file.update).toHaveBeenNthCalledWith(2, {
         where: { id: 'id' },
-        data: { status: FileStatus.DELETED },
+        data: {
+          status: FileStatus.DELETED,
+          statusChangedAt: expect.any(Date),
+        },
       });
     });
   });

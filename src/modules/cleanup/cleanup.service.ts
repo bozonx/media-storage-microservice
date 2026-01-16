@@ -1,0 +1,272 @@
+import { Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { CronJob } from 'cron';
+import { StorageService } from '../storage/storage.service.js';
+import { CleanupConfig } from '../../config/cleanup.config.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { FileStatus } from '../files/file-status.js';
+
+@Injectable()
+export class CleanupService implements OnModuleInit, OnModuleDestroy {
+  private static readonly jobName = 'cleanup';
+  private readonly config: CleanupConfig;
+
+  constructor(
+    @InjectPinoLogger(CleanupService.name)
+    private readonly logger: PinoLogger,
+    private readonly prismaService: PrismaService,
+    private readonly storageService: StorageService,
+    private readonly configService: ConfigService,
+    private readonly schedulerRegistry: SchedulerRegistry,
+  ) {
+    this.config = this.configService.get<CleanupConfig>('cleanup')!;
+  }
+
+  onModuleInit(): void {
+    if (!this.config.enabled) {
+      return;
+    }
+
+    const job = new CronJob(this.config.cron, async () => {
+      await this.runCleanup();
+    });
+
+    this.schedulerRegistry.addCronJob(CleanupService.jobName, job);
+    job.start();
+  }
+
+  onModuleDestroy(): void {
+    try {
+      this.schedulerRegistry.deleteCronJob(CleanupService.jobName);
+    } catch {
+      // ignore
+    }
+  }
+
+  async runCleanup() {
+    if (!this.config.enabled) {
+      return;
+    }
+
+    this.logger.info('Starting cleanup job');
+
+    await this.cleanupCorruptedRecords();
+    await this.cleanupBadStatusFiles();
+    await this.cleanupOldThumbnails();
+
+    this.logger.info('Cleanup job completed');
+  }
+
+  private async cleanupCorruptedRecords() {
+    this.logger.info('Starting corrupted records cleanup');
+
+    const corruptedFiles = await (this.prismaService as any).file.findMany({
+      where: {
+        OR: [
+          {
+            status: FileStatus.DELETING,
+            deletedAt: null,
+          },
+          {
+            status: FileStatus.READY,
+            OR: [{ s3Key: null }, { s3Key: '' }, { mimeType: null }, { mimeType: '' }],
+          },
+        ],
+      },
+      select: {
+        id: true,
+        s3Key: true,
+        originalS3Key: true,
+      },
+      take: this.config.batchSize,
+    });
+
+    if (corruptedFiles.length === 0) {
+      this.logger.info('No corrupted records found');
+      return;
+    }
+
+    this.logger.info({ count: corruptedFiles.length }, 'Found corrupted records');
+
+    for (const file of corruptedFiles) {
+      await this.deleteFileCompletely(file.id, file.s3Key, file.originalS3Key);
+    }
+  }
+
+  private async cleanupBadStatusFiles() {
+    this.logger.info('Starting bad status files cleanup');
+
+    const ttlDays = this.config.badStatusTtlDays;
+    const cutoffTime = new Date(Date.now() - ttlDays * 24 * 60 * 60 * 1000);
+
+    const badFiles = await (this.prismaService as any).file.findMany({
+      where: {
+        status: {
+          in: [FileStatus.UPLOADING, FileStatus.DELETING, FileStatus.FAILED, FileStatus.MISSING],
+        },
+        statusChangedAt: {
+          lt: cutoffTime,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+        s3Key: true,
+        originalS3Key: true,
+      },
+      take: this.config.batchSize,
+    });
+
+    if (badFiles.length === 0) {
+      this.logger.info('No bad status files found');
+      return;
+    }
+
+    this.logger.info({ count: badFiles.length }, 'Found bad status files');
+
+    for (const file of badFiles) {
+      if (file.status === FileStatus.DELETING) {
+        await this.retryDeletion(file.id, file.s3Key);
+      } else {
+        await this.deleteFileCompletely(file.id, file.s3Key, file.originalS3Key);
+      }
+    }
+  }
+
+  private async cleanupOldThumbnails() {
+    this.logger.info('Starting old thumbnails cleanup');
+
+    const ttlDays = this.config.thumbnailsTtlDays;
+    const cutoffTime = new Date(Date.now() - ttlDays * 24 * 60 * 60 * 1000);
+
+    const oldThumbnails = await (this.prismaService as any).thumbnail.findMany({
+      where: {
+        lastAccessedAt: {
+          lt: cutoffTime,
+        },
+      },
+      select: {
+        id: true,
+        s3Key: true,
+      },
+      take: this.config.batchSize,
+    });
+
+    if (oldThumbnails.length === 0) {
+      this.logger.info('No old thumbnails found');
+      return;
+    }
+
+    this.logger.info({ count: oldThumbnails.length }, 'Found old thumbnails');
+
+    for (const thumbnail of oldThumbnails) {
+      try {
+        await this.storageService.deleteFile(thumbnail.s3Key);
+        this.logger.info({ s3Key: thumbnail.s3Key }, 'Deleted thumbnail from storage');
+      } catch (error) {
+        if (!(error instanceof NotFoundException)) {
+          this.logger.warn(
+            { err: error, s3Key: thumbnail.s3Key },
+            'Failed to delete thumbnail from storage',
+          );
+        }
+      }
+
+      await (this.prismaService as any).thumbnail.delete({
+        where: { id: thumbnail.id },
+      });
+      this.logger.info({ thumbnailId: thumbnail.id }, 'Removed thumbnail record');
+    }
+  }
+
+  private async retryDeletion(fileId: string, s3Key: string) {
+    try {
+      await this.storageService.deleteFile(s3Key);
+
+      await (this.prismaService as any).file.update({
+        where: { id: fileId },
+        data: {
+          status: FileStatus.DELETED,
+        },
+      });
+
+      this.logger.info({ fileId }, 'Successfully deleted file on retry');
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        await (this.prismaService as any).file.update({
+          where: { id: fileId },
+          data: {
+            status: FileStatus.DELETED,
+          },
+        });
+
+        this.logger.info({ fileId }, 'File not found in storage (treated as deleted)');
+      } else {
+        this.logger.error({ err: error, fileId }, 'Failed to delete file on retry');
+      }
+    }
+  }
+
+  private async deleteFileCompletely(
+    fileId: string,
+    s3Key: string | null,
+    originalS3Key: string | null,
+  ) {
+    const thumbnails = await (this.prismaService as any).thumbnail.findMany({
+      where: { fileId },
+      select: { id: true, s3Key: true },
+    });
+
+    for (const thumbnail of thumbnails) {
+      try {
+        await this.storageService.deleteFile(thumbnail.s3Key);
+      } catch (error) {
+        if (!(error instanceof NotFoundException)) {
+          this.logger.warn(
+            { err: error, s3Key: thumbnail.s3Key },
+            'Failed to delete thumbnail from storage',
+          );
+        }
+      }
+    }
+
+    if (thumbnails.length > 0) {
+      await (this.prismaService as any).thumbnail.deleteMany({
+        where: { fileId },
+      });
+      this.logger.info({ fileId, count: thumbnails.length }, 'Deleted thumbnails');
+    }
+
+    if (s3Key) {
+      try {
+        await this.storageService.deleteFile(s3Key);
+        this.logger.info({ s3Key }, 'Deleted file from storage');
+      } catch (error) {
+        if (!(error instanceof NotFoundException)) {
+          this.logger.warn({ err: error, s3Key }, 'Failed to delete file from storage');
+        }
+      }
+    }
+
+    if (originalS3Key) {
+      try {
+        await this.storageService.deleteFile(originalS3Key);
+        this.logger.info({ s3Key: originalS3Key }, 'Deleted original file from storage');
+      } catch (error) {
+        if (!(error instanceof NotFoundException)) {
+          this.logger.warn(
+            { err: error, s3Key: originalS3Key },
+            'Failed to delete original file from storage',
+          );
+        }
+      }
+    }
+
+    await (this.prismaService as any).file.delete({
+      where: { id: fileId },
+    });
+    this.logger.info({ fileId }, 'Removed file record');
+  }
+}

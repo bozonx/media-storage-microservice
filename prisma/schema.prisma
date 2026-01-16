@@ -52,10 +52,12 @@ model File {
   metadata                Json?
   uploadedAt              DateTime?           @map("uploaded_at") @db.Timestamp(6)
   deletedAt               DateTime?           @map("deleted_at") @db.Timestamp(6)
+  statusChangedAt         DateTime            @default(now()) @map("status_changed_at") @db.Timestamp(6)
   createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt               DateTime            @updatedAt @map("updated_at") @db.Timestamp(6)
 
   @@index([status, uploadedAt])
+  @@index([status, statusChangedAt])
   @@index([mimeType])
   @@index([checksum])
   @@index([s3Key])
