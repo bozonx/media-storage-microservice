@@ -56,12 +56,20 @@ describe('ThumbnailService (unit)', () => {
               if (key === 'thumbnail') {
                 return {
                   enabled: true,
-                  defaultQuality: 80,
+                  format: 'webp',
                   maxWidth: 2048,
                   maxHeight: 2048,
                   minWidth: 10,
                   minHeight: 10,
                   cacheMaxAge: 31536000,
+                  webp: {
+                    quality: 80,
+                    effort: 6,
+                  },
+                  avif: {
+                    quality: 60,
+                    effort: 6,
+                  },
                 };
               }
               if (key === 'storage.bucket') {
@@ -122,6 +130,7 @@ describe('ThumbnailService (unit)', () => {
         width: 100,
         height: 100,
         quality: 80,
+        paramsHash: 'test-hash',
         s3Key: 'thumbs/test-file-id/hash.webp',
         size: BigInt(1000),
         mimeType: 'image/webp',
@@ -216,6 +225,7 @@ describe('ThumbnailService (unit)', () => {
         width: 100,
         height: 100,
         quality: 80,
+        paramsHash: 'test-hash',
         s3Key: 'thumbs/test-file-id/hash.webp',
         size: BigInt(500),
         mimeType: 'image/webp',
@@ -227,6 +237,7 @@ describe('ThumbnailService (unit)', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             quality: 80,
+            paramsHash: expect.any(String),
           }),
         }),
       );
@@ -254,6 +265,7 @@ describe('ThumbnailService (unit)', () => {
         width: 100,
         height: 100,
         quality: 90,
+        paramsHash: 'test-hash',
         s3Key: 'thumbs/test-file-id/hash.webp',
         size: BigInt(500),
         mimeType: 'image/webp',
@@ -265,6 +277,7 @@ describe('ThumbnailService (unit)', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             quality: 90,
+            paramsHash: expect.any(String),
           }),
         }),
       );
@@ -292,6 +305,7 @@ describe('ThumbnailService (unit)', () => {
         width: 200,
         height: 200,
         quality: 80,
+        paramsHash: 'test-hash',
         s3Key: 'thumbs/test-file-id/hash.webp',
         size: BigInt(500),
         mimeType: 'image/webp',

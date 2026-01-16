@@ -11,7 +11,6 @@ import { createHash, randomUUID } from 'crypto';
 import { Transform, type Readable } from 'stream';
 import { StorageService } from '../storage/storage.service.js';
 import { ImageOptimizerService } from '../optimization/image-optimizer.service.js';
-import { OptimizeParamsDto } from './dto/optimize-params.dto.js';
 import { CompressParamsDto } from './dto/compress-params.dto.js';
 import { ListFilesDto } from './dto/list-files.dto.js';
 import { FileResponseDto } from './dto/file-response.dto.js';
@@ -36,14 +35,12 @@ function isPrismaKnownRequestError(error: unknown): error is {
  * Parameters for uploading a file from an in-memory buffer.
  *
  * `compressParams` is supported only for image uploads.
- * `optimizeParams` is deprecated, use `compressParams` instead.
  */
 export interface UploadFileParams {
   buffer: Buffer;
   filename: string;
   mimeType: string;
   compressParams?: CompressParamsDto;
-  optimizeParams?: OptimizeParamsDto;
   metadata?: Record<string, any>;
 }
 
@@ -93,21 +90,14 @@ export class FilesService {
    *
    * The file is uploaded to a temporary key first and then promoted to a final key derived from
    * its SHA-256 checksum (deduplication).
-   *
-   * @throws {BadRequestException} If `optimizeParams` is provided.
    */
   async uploadFileStream(params: {
     stream: Readable;
     filename: string;
     mimeType: string;
-    optimizeParams?: OptimizeParamsDto;
     metadata?: Record<string, any>;
   }): Promise<FileResponseDto> {
-    const { stream, filename, mimeType, optimizeParams, metadata } = params;
-
-    if (optimizeParams) {
-      throw new BadRequestException('Stream upload does not support optimization');
-    }
+    const { stream, filename, mimeType, metadata } = params;
 
     const tempKey = `tmp/${cryptoRandomId()}`;
 
@@ -199,7 +189,7 @@ export class FilesService {
    * The resulting content is then deduplicated by checksum.
    */
   async uploadFile(params: UploadFileParams): Promise<FileResponseDto> {
-    const { buffer, filename, mimeType, compressParams, optimizeParams, metadata } = params;
+    const { buffer, filename, mimeType, compressParams, metadata } = params;
 
     let processedBuffer = buffer;
     let processedMimeType = mimeType;
@@ -227,17 +217,6 @@ export class FilesService {
             savings: `${((1 - result.size / buffer.length) * 100).toFixed(1)}%`,
           },
           'Image compressed',
-        );
-      }
-    } else if (optimizeParams) {
-      const result = await this.imageOptimizer.optimizeImage(buffer, mimeType, optimizeParams);
-      if (result.size < buffer.length) {
-        processedBuffer = result.buffer;
-        processedMimeType = result.format;
-        originalSize = buffer.length;
-        this.logger.info(
-          { filename, beforeBytes: buffer.length, afterBytes: result.size },
-          'Image optimized (deprecated)',
         );
       }
     }
@@ -269,10 +248,9 @@ export class FilesService {
           s3Key,
           s3Bucket: this.bucket,
           status: FileStatus.UPLOADING,
-          optimizationParams:
-            compressParams || optimizeParams
-              ? ((compressParams || optimizeParams) as unknown as Record<string, any>)
-              : null,
+          optimizationParams: compressParams
+            ? (compressParams as unknown as Record<string, any>)
+            : null,
           metadata: metadata ?? null,
           uploadedAt: null,
         },

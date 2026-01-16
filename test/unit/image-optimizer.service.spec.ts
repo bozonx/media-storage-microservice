@@ -25,21 +25,21 @@ describe('ImageOptimizerService (unit)', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string) => {
-              if (key === 'optimization') {
-                return {
-                  enabled: true,
-                  defaultQuality: 85,
-                  maxWidth: 3840,
-                  maxHeight: 2160,
-                };
-              }
               if (key === 'compression') {
                 return {
                   forceEnabled: false,
-                  defaultQuality: 85,
+                  defaultFormat: 'webp',
                   maxWidth: 3840,
                   maxHeight: 2160,
-                  defaultFormat: 'webp',
+                  webp: {
+                    quality: 80,
+                    effort: 6,
+                  },
+                  avif: {
+                    quality: 60,
+                    effort: 6,
+                    chromaSubsampling: '4:4:4',
+                  },
                 };
               }
               return null;
@@ -160,6 +160,7 @@ describe('ImageOptimizerService (unit)', () => {
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
           format: 'webp',
+          quality: 80,
         }),
         'Image compressed',
       );
@@ -239,12 +240,13 @@ describe('ImageOptimizerService (unit)', () => {
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
           stripMetadata: false,
+          lossless: false,
         }),
         'Image compressed',
       );
     });
 
-    it('should strip metadata when stripMetadata is true', async () => {
+    it('should strip metadata by default', async () => {
       const inputBuffer = await sharp({
         create: {
           width: 100,
@@ -259,7 +261,7 @@ describe('ImageOptimizerService (unit)', () => {
       const result = await service.compressImage(
         inputBuffer,
         'image/png',
-        { format: 'webp', quality: 80, stripMetadata: true },
+        { format: 'webp', quality: 80 },
         false,
       );
 
@@ -282,7 +284,7 @@ describe('ImageOptimizerService (unit)', () => {
       expect(result.size).toBe(inputBuffer.length);
     });
 
-    it('should throw BadRequestException for unsupported format', async () => {
+    it('should support lossless compression', async () => {
       const inputBuffer = await sharp({
         create: {
           width: 100,
@@ -294,9 +296,20 @@ describe('ImageOptimizerService (unit)', () => {
         .png()
         .toBuffer();
 
-      await expect(
-        service.compressImage(inputBuffer, 'image/png', { format: 'jpeg' as any }, false),
-      ).rejects.toThrow(BadRequestException);
+      const result = await service.compressImage(
+        inputBuffer,
+        'image/png',
+        { format: 'webp', lossless: true },
+        false,
+      );
+
+      expect(result.format).toBe('image/webp');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lossless: true,
+        }),
+        'Image compressed',
+      );
     });
 
     it('should handle compression errors gracefully', async () => {
@@ -312,29 +325,6 @@ describe('ImageOptimizerService (unit)', () => {
         }),
         'Failed to compress image',
       );
-    });
-  });
-
-  describe('optimizeImage (deprecated)', () => {
-    it('should still work for backward compatibility', async () => {
-      const inputBuffer = await sharp({
-        create: {
-          width: 100,
-          height: 100,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
-
-      const result = await service.optimizeImage(inputBuffer, 'image/png', {
-        quality: 80,
-        format: 'webp',
-      });
-
-      expect(result.format).toBe('image/webp');
-      expect(result.buffer).toBeInstanceOf(Buffer);
     });
   });
 });

@@ -15,9 +15,6 @@ import {
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { FilesService } from './files.service.js';
 import { ListFilesDto } from './dto/list-files.dto.js';
-import { OptimizeParamsDto } from './dto/optimize-params.dto.js';
-import { plainToInstance } from 'class-transformer';
-import { validateSync } from 'class-validator';
 
 function buildContentDispositionHeader(filename: string): string {
   const safeAscii = sanitizeContentDispositionFilename(filename);
@@ -129,25 +126,9 @@ export class FilesController {
       throw new BadRequestException('File is required');
     }
 
-    let optimizeParams: OptimizeParamsDto | undefined;
     let metadata: Record<string, any> | undefined;
 
-    const optimizeField = data.fields.optimize as any;
     const metadataField = data.fields.metadata as any;
-
-    if (optimizeField?.value) {
-      try {
-        const raw = JSON.parse(optimizeField.value);
-        const dto = plainToInstance(OptimizeParamsDto, raw);
-        const errors = validateSync(dto, { whitelist: true, forbidNonWhitelisted: true });
-        if (errors.length > 0) {
-          throw new BadRequestException('Invalid optimize parameter');
-        }
-        optimizeParams = dto;
-      } catch {
-        throw new BadRequestException('Invalid optimize parameter');
-      }
-    }
 
     if (metadataField?.value) {
       try {
@@ -163,20 +144,6 @@ export class FilesController {
 
     if (isArchiveMimeType(data.mimetype)) {
       throw new UnsupportedMediaTypeException('Archive file types are not allowed');
-    }
-
-    if (optimizeParams) {
-      if (!data.mimetype.startsWith('image/')) {
-        throw new UnsupportedMediaTypeException('Optimization is supported only for images');
-      }
-      const buffer = await data.toBuffer();
-      return this.filesService.uploadFile({
-        buffer,
-        filename: data.filename,
-        mimeType: data.mimetype,
-        optimizeParams,
-        metadata,
-      });
     }
 
     return this.filesService.uploadFileStream({

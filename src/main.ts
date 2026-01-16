@@ -10,6 +10,7 @@ import fastifyStatic from '@fastify/static';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import sharp from 'sharp';
 import { AppModule } from './app.module.js';
 import { ShutdownService } from './common/shutdown/shutdown.service.js';
 import type { AppConfig } from './config/app.config.js';
@@ -21,7 +22,17 @@ function resolveMaxFileSize(): number {
   return maxFileSizeMb * 1024 * 1024;
 }
 
+function validateSharpAvifSupport(): void {
+  const formats = sharp.format;
+  if (!formats.avif || !formats.avif.input || !formats.avif.output) {
+    throw new Error(
+      'Sharp is not compiled with AVIF support. Please rebuild sharp with libheif/libaom support.',
+    );
+  }
+}
+
 async function bootstrap() {
+  validateSharpAvifSupport();
   const maxFileSize = resolveMaxFileSize();
 
   const app = await NestFactory.create<NestFastifyApplication>(

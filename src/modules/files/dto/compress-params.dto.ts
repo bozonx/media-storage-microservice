@@ -30,5 +30,10 @@ export class CompressParamsDto {
   @Type(() => Boolean)
   @IsBoolean()
   @IsOptional()
+  lossless?: boolean;
+
+  @Type(() => Boolean)
+  @IsBoolean()
+  @IsOptional()
   stripMetadata?: boolean;
 }

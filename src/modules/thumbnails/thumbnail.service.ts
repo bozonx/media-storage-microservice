@@ -10,12 +10,20 @@ import { FileStatus } from '../files/file-status.js';
 
 interface ThumbnailConfig {
   enabled: boolean;
-  defaultQuality: number;
+  format: 'webp' | 'avif';
   maxWidth: number;
   maxHeight: number;
   minWidth: number;
   minHeight: number;
   cacheMaxAge: number;
+  webp: {
+    quality: number;
+    effort: number;
+  };
+  avif: {
+    quality: number;
+    effort: number;
+  };
 }
 
 export interface ThumbnailResult {
@@ -58,8 +66,12 @@ export class ThumbnailService {
       throw new BadRequestException('File is not an image');
     }
 
-    const quality = params.quality ?? this.config.defaultQuality;
-    const paramsHash = this.calculateParamsHash(params.width, params.height, quality);
+    const width = Math.min(params.width, this.config.maxWidth);
+    const height = Math.min(params.height, this.config.maxHeight);
+    const format = this.config.format;
+    const quality =
+      params.quality ?? (format === 'webp' ? this.config.webp.quality : this.config.avif.quality);
+    const paramsHash = this.calculateParamsHash(width, height, quality, format);
 
     let thumbnail = await (this.prismaService as any).thumbnail.findUnique({
       where: {
@@ -91,28 +103,24 @@ export class ThumbnailService {
     this.logger.info({ fileId, paramsHash }, 'Generating new thumbnail');
 
     const originalBuffer = await this.storageService.downloadFile(file.s3Key);
-    const thumbnailBuffer = await this.generateThumbnail(
-      originalBuffer,
-      params.width,
-      params.height,
-      quality,
-    );
+    const thumbnailBuffer = await this.generateThumbnail(originalBuffer, width, height, quality);
 
-    const s3Key = this.generateThumbnailS3Key(fileId, paramsHash);
+    const mimeType = format === 'webp' ? 'image/webp' : 'image/avif';
+    const s3Key = this.generateThumbnailS3Key(fileId, paramsHash, format);
 
-    await this.storageService.uploadFile(s3Key, thumbnailBuffer, 'image/webp');
+    await this.storageService.uploadFile(s3Key, thumbnailBuffer, mimeType);
 
     thumbnail = await (this.prismaService as any).thumbnail.create({
       data: {
         fileId,
-        width: params.width,
-        height: params.height,
+        width,
+        height,
         quality,
         paramsHash,
         s3Key,
         s3Bucket: this.bucket,
         size: BigInt(thumbnailBuffer.length),
-        mimeType: 'image/webp',
+        mimeType,
         lastAccessedAt: new Date(),
       },
     });
@@ -129,7 +137,7 @@ export class ThumbnailService {
 
     return {
       buffer: thumbnailBuffer,
-      mimeType: 'image/webp',
+      mimeType,
       size: thumbnailBuffer.length,
       cacheMaxAge: this.config.cacheMaxAge,
     };
@@ -142,16 +150,23 @@ export class ThumbnailService {
     quality: number,
   ): Promise<Buffer> {
     try {
-      const pipeline = sharp(buffer)
-        .rotate()
-        .resize(width, height, {
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
-        .webp({
+      const format = this.config.format;
+      let pipeline = sharp(buffer).autoOrient().resize(width, height, {
+        fit: sharp.fit.inside,
+        withoutEnlargement: true,
+      });
+
+      if (format === 'webp') {
+        pipeline = pipeline.webp({
           quality,
-          effort: 4,
+          effort: this.config.webp.effort,
         });
+      } else {
+        pipeline = pipeline.avif({
+          quality,
+          effort: this.config.avif.effort,
+        });
+      }
 
       return await pipeline.toBuffer();
     } catch (error) {
@@ -160,14 +175,20 @@ export class ThumbnailService {
     }
   }
 
-  private calculateParamsHash(width: number, height: number, quality: number): string {
+  private calculateParamsHash(
+    width: number,
+    height: number,
+    quality: number,
+    format: string,
+  ): string {
     const hash = createHash('sha256');
-    hash.update(`${width}x${height}q${quality}`);
+    hash.update(`${width}x${height}q${quality}f${format}`);
     return hash.digest('hex');
   }
 
-  private generateThumbnailS3Key(fileId: string, paramsHash: string): string {
-    return `thumbs/${fileId}/${paramsHash}.webp`;
+  private generateThumbnailS3Key(fileId: string, paramsHash: string, format: string): string {
+    const ext = format === 'webp' ? 'webp' : 'avif';
+    return `thumbs/${fileId}/${paramsHash}.${ext}`;
   }
 
   private isImageMimeType(mimeType: string): boolean {
