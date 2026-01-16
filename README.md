@@ -233,11 +233,35 @@ curl http://localhost:8080/api/v1/health
 - `BLOCK_ARCHIVE_UPLOADS` — блокировать загрузку архивов (по умолчанию true)
 - `BLOCKED_MIME_TYPES` — дополнительные MIME типы для блокировки (через запятую)
 
-### Оптимизация изображений
-- `IMAGE_OPTIMIZATION_ENABLED` — включить оптимизацию изображений (true/false)
-- `IMAGE_OPTIMIZATION_DEFAULT_QUALITY` — качество по умолчанию (1-100)
-- `IMAGE_OPTIMIZATION_MAX_WIDTH` — максимальная ширина (px)
-- `IMAGE_OPTIMIZATION_MAX_HEIGHT` — максимальная высота (px)
+### Компрессия изображений
+- `FORCE_IMAGE_COMPRESSION_ENABLED` — принудительная компрессия для всех загрузок (true/false)
+- `IMAGE_COMPRESSION_DEFAULT_FORMAT` — формат по умолчанию (webp/avif)
+- `IMAGE_COMPRESSION_MAX_WIDTH` — максимальная ширина (px, по умолчанию 3840)
+- `IMAGE_COMPRESSION_MAX_HEIGHT` — максимальная высота (px, по умолчанию 2160)
+
+**WebP настройки:**
+- `IMAGE_COMPRESSION_WEBP_QUALITY` — качество WebP (1-100, по умолчанию 80)
+- `IMAGE_COMPRESSION_WEBP_EFFORT` — усилие сжатия WebP (0-6, по умолчанию 6)
+
+**AVIF настройки:**
+- `IMAGE_COMPRESSION_AVIF_QUALITY` — качество AVIF (1-100, по умолчанию 60)
+- `IMAGE_COMPRESSION_AVIF_EFFORT` — усилие сжатия AVIF (0-9, по умолчанию 6)
+- `IMAGE_COMPRESSION_AVIF_CHROMA_SUBSAMPLING` — субдискретизация цветности (4:2:0 или 4:4:4)
+
+### Миниатюры (Thumbnails)
+- `THUMBNAIL_ENABLED` — включить генерацию миниатюр (true/false)
+- `THUMBNAIL_FORMAT` — формат миниатюр (webp/avif, по умолчанию webp)
+- `THUMBNAIL_MAX_WIDTH` — максимальная ширина (px, по умолчанию 2048)
+- `THUMBNAIL_MAX_HEIGHT` — максимальная высота (px, по умолчанию 2048)
+- `THUMBNAIL_CACHE_MAX_AGE` — время кеширования в секундах (по умолчанию 31536000 = 1 год)
+
+**WebP настройки для миниатюр:**
+- `THUMBNAIL_WEBP_QUALITY` — качество WebP (1-100, по умолчанию 80)
+- `THUMBNAIL_WEBP_EFFORT` — усилие сжатия WebP (0-6, по умолчанию 6)
+
+**AVIF настройки для миниатюр:**
+- `THUMBNAIL_AVIF_QUALITY` — качество AVIF (1-100, по умолчанию 60)
+- `THUMBNAIL_AVIF_EFFORT` — усилие сжатия AVIF (0-9, по умолчанию 6)
 
 ### Cleanup Job
 - `CLEANUP_ENABLED` — включить cleanup job (true/false)

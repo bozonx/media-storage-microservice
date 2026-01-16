@@ -49,8 +49,8 @@ describe('FilesService (unit)', () => {
     copyObject: jest.fn(),
   };
 
-  const imageOptimizerMock: Pick<ImageOptimizerService, 'optimizeImage'> = {
-    optimizeImage: jest.fn(),
+  const imageOptimizerMock: Pick<ImageOptimizerService, 'compressImage'> = {
+    compressImage: jest.fn(),
   };
 
   const configServiceMock: Pick<ConfigService, 'get'> = {
@@ -210,63 +210,9 @@ describe('FilesService (unit)', () => {
         data: { status: FileStatus.FAILED },
       });
     });
-
-    it('uses optimizer when optimizeParams provided and stores originalSize when smaller', async () => {
-      const optimized = Buffer.from('a');
-
-      (imageOptimizerMock.optimizeImage as jest.Mock).mockResolvedValue({
-        buffer: optimized,
-        size: 1,
-        format: 'image/webp',
-      });
-
-      (prismaMock as any).file.findFirst.mockResolvedValue(null);
-      (prismaMock as any).file.create.mockImplementation(async ({ data }: any) => ({
-        id: 'new-id',
-        filename: data.filename,
-        mimeType: data.mimeType,
-        size: data.size,
-        originalSize: data.originalSize,
-        checksum: data.checksum,
-        uploadedAt: null,
-        status: data.status,
-      }));
-      (prismaMock as any).file.update.mockImplementation(async ({ data }: any) => ({
-        id: 'new-id',
-        filename: 'a.jpg',
-        mimeType: 'image/webp',
-        size: 1n,
-        originalSize: 3n,
-        checksum: 'sha256:optimized',
-        uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
-        status: data.status,
-      }));
-
-      const res = await service.uploadFile({
-        buffer: Buffer.from('abc'),
-        filename: 'a.jpg',
-        mimeType: 'image/jpeg',
-        optimizeParams: { quality: 80 },
-      });
-
-      expect(imageOptimizerMock.optimizeImage).toHaveBeenCalledTimes(1);
-      expect(res.mimeType).toBe('image/webp');
-      expect(res.originalSize).toBe(3);
-    });
   });
 
   describe('uploadFileStream', () => {
-    it('throws when optimizeParams provided', async () => {
-      await expect(
-        service.uploadFileStream({
-          stream: undefined as any,
-          filename: 'a.bin',
-          mimeType: 'application/octet-stream',
-          optimizeParams: { quality: 80 },
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
     it('returns existing file (dedup) and deletes temp objects', async () => {
       const existing = {
         id: 'existing-id',

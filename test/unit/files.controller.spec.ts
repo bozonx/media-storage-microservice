@@ -123,61 +123,6 @@ describe('FilesController (unit)', () => {
 
       await expect(controller.uploadFile(req)).rejects.toBeInstanceOf(BadRequestException);
     });
-
-    it('throws for invalid optimize json', async () => {
-      const req: any = {
-        file: async () => ({
-          filename: 'a.jpg',
-          mimetype: 'image/jpeg',
-          fields: {
-            optimize: { value: '{' },
-          },
-        }),
-      };
-
-      await expect(controller.uploadFile(req)).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('throws for optimize params when mimetype is not image/*', async () => {
-      const req: any = {
-        file: async () => ({
-          filename: 'a.txt',
-          mimetype: 'text/plain',
-          fields: {
-            optimize: { value: JSON.stringify({ quality: 80 }) },
-          },
-        }),
-      };
-
-      await expect(controller.uploadFile(req)).rejects.toBeInstanceOf(
-        UnsupportedMediaTypeException,
-      );
-    });
-
-    it('uses buffer upload when optimize param provided', async () => {
-      (filesServiceMock.uploadFile as jest.Mock).mockResolvedValue({ id: 'id' });
-
-      const req: any = {
-        file: async () => ({
-          filename: 'a.jpg',
-          mimetype: 'image/jpeg',
-          fields: {
-            optimize: { value: JSON.stringify({ quality: 80, format: 'webp' }) },
-          },
-          toBuffer: async () => Buffer.from('abc'),
-        }),
-      };
-
-      const res = await controller.uploadFile(req);
-      expect(res).toEqual({ id: 'id' });
-      expect(filesServiceMock.uploadFile).toHaveBeenCalledWith({
-        buffer: Buffer.from('abc'),
-        filename: 'a.jpg',
-        mimeType: 'image/jpeg',
-        optimizeParams: expect.objectContaining({ quality: 80, format: 'webp' }),
-        metadata: undefined,
-      });
-    });
   });
 
   describe('downloadFile', () => {
