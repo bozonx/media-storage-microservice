@@ -4,6 +4,7 @@ import {
   ConflictException,
   GoneException,
   NotFoundException,
+  RequestTimeoutException,
 } from '@nestjs/common';
 import { jest } from '@jest/globals';
 import { FilesService } from '../../src/modules/files/files.service.js';
@@ -95,6 +96,7 @@ describe('FilesService (unit)', () => {
         await drainStream(params.body);
       }
     });
+    (prismaMock as any).file.updateMany.mockResolvedValue({ count: 0 });
 
     moduleRef = await Test.createTestingModule({
       providers: [
@@ -119,6 +121,65 @@ describe('FilesService (unit)', () => {
     }).compile();
 
     service = moduleRef.get<FilesService>(FilesService);
+  });
+
+  describe('ensureOptimized', () => {
+    it('throws RequestTimeoutException when optimization does not finish in time', async () => {
+      const timeoutConfigServiceMock: any = {
+        get: jest.fn((key: string) => {
+          if (key === 'storage.bucket') {
+            return 'test-bucket';
+          }
+          if (key === 'app.basePath') {
+            return '';
+          }
+          if (key === 'BASE_PATH') {
+            return undefined;
+          }
+          if (key === 'compression.forceEnabled') {
+            return false;
+          }
+          if (key === 'heavyTasksQueue.timeoutMs') {
+            return 1;
+          }
+          return undefined;
+        }),
+      };
+
+      await moduleRef.close();
+      moduleRef = await Test.createTestingModule({
+        providers: [
+          FilesService,
+          {
+            provide: getLoggerToken(FilesService.name),
+            useValue: {
+              info: jest.fn(),
+              warn: jest.fn(),
+              error: jest.fn(),
+              debug: jest.fn(),
+              trace: jest.fn(),
+              fatal: jest.fn(),
+            },
+          },
+          { provide: PrismaService, useValue: prismaMock },
+          { provide: StorageService, useValue: storageMock },
+          { provide: ImageOptimizerService, useValue: imageOptimizerMock },
+          { provide: ConfigService, useValue: timeoutConfigServiceMock },
+          { provide: ExifService, useValue: exifServiceMock },
+        ],
+      }).compile();
+
+      service = moduleRef.get<FilesService>(FilesService);
+
+      (prismaMock as any).file.updateMany.mockResolvedValue({ count: 0 });
+      (prismaMock as any).file.findUnique.mockResolvedValue({
+        id: 'id',
+        status: FileStatus.READY,
+        optimizationStatus: OptimizationStatus.PROCESSING,
+      });
+
+      await expect(service.ensureOptimized('id')).rejects.toBeInstanceOf(RequestTimeoutException);
+    });
   });
 
   describe('downloadFileStream', () => {
@@ -200,8 +261,8 @@ describe('FilesService (unit)', () => {
           if (key === 'compression.forceEnabled') {
             return false;
           }
-          if (key === 'IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS') {
-            return '30000';
+          if (key === 'heavyTasksQueue.timeoutMs') {
+            return 30000;
           }
           return undefined;
         }),
@@ -314,6 +375,7 @@ describe('FilesService (unit)', () => {
       (prismaMock as any).file.findFirst.mockResolvedValue(null);
       (prismaMock as any).file.create.mockResolvedValue(created);
       (prismaMock as any).file.update.mockResolvedValue(updated);
+      (prismaMock as any).file.updateMany.mockResolvedValue({ count: 0 });
 
       const res = await service.uploadFile({
         buffer: Buffer.from('abc'),
@@ -429,8 +491,8 @@ describe('FilesService (unit)', () => {
         if (key === 'compression.forceEnabled') {
           return true;
         }
-        if (key === 'IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS') {
-          return '30000';
+        if (key === 'heavyTasksQueue.timeoutMs') {
+          return 30000;
         }
         return undefined;
       });

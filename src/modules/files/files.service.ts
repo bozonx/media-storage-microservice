@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  RequestTimeoutException,
   GoneException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -149,17 +150,18 @@ export class FilesService {
     stream: Readable;
     filename: string;
     mimeType: string;
+    compressParams?: CompressParamsDto;
     metadata?: Record<string, any>;
     appId?: string;
     userId?: string;
     purpose?: string;
   }): Promise<FileResponseDto> {
-    const { stream, filename, mimeType, metadata, appId, userId, purpose } = params;
+    const { stream, filename, mimeType, compressParams, metadata, appId, userId, purpose } = params;
 
     const enforceImageLimit = mimeType.startsWith('image/');
 
-    const needsOptimization = this.forceCompression && this.isImage(mimeType);
-    const originalKey = needsOptimization
+    const wantsOptimization = this.isImage(mimeType) && (this.forceCompression || !!compressParams);
+    const originalKey = wantsOptimization
       ? `originals/${cryptoRandomId()}`
       : `tmp/${cryptoRandomId()}`;
 
@@ -169,18 +171,23 @@ export class FilesService {
         appId: appId ?? null,
         userId: userId ?? null,
         purpose: purpose ?? null,
-        originalMimeType: needsOptimization ? mimeType : null,
+        originalMimeType: wantsOptimization ? mimeType : null,
         originalSize: null,
         originalChecksum: null,
-        originalS3Key: needsOptimization ? originalKey : null,
-        mimeType: needsOptimization ? null : mimeType,
+        originalS3Key: wantsOptimization ? originalKey : null,
+        mimeType: wantsOptimization ? null : mimeType,
         size: null,
         checksum: null,
-        s3Key: needsOptimization ? '' : originalKey,
+        s3Key: wantsOptimization ? '' : originalKey,
         s3Bucket: this.bucket,
         status: FileStatus.UPLOADING,
-        optimizationStatus: needsOptimization ? OptimizationStatus.PENDING : null,
-        optimizationParams: needsOptimization ? {} : null,
+        optimizationStatus: wantsOptimization ? OptimizationStatus.PENDING : null,
+        optimizationParams: wantsOptimization
+          ? ((this.forceCompression ? {} : (compressParams ?? {})) as unknown as Record<
+              string,
+              any
+            >)
+          : null,
         metadata: metadata ?? null,
         uploadedAt: null,
       },
@@ -237,7 +244,7 @@ export class FilesService {
       hashFinalized = true;
       const checksum = `sha256:${hash.digest('hex')}`;
 
-      if (needsOptimization) {
+      if (wantsOptimization) {
         const updated = await (this.prismaService as any).file.update({
           where: { id: file.id },
           data: {
@@ -250,6 +257,8 @@ export class FilesService {
         });
 
         tmpKeyToCleanup = null;
+
+        this.triggerOptimizationIfPending(updated.id);
 
         this.logger.info(
           { fileId: file.id, needsOptimization: true },
@@ -347,117 +356,17 @@ export class FilesService {
   async uploadFile(params: UploadFileParams): Promise<FileResponseDto> {
     const { buffer, filename, mimeType, compressParams, metadata, appId, userId, purpose } = params;
 
-    if (mimeType.startsWith('image/') && buffer.length > this.imageMaxBytes) {
-      throw new BadRequestException('Image is too large');
-    }
-
-    let processedBuffer = buffer;
-    let processedMimeType = mimeType;
-    let originalSize: number | null = null;
-
-    const forceCompress = this.configService.get<boolean>('compression.forceEnabled') ?? false;
-    const shouldCompress = forceCompress || (compressParams && this.isImage(mimeType));
-
-    if (shouldCompress && this.isImage(mimeType)) {
-      const result = await this.imageOptimizer.compressImage(
-        buffer,
-        mimeType,
-        compressParams ?? {},
-        forceCompress,
-      );
-      if (result.size < buffer.length) {
-        processedBuffer = result.buffer;
-        processedMimeType = result.format;
-        originalSize = buffer.length;
-        this.logger.info(
-          {
-            filename,
-            beforeBytes: buffer.length,
-            afterBytes: result.size,
-            savings: `${((1 - result.size / buffer.length) * 100).toFixed(1)}%`,
-          },
-          'Image compressed',
-        );
-      }
-    }
-
-    const checksum = this.calculateChecksum(processedBuffer);
-    const s3Key = this.generateS3Key(checksum, processedMimeType);
-
-    const existing = await (this.prismaService as any).file.findFirst({
-      where: {
-        checksum,
-        mimeType: processedMimeType,
-        status: FileStatus.READY,
-      },
+    const stream = (await import('stream')).Readable.from([buffer]);
+    return this.uploadFileStream({
+      stream,
+      filename,
+      mimeType,
+      compressParams,
+      metadata,
+      appId,
+      userId,
+      purpose,
     });
-
-    if (existing) {
-      return this.toResponseDto(existing);
-    }
-
-    let file: any;
-    try {
-      file = await (this.prismaService as any).file.create({
-        data: {
-          filename,
-          appId: appId ?? null,
-          userId: userId ?? null,
-          purpose: purpose ?? null,
-          mimeType: processedMimeType,
-          size: BigInt(processedBuffer.length),
-          originalSize: originalSize === null ? null : BigInt(originalSize),
-          checksum,
-          s3Key,
-          s3Bucket: this.bucket,
-          status: FileStatus.UPLOADING,
-          optimizationParams: compressParams
-            ? (compressParams as unknown as Record<string, any>)
-            : null,
-          metadata: metadata ?? null,
-          uploadedAt: null,
-        },
-      });
-    } catch (error) {
-      if (this.isUniqueConstraintViolation(error)) {
-        const dedup = await this.findReadyByChecksum({ checksum, mimeType: processedMimeType });
-        if (dedup) {
-          return this.toResponseDto(dedup);
-        }
-      }
-      throw error;
-    }
-
-    this.logger.info({ fileId: file.id }, 'File record created with status=uploading');
-
-    try {
-      await this.storageService.uploadFile(s3Key, processedBuffer, processedMimeType);
-
-      const updated = await (this.prismaService as any).file.update({
-        where: { id: file.id },
-        data: {
-          status: FileStatus.READY,
-          statusChangedAt: new Date(),
-          uploadedAt: new Date(),
-        },
-      });
-
-      this.logger.info({ fileId: updated.id }, 'File upload completed');
-
-      return this.toResponseDto(updated);
-    } catch (error) {
-      this.logger.error({ err: error, fileId: file.id, s3Key }, 'Failed to upload file to storage');
-
-      await (this.prismaService as any).file.update({
-        where: { id: file.id },
-        data: {
-          status: FileStatus.FAILED,
-          statusChangedAt: new Date(),
-        },
-      });
-
-      throw error;
-    }
   }
 
   /**
@@ -1118,7 +1027,30 @@ export class FilesService {
       await new Promise(resolve => setTimeout(resolve, 300));
     }
 
-    throw new ConflictException('Image optimization timeout');
+    throw new RequestTimeoutException('Image optimization timeout');
+  }
+
+  private triggerOptimizationIfPending(fileId: string): void {
+    void (async () => {
+      const updated = await (this.prismaService as any).file.updateMany({
+        where: {
+          id: fileId,
+          optimizationStatus: OptimizationStatus.PENDING,
+        },
+        data: {
+          optimizationStatus: OptimizationStatus.PROCESSING,
+          optimizationStartedAt: new Date(),
+        },
+      });
+
+      if (updated.count > 0) {
+        void this.optimizeImage(fileId).catch(err => {
+          this.logger.error({ err, fileId }, 'Background optimization failed');
+        });
+      }
+    })().catch(err => {
+      this.logger.error({ err, fileId }, 'Failed to schedule background optimization');
+    });
   }
 
   private async optimizeImage(fileId: string): Promise<void> {
@@ -1140,11 +1072,13 @@ export class FilesService {
       const { stream } = await this.storageService.downloadStream(file.originalS3Key);
       const originalBuffer = await this.readToBufferWithLimit(stream, this.imageMaxBytes);
 
+      const params = file.optimizationParams ? (file.optimizationParams as CompressParamsDto) : {};
+
       const result = await this.imageOptimizer.compressImage(
         originalBuffer,
         file.originalMimeType,
-        {},
-        true,
+        params,
+        this.forceCompression,
       );
 
       const checksum = this.calculateChecksum(result.buffer);

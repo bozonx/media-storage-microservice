@@ -15,20 +15,10 @@ describe('Files from url (e2e)', () => {
   let baseUrl: string;
 
   const filesServiceMock: any = {
-    uploadFileStream: async () => ({
+    uploadFileStream: async (params: any) => ({
       id: 'id',
-      filename: 'file.txt',
-      mimeType: 'text/plain',
-      size: 3,
-      checksum: 'sha256:x',
-      uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
-      statusChangedAt: new Date('2020-01-01T00:00:00.000Z'),
-      url: '/api/v1/files/id/download',
-    }),
-    uploadFile: async () => ({
-      id: 'id',
-      filename: 'x.jpg',
-      mimeType: 'image/webp',
+      filename: params.filename,
+      mimeType: params.mimeType,
       size: 3,
       checksum: 'sha256:x',
       uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
@@ -118,7 +108,7 @@ describe('Files from url (e2e)', () => {
     });
   });
 
-  it('POST /api/v1/files/from-url downloads to buffer when optimize is provided', async () => {
+  it('POST /api/v1/files/from-url streams remote content when optimize is provided', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/files/from-url',
@@ -135,7 +125,7 @@ describe('Files from url (e2e)', () => {
     expect(JSON.parse(response.body)).toEqual({
       id: 'id',
       filename: 'x.jpg',
-      mimeType: 'image/webp',
+      mimeType: 'image/jpeg',
       size: 3,
       checksum: 'sha256:x',
       uploadedAt: '2020-01-01T00:00:00.000Z',

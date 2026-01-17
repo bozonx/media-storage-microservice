@@ -12,7 +12,6 @@ describe('FilesController (unit)', () => {
   const filesServiceMock: jest.Mocked<
     Pick<
       FilesService,
-      | 'uploadFile'
       | 'uploadFileStream'
       | 'downloadFileStream'
       | 'getFileMetadata'
@@ -21,7 +20,6 @@ describe('FilesController (unit)', () => {
       | 'listFiles'
     >
   > = {
-    uploadFile: jest.fn<FilesService['uploadFile']>(),
     uploadFileStream: jest.fn<FilesService['uploadFileStream']>(),
     downloadFileStream: jest.fn<FilesService['downloadFileStream']>(),
     getFileMetadata: jest.fn<FilesService['getFileMetadata']>(),
@@ -313,16 +311,19 @@ describe('FilesController (unit)', () => {
       });
     });
 
-    it('passes buffer download to uploadFile when optimize param is provided', async () => {
-      urlDownloadServiceMock.downloadToBuffer.mockResolvedValue({
-        buffer: Buffer.from('abc'),
+    it('passes stream download to uploadFileStream when optimize param is provided', async () => {
+      const stream: any = { pipe: jest.fn() };
+
+      urlDownloadServiceMock.download.mockResolvedValue({
+        stream,
         mimeType: 'image/jpeg',
+        contentLength: 3,
       });
 
-      filesServiceMock.uploadFile.mockResolvedValue({
+      filesServiceMock.uploadFileStream.mockResolvedValue({
         id: 'id',
         filename: 'x.jpg',
-        mimeType: 'image/webp',
+        mimeType: 'image/jpeg',
         size: 1,
         checksum: 'sha256:x',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
@@ -336,11 +337,11 @@ describe('FilesController (unit)', () => {
         mimeType: 'image/jpeg',
       } as any);
 
-      expect(urlDownloadServiceMock.downloadToBuffer).toHaveBeenCalledWith({
+      expect(urlDownloadServiceMock.download).toHaveBeenCalledWith({
         url: 'https://example.com/x.jpg',
       });
-      expect(filesServiceMock.uploadFile).toHaveBeenCalledWith({
-        buffer: Buffer.from('abc'),
+      expect(filesServiceMock.uploadFileStream).toHaveBeenCalledWith({
+        stream,
         filename: 'x.jpg',
         mimeType: 'image/jpeg',
         compressParams: { format: 'webp' },

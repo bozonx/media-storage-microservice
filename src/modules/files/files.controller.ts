@@ -213,24 +213,11 @@ export class FilesController {
       throw new UnsupportedMediaTypeException('Archive file types are not allowed');
     }
 
-    if (compressParams) {
-      const buffer = await data.toBuffer();
-      return this.filesService.uploadFile({
-        buffer,
-        filename: sanitizeFilename(data.filename),
-        mimeType: data.mimetype,
-        compressParams,
-        metadata,
-        appId,
-        userId,
-        purpose,
-      });
-    }
-
     return this.filesService.uploadFileStream({
       stream: data.file,
       filename: sanitizeFilename(data.filename),
       mimeType: data.mimetype,
+      compressParams,
       metadata,
       appId,
       userId,
@@ -242,38 +229,6 @@ export class FilesController {
   @HttpCode(HttpStatus.CREATED)
   async uploadFileFromUrl(@Body() body: UploadFileFromUrlDto) {
     const filename = sanitizeFilename(body.filename ?? this.inferFilenameFromUrl(body.url));
-
-    if (body.optimize) {
-      const downloaded = await this.urlDownloadService.downloadToBuffer({ url: body.url });
-
-      const mimeType =
-        (typeof body.mimeType === 'string' && body.mimeType.trim().length > 0
-          ? body.mimeType.trim()
-          : undefined) ??
-        (typeof downloaded.mimeType === 'string' && downloaded.mimeType.trim().length > 0
-          ? downloaded.mimeType.trim()
-          : undefined) ??
-        'application/octet-stream';
-
-      if (isExecutableMimeType(mimeType)) {
-        throw new UnsupportedMediaTypeException('Executable file types are not allowed');
-      }
-
-      if (isArchiveMimeType(mimeType)) {
-        throw new UnsupportedMediaTypeException('Archive file types are not allowed');
-      }
-
-      return this.filesService.uploadFile({
-        buffer: downloaded.buffer,
-        filename,
-        mimeType,
-        compressParams: body.optimize,
-        metadata: body.metadata,
-        appId: body.appId,
-        userId: body.userId,
-        purpose: body.purpose,
-      });
-    }
 
     const downloaded = await this.urlDownloadService.download({ url: body.url });
 
@@ -298,6 +253,7 @@ export class FilesController {
       stream: downloaded.stream,
       filename,
       mimeType,
+      compressParams: body.optimize,
       metadata: body.metadata,
       appId: body.appId,
       userId: body.userId,
