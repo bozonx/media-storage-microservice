@@ -329,7 +329,6 @@ curl http://localhost:8080/api/v1/health
 ### EXIF
 - `EXIF_MAX_BYTES_MB` — максимальный размер файла в мегабайтах для извлечения EXIF (по умолчанию 25).
   - Значение `0` отключает извлечение EXIF.
-- `EXIF_MAX_BYTES` — устаревшая переменная в байтах, используется только как fallback.
 
 ### Компрессия изображений
 - `FORCE_IMAGE_COMPRESSION_ENABLED` — принудительная компрессия для всех загрузок (true/false, по умолчанию false)
@@ -349,10 +348,6 @@ curl http://localhost:8080/api/v1/health
 - `IMAGE_COMPRESSION_QUALITY` — качество (1-100, по умолчанию 80)
 - `IMAGE_COMPRESSION_EFFORT` — усилие сжатия (WebP: 0-6, AVIF: 0-9, по умолчанию 6)
 - `IMAGE_COMPRESSION_AVIF_CHROMA_SUBSAMPLING` — субдискретизация цветности (4:2:0 или 4:4:4). Если не задано, параметр не пробрасывается и используется дефолт энкодера. Рекомендуемое значение для минимального размера: `4:2:0`.
-
-Примечание: legacy-переменные `IMAGE_COMPRESSION_WEBP_QUALITY`, `IMAGE_COMPRESSION_WEBP_EFFORT`,
-`IMAGE_COMPRESSION_AVIF_QUALITY`, `IMAGE_COMPRESSION_AVIF_EFFORT` всё ещё поддерживаются как fallback,
-но использовать рекомендуется новые `IMAGE_COMPRESSION_QUALITY`/`IMAGE_COMPRESSION_EFFORT`.
 
 ### Миниатюры (Thumbnails)
 - `THUMBNAIL_FORMAT` — формат миниатюр (webp/avif, по умолчанию webp)

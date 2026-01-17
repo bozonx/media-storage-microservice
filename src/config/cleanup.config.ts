@@ -5,6 +5,8 @@ export interface CleanupConfig {
   enabled: boolean;
   cron: string;
   badStatusTtlDays: number;
+  softDeletedRetryDelayMinutes: number;
+  softDeletedStuckWarnDays: number;
   thumbnailsTtlDays: number;
   batchSize: number;
   tmpTtlDays: number;
@@ -42,6 +44,11 @@ export default registerAs(
     enabled: process.env.CLEANUP_ENABLED !== 'false',
     cron: parseCron(process.env.CLEANUP_CRON, '0 */6 * * *'),
     badStatusTtlDays: parsePositiveInt(process.env.CLEANUP_BAD_STATUS_TTL_DAYS, 7),
+    softDeletedRetryDelayMinutes: parsePositiveInt(
+      process.env.CLEANUP_SOFT_DELETED_RETRY_DELAY_MINUTES,
+      30,
+    ),
+    softDeletedStuckWarnDays: parsePositiveInt(process.env.CLEANUP_SOFT_DELETED_STUCK_WARN_DAYS, 3),
     thumbnailsTtlDays: parsePositiveInt(process.env.THUMBNAIL_MAX_AGE_DAYS, 90),
     batchSize: parsePositiveInt(process.env.CLEANUP_BATCH_SIZE, 200),
     tmpTtlDays: parsePositiveInt(process.env.CLEANUP_TMP_TTL_DAYS, 2),

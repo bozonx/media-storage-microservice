@@ -13,7 +13,7 @@
   - Prevents server overload by limiting concurrent sharp/exifr operations.
   - Ensures request-bound tasks (EXIF, thumbnails) don't wait for background compression.
 - Logging: unify application logs on Pino (nestjs-pino) with structured error fields.
-- Env: unify image compression quality/effort settings into `IMAGE_COMPRESSION_QUALITY` and `IMAGE_COMPRESSION_EFFORT` (legacy per-format vars still supported as fallback).
+- Env: unify image compression quality/effort settings into `IMAGE_COMPRESSION_QUALITY` and `IMAGE_COMPRESSION_EFFORT`.
 - Compression (breaking): replace `IMAGE_COMPRESSION_MAX_WIDTH`/`IMAGE_COMPRESSION_MAX_HEIGHT` with `IMAGE_COMPRESSION_MAX_DIMENSION` and replace request optimize params `maxWidth`/`maxHeight` with `maxDimension`.
 - Compression (breaking): rename env vars to remove DEFAULT suffixes/prefixes:
   - `IMAGE_COMPRESSION_DEFAULT_FORMAT` -> `IMAGE_COMPRESSION_FORMAT`
@@ -35,6 +35,9 @@
   - Cleanup: add S3 cleanup for `tmp/` and `originals/` prefixes using `ListObjectsV2` with TTL policies.
   - Cleanup: treat `NULL` `s3_key` / `mime_type` in READY rows as corrupted.
   - Cleanup: make retry deletion for stuck `deleting` rows use full cleanup logic (file + original + thumbnails).
+  - Cleanup: add claim + backoff for soft-deleted cleanup to prevent tight retry loops.
+    - Add `CLEANUP_SOFT_DELETED_RETRY_DELAY_MINUTES` (default 30).
+    - Add `CLEANUP_SOFT_DELETED_STUCK_WARN_DAYS` (default 3).
 - Files: harden download headers and improve deduplication behavior.
   - **Fix**: Handle deduplication race conditions in image optimization pipeline (`optimizeImage`).
   - **Fix**: Ensure temporary objects (`tmp/`, `originals/`) are cleaned up via cleanup job to reduce storage waste.

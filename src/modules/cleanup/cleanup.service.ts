@@ -32,6 +32,14 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     this.config = this.configService.get<CleanupConfig>('cleanup')!;
   }
 
+  private getSoftDeletedRetryCutoffTime(): Date {
+    return new Date(Date.now() - this.config.softDeletedRetryDelayMinutes * 60 * 1000);
+  }
+
+  private getSoftDeletedStuckWarnCutoffTime(): Date {
+    return new Date(Date.now() - this.config.softDeletedStuckWarnDays * MS_PER_DAY);
+  }
+
   onModuleInit(): void {
     if (!this.config.enabled) {
       return;
@@ -151,6 +159,9 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
   private async cleanupSoftDeletedFiles() {
     this.logger.info('Starting soft-deleted files cleanup');
 
+    const retryCutoffTime = this.getSoftDeletedRetryCutoffTime();
+    const stuckWarnCutoffTime = this.getSoftDeletedStuckWarnCutoffTime();
+
     const softDeletedFiles = await this.prismaService.$queryRaw<
       Array<{
         id: string;
@@ -158,6 +169,9 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
         originalS3Key: string | null;
         checksum: string | null;
         mimeType: string;
+        deletedAt: Date;
+        status: PrismaFileStatus;
+        statusChangedAt: Date;
       }>
     >(Prisma.sql`
       SELECT
@@ -165,9 +179,18 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
         s3_key AS "s3Key",
         original_s3_key AS "originalS3Key",
         checksum,
-        mime_type AS "mimeType"
+        mime_type AS "mimeType",
+        deleted_at AS "deletedAt",
+        status,
+        status_changed_at AS "statusChangedAt"
       FROM files
-      WHERE deleted_at IS NOT NULL
+      WHERE
+        deleted_at IS NOT NULL
+        AND (
+          status <> ${PrismaFileStatus.deleting}
+          OR status_changed_at < ${retryCutoffTime}
+        )
+      ORDER BY deleted_at ASC
       LIMIT ${this.config.batchSize}
     `);
 
@@ -176,10 +199,54 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.logger.info({ count: softDeletedFiles.length }, 'Found soft-deleted files');
+    this.logger.info(
+      { count: softDeletedFiles.length, retryCutoffTime },
+      'Found soft-deleted files eligible for cleanup',
+    );
+
+    let claimedCount = 0;
+    let deletedCount = 0;
+    let incompleteCount = 0;
+    let skippedNotClaimedCount = 0;
+    let stuckWarnCount = 0;
 
     for (const file of softDeletedFiles) {
       try {
+        if (file.deletedAt < stuckWarnCutoffTime) {
+          stuckWarnCount += 1;
+          this.logger.warn(
+            {
+              fileId: file.id,
+              deletedAt: file.deletedAt,
+              status: file.status,
+              statusChangedAt: file.statusChangedAt,
+            },
+            'Soft-deleted file has been pending cleanup for too long',
+          );
+        }
+
+        const claimed = await (this.prismaService as any).file.updateMany({
+          where: {
+            id: file.id,
+            deletedAt: { not: null },
+            OR: [
+              { status: { not: PrismaFileStatus.deleting } },
+              { statusChangedAt: { lt: retryCutoffTime } },
+            ],
+          },
+          data: {
+            status: PrismaFileStatus.deleting,
+            statusChangedAt: new Date(),
+          },
+        });
+
+        if (claimed.count !== 1) {
+          skippedNotClaimedCount += 1;
+          continue;
+        }
+
+        claimedCount += 1;
+
         const shouldDeleteBlob = await this.shouldDeleteBlob(file.checksum, file.mimeType, file.id);
 
         if (!shouldDeleteBlob) {
@@ -243,8 +310,10 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
         });
 
         if (allThumbnailsDeleted && allBlobKeysDeleted) {
+          deletedCount += 1;
           this.logger.info({ fileId: file.id }, 'Soft-deleted file cleaned up');
         } else {
+          incompleteCount += 1;
           this.logger.warn(
             {
               fileId: file.id,
@@ -259,6 +328,18 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
         this.logger.error({ err: error, fileId: file.id }, 'Failed to cleanup soft-deleted file');
       }
     }
+
+    this.logger.info(
+      {
+        scanned: softDeletedFiles.length,
+        claimed: claimedCount,
+        deleted: deletedCount,
+        incomplete: incompleteCount,
+        skippedNotClaimed: skippedNotClaimedCount,
+        stuckWarnCount,
+      },
+      'Soft-deleted files cleanup completed',
+    );
   }
 
   private async shouldDeleteBlob(

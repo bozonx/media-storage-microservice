@@ -47,6 +47,8 @@ describe('CleanupService (unit)', () => {
           enabled: true,
           cron: '* * * * *',
           badStatusTtlDays: 7,
+          softDeletedRetryDelayMinutes: 30,
+          softDeletedStuckWarnDays: 3,
           thumbnailsTtlDays: 90,
           batchSize: 200,
           tmpTtlDays: 2,
@@ -193,10 +195,14 @@ describe('CleanupService (unit)', () => {
           originalS3Key: null,
           checksum: 'sha256:abc',
           mimeType: 'image/jpeg',
+          deletedAt: new Date('2020-01-01T00:00:00.000Z'),
+          status: PrismaFileStatus.ready,
+          statusChangedAt: new Date('2020-01-01T00:00:00.000Z'),
         },
       ]);
 
       prismaMock.file.count.mockResolvedValue(0);
+      prismaMock.file.updateMany.mockResolvedValueOnce({ count: 1 });
       prismaMock.thumbnail.findMany.mockResolvedValue([]);
       storageMock.deleteFiles.mockResolvedValue({
         deletedKeys: new Set(['aa/bb/hash.jpg']),
@@ -225,6 +231,50 @@ describe('CleanupService (unit)', () => {
       expect(prismaMock.$transaction).toHaveBeenCalled();
     });
 
+    it('does not claim a deleting soft-deleted file before retry cutoff', async () => {
+      prismaMock.$queryRaw.mockResolvedValueOnce([
+        {
+          id: 'file-1',
+          s3Key: 'aa/bb/hash.jpg',
+          originalS3Key: null,
+          checksum: 'sha256:abc',
+          mimeType: 'image/jpeg',
+          deletedAt: new Date('2020-01-01T00:00:00.000Z'),
+          status: PrismaFileStatus.deleting,
+          statusChangedAt: new Date(),
+        },
+      ]);
+
+      prismaMock.file.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await service.runCleanup();
+
+      expect(storageMock.deleteFiles).not.toHaveBeenCalled();
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('skips deletion when claim fails for soft-deleted file', async () => {
+      prismaMock.$queryRaw.mockResolvedValueOnce([
+        {
+          id: 'file-1',
+          s3Key: 'aa/bb/hash.jpg',
+          originalS3Key: null,
+          checksum: 'sha256:abc',
+          mimeType: 'image/jpeg',
+          deletedAt: new Date('2020-01-01T00:00:00.000Z'),
+          status: PrismaFileStatus.ready,
+          statusChangedAt: new Date('2020-01-01T00:00:00.000Z'),
+        },
+      ]);
+
+      prismaMock.file.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await service.runCleanup();
+
+      expect(storageMock.deleteFiles).not.toHaveBeenCalled();
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    });
+
     it('skips blob deletion when other files still reference it', async () => {
       prismaMock.$queryRaw.mockResolvedValueOnce([
         {
@@ -233,10 +283,14 @@ describe('CleanupService (unit)', () => {
           originalS3Key: null,
           checksum: 'sha256:abc',
           mimeType: 'image/jpeg',
+          deletedAt: new Date('2020-01-01T00:00:00.000Z'),
+          status: PrismaFileStatus.ready,
+          statusChangedAt: new Date('2020-01-01T00:00:00.000Z'),
         },
       ]);
 
       prismaMock.file.count.mockResolvedValue(2);
+      prismaMock.file.updateMany.mockResolvedValueOnce({ count: 1 });
       prismaMock.thumbnail.findMany.mockResolvedValue([]);
 
       storageMock.deleteFiles.mockResolvedValue({ deletedKeys: new Set<string>(), errors: [] });
@@ -263,10 +317,14 @@ describe('CleanupService (unit)', () => {
           originalS3Key: null,
           checksum: 'sha256:abc',
           mimeType: 'image/jpeg',
+          deletedAt: new Date('2020-01-01T00:00:00.000Z'),
+          status: PrismaFileStatus.ready,
+          statusChangedAt: new Date('2020-01-01T00:00:00.000Z'),
         },
       ]);
 
       prismaMock.file.count.mockResolvedValue(1);
+      prismaMock.file.updateMany.mockResolvedValueOnce({ count: 1 });
       prismaMock.thumbnail.findMany.mockResolvedValue([
         { id: 'thumb-1', s3Key: 'thumbnails/thumb1.jpg' },
         { id: 'thumb-2', s3Key: 'thumbnails/thumb2.jpg' },
