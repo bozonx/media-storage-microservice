@@ -80,6 +80,14 @@ function escapeHtml(unsafe) {
         .replaceAll("'", '&#039;');
 }
 
+function formatJson(value) {
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch {
+        return '[unserializable]';
+    }
+}
+
 function setStatus(message, variant) {
     if (!message) {
         statusEl.textContent = '';
@@ -122,6 +130,17 @@ function renderFiles(items) {
             const appId = escapeHtml(item.appId || '—');
             const userId = escapeHtml(item.userId || '—');
             const purpose = escapeHtml(item.purpose || '—');
+            const status = escapeHtml(item.status || '—');
+
+            const metadataValue = item && typeof item === 'object' ? item.metadata : undefined;
+            const hasMetadata =
+                metadataValue &&
+                typeof metadataValue === 'object' &&
+                !Array.isArray(metadataValue) &&
+                Object.keys(metadataValue).length > 0;
+            const metadataText = hasMetadata ? escapeHtml(formatJson(metadataValue)) : '';
+
+            const statusClass = typeof item.status === 'string' ? `status-${escapeHtml(item.status)}` : '';
 
             const isImage = typeof item.mimeType === 'string' && item.mimeType.startsWith('image/');
             const thumbnailUrl = isImage
@@ -141,7 +160,10 @@ function renderFiles(items) {
                         }
                     </div>
                     <div class="file-row-main">
-                        <div class="file-row-title">${filename}</div>
+                        <div class="file-row-title">
+                            <span class="file-row-filename">${filename}</span>
+                            <span class="file-status-badge ${statusClass}">${status}</span>
+                        </div>
                         <div class="file-row-meta">
                             <span><strong>ID:</strong> ${id}</span>
                             <span><strong>appId:</strong> ${appId}</span>
@@ -150,7 +172,16 @@ function renderFiles(items) {
                             <span><strong>MIME:</strong> ${mimeType}</span>
                             <span><strong>Size:</strong> ${size}</span>
                             <span><strong>Uploaded:</strong> ${escapeHtml(uploadedAt)}</span>
+                            <span><strong>Status:</strong> ${status}</span>
                         </div>
+                        ${
+                            hasMetadata
+                                ? `<details class="file-row-details">
+                                      <summary>metadata</summary>
+                                      <pre class="file-row-metadata">${metadataText}</pre>
+                                   </details>`
+                                : ''
+                        }
                     </div>
                     <div class="file-row-actions">
                         <a class="link" href="${url}" target="_blank" rel="noreferrer">Download</a>

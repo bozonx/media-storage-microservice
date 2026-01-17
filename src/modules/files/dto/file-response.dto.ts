@@ -1,4 +1,5 @@
 import { Exclude, Expose } from 'class-transformer';
+import { FileStatus } from '../file-status.js';
 
 @Exclude()
 export class FileResponseDto {
@@ -31,6 +32,12 @@ export class FileResponseDto {
 
   @Expose()
   uploadedAt!: Date;
+
+  @Expose()
+  status?: FileStatus;
+
+  @Expose()
+  metadata?: Record<string, any>;
 
   @Expose()
   url!: string;

@@ -265,6 +265,7 @@ describe('FilesService (unit)', () => {
         checksum: 'sha256:abc',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
         status: FileStatus.READY,
+        metadata: { a: 1 },
       };
 
       (prismaMock as any).file.findFirst.mockResolvedValue(existing);
@@ -283,6 +284,8 @@ describe('FilesService (unit)', () => {
         originalSize: undefined,
         checksum: 'sha256:abc',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
+        status: FileStatus.READY,
+        metadata: { a: 1 },
         url: '/api/v1/files/file-id/download',
       });
 
@@ -560,6 +563,8 @@ describe('FilesService (unit)', () => {
           originalSize: null,
           checksum: 'sha256:x',
           uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
+          status: FileStatus.READY,
+          metadata: { a: 1 },
         },
       ];
 
@@ -578,6 +583,8 @@ describe('FilesService (unit)', () => {
       expect(res.items[0]?.appId).toBe('app-1');
       expect(res.items[0]?.userId).toBe('user-1');
       expect(res.items[0]?.purpose).toBe('avatar');
+      expect(res.items[0]?.status).toBe(FileStatus.READY);
+      expect(res.items[0]?.metadata).toEqual({ a: 1 });
     });
   });
 
