@@ -102,7 +102,7 @@ export class ThumbnailService {
       file.optimizationStatus === OptimizationStatus.PENDING ||
       file.optimizationStatus === OptimizationStatus.PROCESSING
     ) {
-      file = await (this.filesService as any).ensureOptimized(fileId);
+      file = await this.filesService.ensureOptimized(fileId);
     }
 
     if (file.optimizationStatus === OptimizationStatus.FAILED) {

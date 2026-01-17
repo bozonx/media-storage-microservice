@@ -27,7 +27,7 @@ interface CompressionConfig {
   avif: {
     quality: number;
     effort: number;
-    chromaSubsampling: '4:2:0' | '4:4:4';
+    chromaSubsampling: '4:2:0' | '4:4:4' | undefined;
   };
 }
 
@@ -113,11 +113,13 @@ export class ImageOptimizerService {
             ? this.compressionConfig.avif.quality
             : (params.quality ?? this.compressionConfig.avif.quality);
 
+          const chromaSubsampling = this.compressionConfig.avif.chromaSubsampling;
+
           pipeline = pipeline.avif({
             quality,
             lossless,
             effort: this.compressionConfig.avif.effort,
-            chromaSubsampling: this.compressionConfig.avif.chromaSubsampling,
+            ...(chromaSubsampling ? { chromaSubsampling } : {}),
           });
           outputMimeType = 'image/avif';
         } else {

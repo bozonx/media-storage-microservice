@@ -30,9 +30,10 @@ export default () => ({
           '6',
         10,
       ),
-      chromaSubsampling: (process.env.IMAGE_COMPRESSION_AVIF_CHROMA_SUBSAMPLING || '4:4:4') as
+      chromaSubsampling: process.env.IMAGE_COMPRESSION_AVIF_CHROMA_SUBSAMPLING as
         | '4:2:0'
-        | '4:4:4',
+        | '4:4:4'
+        | undefined,
     },
   },
 });

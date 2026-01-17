@@ -874,7 +874,7 @@ export class FilesService {
     }
   }
 
-  private async ensureOptimized(fileId: string): Promise<any> {
+  public async ensureOptimized(fileId: string): Promise<any> {
     const updated = await (this.prismaService as any).file.updateMany({
       where: {
         id: fileId,

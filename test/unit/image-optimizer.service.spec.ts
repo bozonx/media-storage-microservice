@@ -44,7 +44,7 @@ describe('ImageOptimizerService (unit)', () => {
                   avif: {
                     quality: 60,
                     effort: 6,
-                    chromaSubsampling: '4:4:4',
+                    chromaSubsampling: undefined,
                   },
                 };
               }

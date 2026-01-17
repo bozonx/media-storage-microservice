@@ -348,7 +348,7 @@ curl http://localhost:8080/api/v1/health
 **Настройки качества (единые для WebP и AVIF):**
 - `IMAGE_COMPRESSION_QUALITY` — качество (1-100, по умолчанию 80)
 - `IMAGE_COMPRESSION_EFFORT` — усилие сжатия (WebP: 0-6, AVIF: 0-9, по умолчанию 6)
-- `IMAGE_COMPRESSION_AVIF_CHROMA_SUBSAMPLING` — субдискретизация цветности (4:2:0 или 4:4:4, по умолчанию 4:4:4)
+- `IMAGE_COMPRESSION_AVIF_CHROMA_SUBSAMPLING` — субдискретизация цветности (4:2:0 или 4:4:4). Если не задано, параметр не пробрасывается и используется дефолт энкодера. Рекомендуемое значение для минимального размера: `4:2:0`.
 
 Примечание: legacy-переменные `IMAGE_COMPRESSION_WEBP_QUALITY`, `IMAGE_COMPRESSION_WEBP_EFFORT`,
 `IMAGE_COMPRESSION_AVIF_QUALITY`, `IMAGE_COMPRESSION_AVIF_EFFORT` всё ещё поддерживаются как fallback,
