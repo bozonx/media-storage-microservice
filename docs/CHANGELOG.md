@@ -17,7 +17,7 @@
 - Errors: harden global exception responses and map Prisma errors to HTTP.
 - Cleanup: comprehensive cleanup service with TTL-based policies for bad status files and old thumbnails.
   - Add `statusChangedAt` field to track when file status changes.
-  - Replace `CLEANUP_ORPHAN_TIMEOUT_MINUTES` with `CLEANUP_BAD_STATUS_TTL_DAYS` (default 30 days).
+  - Replace `CLEANUP_ORPHAN_TIMEOUT_MINUTES` with `CLEANUP_BAD_STATUS_TTL_DAYS` (default 7 days).
   - Add `THUMBNAIL_MAX_AGE_DAYS` for unused thumbnail cleanup and thumbnail cache max-age (default 90 days).
   - Add `CLEANUP_BATCH_SIZE` for controlling cleanup batch operations.
   - Unified cleanup pipeline: corrupted records, bad status files, and old thumbnails.

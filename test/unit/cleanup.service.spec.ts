@@ -45,7 +45,7 @@ describe('CleanupService (unit)', () => {
         return {
           enabled: true,
           cron: '* * * * *',
-          badStatusTtlDays: 30,
+          badStatusTtlDays: 7,
           thumbnailsTtlDays: 90,
           batchSize: 200,
         };
