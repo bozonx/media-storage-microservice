@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Heavy Tasks Queue**: add priority-based queue system for memory/CPU-intensive operations.
+  - Implement `HeavyTasksQueueService` using `p-queue` with three priority levels.
+  - Priority 0 (highest): EXIF extraction (request-bound, user waits).
+  - Priority 1 (medium): Thumbnail generation (request-bound, user waits).
+  - Priority 2 (lowest): Lazy image compression (background task).
+  - Add `HEAVY_TASKS_MAX_CONCURRENCY` env var to control concurrent heavy tasks (default 4).
+  - Add `HEAVY_TASKS_QUEUE_TIMEOUT_MS` env var for task timeout (default 30000ms).
+  - Replace `IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS` with `HEAVY_TASKS_QUEUE_TIMEOUT_MS` for waiting on lazy optimization completion.
+  - Prevents server overload by limiting concurrent sharp/exifr operations.
+  - Ensures request-bound tasks (EXIF, thumbnails) don't wait for background compression.
 - Logging: unify application logs on Pino (nestjs-pino) with structured error fields.
 - Env: unify image compression quality/effort settings into `IMAGE_COMPRESSION_QUALITY` and `IMAGE_COMPRESSION_EFFORT` (legacy per-format vars still supported as fallback).
 - Compression (breaking): replace `IMAGE_COMPRESSION_MAX_WIDTH`/`IMAGE_COMPRESSION_MAX_HEIGHT` with `IMAGE_COMPRESSION_MAX_DIMENSION` and replace request optimize params `maxWidth`/`maxHeight` with `maxDimension`.

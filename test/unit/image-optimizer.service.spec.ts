@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { jest } from '@jest/globals';
 import { ImageOptimizerService } from '../../src/modules/optimization/image-optimizer.service.js';
+import { HeavyTasksQueueService } from '../../src/modules/heavy-tasks-queue/heavy-tasks-queue.service.js';
 import { getLoggerToken } from 'nestjs-pino';
 import sharp from 'sharp';
 
@@ -15,6 +16,10 @@ describe('ImageOptimizerService (unit)', () => {
     error: jest.fn(),
     warn: jest.fn(),
     debug: jest.fn(),
+  };
+
+  const heavyTasksQueueMock: any = {
+    execute: jest.fn(async (task: any) => task()),
   };
 
   beforeEach(async () => {
@@ -50,6 +55,10 @@ describe('ImageOptimizerService (unit)', () => {
         {
           provide: getLoggerToken(ImageOptimizerService.name),
           useValue: mockLogger,
+        },
+        {
+          provide: HeavyTasksQueueService,
+          useValue: heavyTasksQueueMock,
         },
       ],
     }).compile();

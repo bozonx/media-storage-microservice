@@ -15,6 +15,10 @@ import { ThumbnailParamsDto } from '../files/dto/thumbnail-params.dto.js';
 import { FileStatus } from '../files/file-status.js';
 import { OptimizationStatus } from '../files/optimization-status.js';
 import { FilesService } from '../files/files.service.js';
+import {
+  HeavyTasksQueueService,
+  TaskPriority,
+} from '../heavy-tasks-queue/heavy-tasks-queue.service.js';
 
 interface ThumbnailConfig {
   format: 'webp' | 'avif';
@@ -48,6 +52,7 @@ export class ThumbnailService {
     private readonly storageService: StorageService,
     @Inject(forwardRef(() => FilesService))
     private readonly filesService: FilesService,
+    private readonly heavyTasksQueue: HeavyTasksQueueService,
   ) {
     this.config = this.configService.get<ThumbnailConfig>('thumbnail')!;
     this.bucket = this.configService.get<string>('storage.bucket')!;
@@ -177,30 +182,32 @@ export class ThumbnailService {
     height: number,
     quality: number,
   ): Promise<Buffer> {
-    try {
-      const format = this.config.format;
-      let pipeline = sharp(buffer).autoOrient().resize(width, height, {
-        fit: sharp.fit.inside,
-        withoutEnlargement: true,
-      });
+    return this.heavyTasksQueue.execute(async () => {
+      try {
+        const format = this.config.format;
+        let pipeline = sharp(buffer).autoOrient().resize(width, height, {
+          fit: sharp.fit.inside,
+          withoutEnlargement: true,
+        });
 
-      if (format === 'webp') {
-        pipeline = pipeline.webp({
-          quality,
-          effort: this.config.effort,
-        });
-      } else {
-        pipeline = pipeline.avif({
-          quality,
-          effort: this.config.effort,
-        });
+        if (format === 'webp') {
+          pipeline = pipeline.webp({
+            quality,
+            effort: this.config.effort,
+          });
+        } else {
+          pipeline = pipeline.avif({
+            quality,
+            effort: this.config.effort,
+          });
+        }
+
+        return await pipeline.toBuffer();
+      } catch (error) {
+        this.logger.error({ err: error }, 'Failed to generate thumbnail');
+        throw new BadRequestException('Failed to generate thumbnail');
       }
-
-      return await pipeline.toBuffer();
-    } catch (error) {
-      this.logger.error({ err: error }, 'Failed to generate thumbnail');
-      throw new BadRequestException('Failed to generate thumbnail');
-    }
+    }, TaskPriority.THUMBNAIL_GENERATION);
   }
 
   private calculateParamsHash(

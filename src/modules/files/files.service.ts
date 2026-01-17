@@ -98,10 +98,8 @@ export class FilesService {
       this.configService.get<string>('app.basePath') ||
       this.configService.get<string>('BASE_PATH') ||
       '';
-    this.optimizationWaitTimeout = parseInt(
-      this.configService.get<string>('IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS') || '30000',
-      10,
-    );
+    this.optimizationWaitTimeout =
+      this.configService.get<number>('heavyTasksQueue.timeoutMs') ?? 30000;
     this.forceCompression = this.configService.get<boolean>('compression.forceEnabled') ?? false;
   }
 

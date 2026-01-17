@@ -59,12 +59,15 @@ model File {
   createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt               DateTime            @updatedAt @map("updated_at") @db.Timestamp(6)
 
+  thumbnails              Thumbnail[]
+
   @@index([status, uploadedAt])
   @@index([status, statusChangedAt])
   @@index([mimeType])
   @@index([checksum])
   @@index([s3Key])
   @@index([optimizationStatus])
+  @@index([optimizationStatus, optimizationStartedAt])
   @@index([deletedAt])
   @@index([appId])
   @@index([userId])
@@ -87,6 +90,8 @@ model Thumbnail {
   mimeType       String   @map("mime_type") @db.VarChar(100)
   lastAccessedAt DateTime @default(now()) @map("last_accessed_at") @db.Timestamp(6)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  file           File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
 
   @@unique([fileId, paramsHash])
   @@index([fileId])

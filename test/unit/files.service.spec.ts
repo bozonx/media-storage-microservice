@@ -74,8 +74,8 @@ describe('FilesService (unit)', () => {
       if (key === 'compression.forceEnabled') {
         return false;
       }
-      if (key === 'IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS') {
-        return '30000';
+      if (key === 'heavyTasksQueue.timeoutMs') {
+        return 30000;
       }
       return undefined;
     }),

@@ -12,6 +12,8 @@ jest.unstable_mockModule('exifr', () => ({
 
 const { ExifService } = await import('../../src/modules/files/exif.service.js');
 const { StorageService } = await import('../../src/modules/storage/storage.service.js');
+const { HeavyTasksQueueService } =
+  await import('../../src/modules/heavy-tasks-queue/heavy-tasks-queue.service.js');
 
 describe('ExifService (unit)', () => {
   let service: InstanceType<typeof ExifService>;
@@ -29,6 +31,10 @@ describe('ExifService (unit)', () => {
     fatal: jest.fn(),
   };
 
+  const heavyTasksQueueMock: any = {
+    execute: jest.fn(async (task: any) => task()),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -40,6 +46,7 @@ describe('ExifService (unit)', () => {
         ExifService,
         { provide: getLoggerToken('ExifService'), useValue: loggerMock },
         { provide: StorageService, useValue: storageMock },
+        { provide: HeavyTasksQueueService, useValue: heavyTasksQueueMock },
       ],
     }).compile();
 
@@ -64,6 +71,7 @@ describe('ExifService (unit)', () => {
         ExifService,
         { provide: getLoggerToken('ExifService'), useValue: loggerMock },
         { provide: StorageService, useValue: storageMock },
+        { provide: HeavyTasksQueueService, useValue: heavyTasksQueueMock },
       ],
     }).compile();
 
@@ -98,6 +106,7 @@ describe('ExifService (unit)', () => {
         ExifService,
         { provide: getLoggerToken('ExifService'), useValue: loggerMock },
         { provide: StorageService, useValue: storageMock },
+        { provide: HeavyTasksQueueService, useValue: heavyTasksQueueMock },
       ],
     }).compile();
 

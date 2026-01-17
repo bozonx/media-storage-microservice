@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import exifr from 'exifr';
 import { StorageService } from '../storage/storage.service.js';
+import {
+  HeavyTasksQueueService,
+  TaskPriority,
+} from '../heavy-tasks-queue/heavy-tasks-queue.service.js';
 
 const BYTES_PER_MEGABYTE = 1024 * 1024;
 const DEFAULT_MAX_BYTES = 25 * BYTES_PER_MEGABYTE;
@@ -14,6 +18,7 @@ export class ExifService {
     @InjectPinoLogger(ExifService.name)
     private readonly logger: PinoLogger,
     private readonly storageService: StorageService,
+    private readonly heavyTasksQueue: HeavyTasksQueueService,
   ) {
     const parsedMb = this.parseMegabytes(process.env.EXIF_MAX_BYTES_MB);
     if (parsedMb !== undefined) {
@@ -50,22 +55,24 @@ export class ExifService {
       return undefined;
     }
 
-    try {
-      const res = await exifr.parse(params.buffer, {
-        translateKeys: true,
-        translateValues: false,
-        sanitize: true,
-      });
+    return this.heavyTasksQueue.execute(async () => {
+      try {
+        const res = await exifr.parse(params.buffer, {
+          translateKeys: true,
+          translateValues: false,
+          sanitize: true,
+        });
 
-      if (!res || typeof res !== 'object') {
+        if (!res || typeof res !== 'object') {
+          return undefined;
+        }
+
+        return res as Record<string, any>;
+      } catch (err) {
+        this.logger.debug({ err }, 'Failed to extract EXIF');
         return undefined;
       }
-
-      return res as Record<string, any>;
-    } catch (err) {
-      this.logger.debug({ err }, 'Failed to extract EXIF');
-      return undefined;
-    }
+    }, TaskPriority.EXIF_EXTRACTION);
   }
 
   async tryExtractFromStorageKey(params: {
@@ -80,18 +87,36 @@ export class ExifService {
       return undefined;
     }
 
-    const { stream, contentLength } = await this.storageService.downloadStream(params.key);
+    return this.heavyTasksQueue.execute(async () => {
+      const { stream, contentLength } = await this.storageService.downloadStream(params.key);
 
-    if (typeof contentLength === 'number' && contentLength > this.maxBytes) {
-      this.logger.debug(
-        { contentLength, maxBytes: this.maxBytes },
-        'Skip EXIF extraction: file too large',
-      );
-      return undefined;
-    }
+      if (typeof contentLength === 'number' && contentLength > this.maxBytes) {
+        this.logger.debug(
+          { contentLength, maxBytes: this.maxBytes },
+          'Skip EXIF extraction: file too large',
+        );
+        return undefined;
+      }
 
-    const buffer = await this.readToBufferWithLimit(stream, this.maxBytes);
-    return this.tryExtractFromBuffer({ buffer, mimeType: params.mimeType });
+      const buffer = await this.readToBufferWithLimit(stream, this.maxBytes);
+
+      try {
+        const res = await exifr.parse(buffer, {
+          translateKeys: true,
+          translateValues: false,
+          sanitize: true,
+        });
+
+        if (!res || typeof res !== 'object') {
+          return undefined;
+        }
+
+        return res as Record<string, any>;
+      } catch (err) {
+        this.logger.debug({ err }, 'Failed to extract EXIF');
+        return undefined;
+      }
+    }, TaskPriority.EXIF_EXTRACTION);
   }
 
   private isImage(mimeType: string): boolean {

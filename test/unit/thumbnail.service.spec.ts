@@ -6,6 +6,7 @@ import { ThumbnailService } from '../../src/modules/thumbnails/thumbnail.service
 import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
 import { StorageService } from '../../src/modules/storage/storage.service.js';
 import { FilesService } from '../../src/modules/files/files.service.js';
+import { HeavyTasksQueueService } from '../../src/modules/heavy-tasks-queue/heavy-tasks-queue.service.js';
 import { getLoggerToken } from 'nestjs-pino';
 import { FileStatus } from '../../src/modules/files/file-status.js';
 import { OptimizationStatus } from '../../src/modules/files/optimization-status.js';
@@ -41,6 +42,10 @@ describe('ThumbnailService (unit)', () => {
 
   const filesServiceMock: any = {
     ensureOptimized: jest.fn(),
+  };
+
+  const heavyTasksQueueMock: any = {
+    execute: jest.fn(async (task: any) => task()),
   };
 
   beforeEach(async () => {
@@ -85,6 +90,10 @@ describe('ThumbnailService (unit)', () => {
         {
           provide: getLoggerToken(ThumbnailService.name),
           useValue: mockLogger,
+        },
+        {
+          provide: HeavyTasksQueueService,
+          useValue: heavyTasksQueueMock,
         },
       ],
     }).compile();

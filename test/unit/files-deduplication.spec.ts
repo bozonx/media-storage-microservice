@@ -29,7 +29,7 @@ describe('FilesService - Deduplication', () => {
         'storage.bucket': 'test-bucket',
         'app.basePath': '',
         BASE_PATH: '',
-        IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS: '30000',
+        'heavyTasksQueue.timeoutMs': 30000,
         'compression.forceEnabled': false,
       };
       return config[key];
