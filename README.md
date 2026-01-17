@@ -366,6 +366,11 @@ curl http://localhost:8080/api/v1/health
 ### Cleanup Job
 - `CLEANUP_ENABLED` — включить cleanup job (true/false)
 - `CLEANUP_CRON` — расписание cron (по умолчанию: каждые 6 часов)
+- `CLEANUP_BAD_STATUS_TTL_DAYS` — TTL в днях для файлов в "плохих" статусах (uploading/deleting/failed/missing)
+- `CLEANUP_BATCH_SIZE` — размер батча для операций cleanup (БД)
+- `CLEANUP_TMP_TTL_DAYS` — TTL в днях для объектов S3 с префиксом `tmp/`
+- `CLEANUP_ORIGINALS_TTL_DAYS` — TTL в днях для объектов S3 с префиксом `originals/`
+- `CLEANUP_S3_LIST_PAGE_SIZE` — размер страницы при `ListObjectsV2` (по умолчанию 1000)
 
 ### Base path
 - `BASE_PATH` — префикс пути для API и UI (например, `media`, без ведущих/замыкающих `/`)

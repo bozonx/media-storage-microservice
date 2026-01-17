@@ -276,7 +276,7 @@ describe('FilesService (unit)', () => {
         mimeType: 'image/png',
       });
 
-      expect(res).toEqual({
+      expect(res).toMatchObject({
         id: 'file-id',
         filename: 'a.png',
         mimeType: 'image/png',

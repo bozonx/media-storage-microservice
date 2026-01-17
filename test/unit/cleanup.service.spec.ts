@@ -37,6 +37,7 @@ describe('CleanupService (unit)', () => {
 
   const storageMock: any = {
     deleteFiles: jest.fn(),
+    listObjects: jest.fn(),
   };
 
   const configServiceMock: any = {
@@ -48,6 +49,9 @@ describe('CleanupService (unit)', () => {
           badStatusTtlDays: 7,
           thumbnailsTtlDays: 90,
           batchSize: 200,
+          tmpTtlDays: 2,
+          originalsTtlDays: 14,
+          s3ListPageSize: 1000,
         };
       }
       return undefined;
@@ -76,6 +80,7 @@ describe('CleanupService (unit)', () => {
     prismaMock.thumbnail.findMany.mockResolvedValue([]);
     prismaMock.file.updateMany.mockResolvedValue({ count: 0 });
     storageMock.deleteFiles.mockResolvedValue({ deletedKeys: new Set<string>(), errors: [] });
+    storageMock.listObjects.mockResolvedValue({ items: [], nextContinuationToken: undefined });
 
     moduleRef = await Test.createTestingModule({
       providers: [
@@ -120,6 +125,62 @@ describe('CleanupService (unit)', () => {
       await service.runCleanup();
 
       expect(loggerMock.info).not.toHaveBeenCalled();
+    });
+
+    it('skips run when already running', async () => {
+      (service as any).isRunning = true;
+
+      await service.runCleanup();
+
+      expect(loggerMock.warn).toHaveBeenCalled();
+      expect(storageMock.listObjects).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('temporary objects cleanup (tmp/ and originals/)', () => {
+    it('deletes only objects older than cutoff', async () => {
+      const now = Date.now();
+      const oldDate = new Date(now - 3 * 24 * 60 * 60 * 1000);
+      const veryOldDate = new Date(now - 20 * 24 * 60 * 60 * 1000);
+      const freshDate = new Date(now - 1 * 60 * 60 * 1000);
+
+      storageMock.listObjects
+        .mockResolvedValueOnce({
+          items: [
+            { key: 'tmp/old', lastModified: oldDate },
+            { key: 'tmp/fresh', lastModified: freshDate },
+          ],
+          nextContinuationToken: undefined,
+        })
+        .mockResolvedValueOnce({
+          items: [
+            { key: 'originals/old', lastModified: veryOldDate },
+            { key: 'originals/fresh', lastModified: freshDate },
+          ],
+          nextContinuationToken: undefined,
+        });
+
+      storageMock.deleteFiles.mockResolvedValue({
+        deletedKeys: new Set(['tmp/old', 'originals/old']),
+        errors: [],
+      });
+
+      await service.runCleanup();
+
+      expect(storageMock.listObjects).toHaveBeenCalledWith({
+        prefix: 'tmp/',
+        continuationToken: undefined,
+        maxKeys: 1000,
+      });
+      expect(storageMock.listObjects).toHaveBeenCalledWith({
+        prefix: 'originals/',
+        continuationToken: undefined,
+        maxKeys: 1000,
+      });
+
+      const deleteArgs = (storageMock.deleteFiles as jest.Mock).mock.calls.map(call => call[0]);
+      expect(deleteArgs).toContainEqual(['tmp/old']);
+      expect(deleteArgs).toContainEqual(['originals/old']);
     });
   });
 
@@ -320,6 +381,75 @@ describe('CleanupService (unit)', () => {
 
       expect(storageMock.deleteFiles).not.toHaveBeenCalled();
       expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('deleting status uses full delete (includes originals and thumbnails)', async () => {
+      prismaMock.$queryRaw.mockResolvedValue([]);
+
+      prismaMock.file.findMany.mockResolvedValue([
+        {
+          id: 'file-1',
+          status: PrismaFileStatus.deleting,
+          s3Key: 'k1',
+          originalS3Key: 'ok1',
+        },
+      ]);
+
+      prismaMock.file.updateMany.mockResolvedValueOnce({ count: 1 });
+      prismaMock.thumbnail.findMany.mockResolvedValue([{ id: 't1', s3Key: 'th/t1' }]);
+
+      storageMock.deleteFiles.mockResolvedValue({
+        deletedKeys: new Set(['k1', 'ok1', 'th/t1']),
+        errors: [],
+      });
+
+      prismaMock.$transaction.mockImplementation(async (fn: any) => {
+        const tx = {
+          thumbnail: { deleteMany: jest.fn(async () => ({ count: 1 })) },
+          file: { delete: jest.fn(async () => ({})) },
+        };
+        return fn(tx);
+      });
+
+      await service.runCleanup();
+
+      expect(storageMock.deleteFiles).toHaveBeenCalledWith(['th/t1', 'k1', 'ok1']);
+      expect(prismaMock.$transaction).toHaveBeenCalled();
+    });
+  });
+
+  describe('cleanupCorruptedRecords', () => {
+    it('treats NULL s3Key/mimeType as corrupted', async () => {
+      prismaMock.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        {
+          id: 'file-1',
+          s3Key: null,
+          originalS3Key: null,
+        },
+      ]);
+
+      prismaMock.file.updateMany.mockResolvedValueOnce({ count: 1 });
+      prismaMock.thumbnail.findMany.mockResolvedValue([]);
+      storageMock.deleteFiles.mockResolvedValue({
+        deletedKeys: new Set<string>(),
+        errors: [],
+      });
+
+      await service.runCleanup();
+
+      expect(prismaMock.file.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'file-1',
+          status: {
+            in: [PrismaFileStatus.ready, PrismaFileStatus.deleting],
+          },
+        },
+        data: {
+          status: PrismaFileStatus.deleting,
+          deletedAt: expect.any(Date),
+          statusChangedAt: expect.any(Date),
+        },
+      });
     });
   });
 });

@@ -32,12 +32,16 @@
   - Add `THUMBNAIL_MAX_AGE_DAYS` for unused thumbnail cleanup and thumbnail cache max-age (default 90 days).
   - Add `CLEANUP_BATCH_SIZE` for controlling cleanup batch operations.
   - Unified cleanup pipeline: corrupted records, bad status files, and old thumbnails.
+  - Cleanup: add S3 cleanup for `tmp/` and `originals/` prefixes using `ListObjectsV2` with TTL policies.
+  - Cleanup: treat `NULL` `s3_key` / `mime_type` in READY rows as corrupted.
+  - Cleanup: make retry deletion for stuck `deleting` rows use full cleanup logic (file + original + thumbnails).
 - Files: harden download headers and improve deduplication behavior.
   - **Fix**: Handle deduplication race conditions in image optimization pipeline (`optimizeImage`).
   - **Fix**: Ensure temporary objects (`tmp/`, `originals/`) are cleaned up via cleanup job to reduce storage waste.
   - **Enhancement**: Pre-check for existing optimized content before upload to avoid duplicate work.
   - **Enhancement**: Graceful handling of P2002 unique constraint violations during concurrent uploads.
   - **Enhancement**: Improved error logging for deduplication and cleanup operations.
+  - Prisma: deduplication uses a partial unique index for active READY files (allows re-upload after soft delete).
 - **Files: add optional tagging support** (`appId`, `userId`, `purpose`).
   - Add nullable `appId`, `userId`, `purpose` fields to File model with indexes for filtering.
   - Support multipart fields `appId`, `userId`, `purpose` on upload (`POST /api/v1/files`).
