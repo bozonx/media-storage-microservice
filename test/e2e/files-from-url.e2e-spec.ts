@@ -117,7 +117,6 @@ describe('Files from url (e2e)', () => {
         optimize: {
           format: 'webp',
         },
-        mimeType: 'image/jpeg',
       },
     });
 

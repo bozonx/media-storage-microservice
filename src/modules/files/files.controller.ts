@@ -233,13 +233,13 @@ export class FilesController {
     const downloaded = await this.urlDownloadService.download({ url: body.url });
 
     const mimeType =
-      (typeof body.mimeType === 'string' && body.mimeType.trim().length > 0
-        ? body.mimeType.trim()
-        : undefined) ??
-      (typeof downloaded.mimeType === 'string' && downloaded.mimeType.trim().length > 0
+      typeof downloaded.mimeType === 'string' && downloaded.mimeType.trim().length > 0
         ? downloaded.mimeType.trim()
-        : undefined) ??
-      'application/octet-stream';
+        : '';
+
+    if (!mimeType) {
+      throw new BadRequestException('Remote server did not provide Content-Type');
+    }
 
     if (isExecutableMimeType(mimeType)) {
       throw new UnsupportedMediaTypeException('Executable file types are not allowed');

@@ -334,7 +334,6 @@ describe('FilesController (unit)', () => {
       await controller.uploadFileFromUrl({
         url: 'https://example.com/x.jpg',
         optimize: { format: 'webp' },
-        mimeType: 'image/jpeg',
       } as any);
 
       expect(urlDownloadServiceMock.download).toHaveBeenCalledWith({

@@ -145,10 +145,12 @@ curl -X POST http://localhost:8080/api/v1/files/from-url \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://example.com/image.jpg","filename":"avatar.jpg","appId":"my-app","userId":"user-123","purpose":"avatar"}'
 
-# С оптимизацией (будет скачано в память, чтобы поддержать optimize)
+# С оптимизацией (оптимизация применяется лениво при первом download/thumbnail)
 curl -X POST http://localhost:8080/api/v1/files/from-url \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://example.com/image.jpg","optimize":{"format":"webp","quality":80,"maxDimension":1920}}'
+
+# Примечание: сервис использует Content-Type удалённого сервера. Если Content-Type не задан, запрос будет отклонён.
 ```
 
 **Response:**

@@ -112,7 +112,28 @@ describe('FilesService - Deduplication', () => {
         uploadedAt: new Date(),
       };
 
+      const created = {
+        id: 'created-id',
+        filename: 'test.txt',
+        mimeType: 'text/plain',
+        size: null,
+        originalSize: null,
+        checksum: null,
+        uploadedAt: null,
+        status: FileStatus.UPLOADING,
+        s3Key: 'tmp/test-key',
+      };
+
+      (prismaService.file.create as any).mockResolvedValue(created);
+      (storageService.uploadStream as any).mockImplementation(async ({ body }: any) => {
+        for await (const _chunk of body as any) {
+          // drain
+        }
+      });
+
       (prismaService.file.findFirst as any).mockResolvedValue(existingFile);
+      (storageService.deleteFile as any).mockResolvedValue(undefined);
+      (prismaService.file.delete as any).mockResolvedValue(undefined);
 
       const result = await service.uploadFile({
         buffer,
@@ -121,42 +142,66 @@ describe('FilesService - Deduplication', () => {
       });
 
       expect(result.id).toBe('existing-id');
-      expect(prismaService.file.create).not.toHaveBeenCalled();
-      expect(storageService.uploadFile).not.toHaveBeenCalled();
+      expect(prismaService.file.create).toHaveBeenCalledTimes(1);
+      expect(storageService.uploadStream).toHaveBeenCalledTimes(1);
+      expect(storageService.deleteFile).toHaveBeenCalledTimes(1);
+      expect(prismaService.file.delete).toHaveBeenCalledTimes(1);
     });
+  });
 
-    it('should handle P2002 race condition during create and retry with existing file', async () => {
-      const buffer = Buffer.from('test content');
-      const checksum = 'sha256:9a0364b9e99bb480dd25e1f0284c8555f0c8d9c8a8f5a5f5f5f5f5f5f5f5f5f5';
+  describe('uploadFileStream - promote race condition (P2002)', () => {
+    it('should deduplicate when promoteUploadedFileToReady hits P2002 and READY file exists', async () => {
+      const fileId = 'new-file-id';
+      const checksum = 'sha256:abcd1234';
+
+      const created = {
+        id: fileId,
+        s3Key: 'tmp/test-key',
+        status: FileStatus.UPLOADING,
+      };
 
       const existingFile = {
         id: 'existing-id',
         filename: 'existing.txt',
         mimeType: 'text/plain',
-        size: BigInt(buffer.length),
+        size: BigInt(100),
         originalSize: null,
         checksum,
-        s3Key: 'ab/cd/abcd...txt',
+        s3Key: 'ab/cd/abcd1234.txt',
         s3Bucket: 'test-bucket',
         status: FileStatus.READY,
         uploadedAt: new Date(),
       };
 
+      (prismaService.file.create as any).mockResolvedValue(created);
+      (storageService.uploadStream as any).mockImplementation(async ({ body }: any) => {
+        for await (const _chunk of body as any) {
+          // drain
+        }
+      });
+
       (prismaService.file.findFirst as any).mockResolvedValueOnce(null);
-      (prismaService.file.create as any).mockRejectedValueOnce({
+      (storageService.copyObject as any).mockResolvedValue(undefined);
+      (storageService.deleteFile as any).mockResolvedValue(undefined);
+
+      (prismaService.file.update as any).mockRejectedValueOnce({
         name: 'PrismaClientKnownRequestError',
         code: 'P2002',
       });
-      (prismaService.file.findFirst as any).mockResolvedValueOnce(existingFile);
 
-      const result = await service.uploadFile({
-        buffer,
+      (prismaService.file.findFirst as any).mockResolvedValueOnce(existingFile);
+      (prismaService.file.delete as any).mockResolvedValue(undefined);
+
+      const stream = Readable.from([Buffer.from('test content')]);
+
+      const result = await service.uploadFileStream({
+        stream,
         filename: 'test.txt',
         mimeType: 'text/plain',
       });
 
       expect(result.id).toBe('existing-id');
-      expect(storageService.uploadFile).not.toHaveBeenCalled();
+      expect(prismaService.file.delete).toHaveBeenCalledWith({ where: { id: fileId } });
     });
   });
 

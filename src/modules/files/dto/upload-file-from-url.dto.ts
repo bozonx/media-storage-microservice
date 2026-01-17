@@ -10,10 +10,6 @@ export class UploadFileFromUrlDto {
   @IsOptional()
   filename?: string;
 
-  @IsString()
-  @IsOptional()
-  mimeType?: string;
-
   @IsObject()
   @IsOptional()
   metadata?: Record<string, any>;

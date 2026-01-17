@@ -172,6 +172,71 @@ export class UrlDownloadService {
     });
   }
 
+  private createDownloadGuardStream(params: {
+    maxBytes: number;
+    timeoutMs: number;
+    expectedContentLength?: number;
+    onTimeout: () => void;
+  }): Transform {
+    let total = 0;
+
+    let timeout: NodeJS.Timeout | undefined;
+    const clearTimer = () => {
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = undefined;
+      }
+    };
+
+    const resetTimer = (stream: Transform) => {
+      clearTimer();
+      timeout = setTimeout(() => {
+        try {
+          params.onTimeout();
+        } finally {
+          stream.destroy(new BadRequestException('Download timeout'));
+        }
+      }, params.timeoutMs);
+    };
+
+    const guard = new Transform({
+      transform: (chunk, _encoding, callback) => {
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        total += buf.length;
+
+        if (total > params.maxBytes) {
+          callback(new BadRequestException('File is too large'));
+          return;
+        }
+
+        resetTimer(guard);
+        callback(null, buf);
+      },
+      final: callback => {
+        clearTimer();
+        if (
+          typeof params.expectedContentLength === 'number' &&
+          Number.isFinite(params.expectedContentLength) &&
+          total !== params.expectedContentLength
+        ) {
+          callback(new BadRequestException('Corrupted download: content-length mismatch'));
+          return;
+        }
+        callback();
+      },
+    });
+
+    guard.on('close', () => {
+      clearTimer();
+    });
+    guard.on('error', () => {
+      clearTimer();
+    });
+
+    resetTimer(guard);
+    return guard;
+  }
+
   private async readToBuffer(stream: Readable): Promise<Buffer> {
     const chunks: Buffer[] = [];
     for await (const chunk of stream as any) {
@@ -198,7 +263,16 @@ export class UrlDownloadService {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), cfg.timeoutMs);
+
+    let activeRawStream: Readable | undefined;
+    const onTimeout = () => {
+      try {
+        controller.abort();
+      } catch {}
+      if (activeRawStream) {
+        activeRawStream.destroy(new BadRequestException('Download timeout'));
+      }
+    };
 
     try {
       let currentUrl = url;
@@ -245,8 +319,16 @@ export class UrlDownloadService {
         const mimeType = response.headers.get('content-type') ?? undefined;
 
         const rawStream = await this.readBodyAsStream(response);
-        const limiter = this.createSizeLimitStream({ maxBytes: cfg.maxBytes });
-        const stream = rawStream.pipe(limiter);
+        activeRawStream = rawStream;
+
+        const stream = rawStream.pipe(
+          this.createDownloadGuardStream({
+            maxBytes: cfg.maxBytes,
+            timeoutMs: cfg.timeoutMs,
+            expectedContentLength: contentLength,
+            onTimeout,
+          }),
+        );
 
         const filename = undefined;
 
@@ -269,8 +351,6 @@ export class UrlDownloadService {
       }
       this.logger.error({ err, url: params.url }, 'Failed to download url');
       throw new BadRequestException('Failed to download url');
-    } finally {
-      clearTimeout(timeout);
     }
   }
 

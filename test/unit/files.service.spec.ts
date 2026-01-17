@@ -292,6 +292,18 @@ describe('FilesService (unit)', () => {
 
       const serviceWithBasePath = moduleWithBasePath.get<FilesService>(FilesService);
 
+      const created = {
+        id: 'created-id',
+        filename: 'a.png',
+        mimeType: 'image/png',
+        size: null,
+        originalSize: null,
+        checksum: null,
+        uploadedAt: null,
+        status: FileStatus.UPLOADING,
+        s3Key: 'tmp/whatever',
+      };
+
       const existing = {
         id: 'file-id',
         filename: 'a.png',
@@ -303,7 +315,16 @@ describe('FilesService (unit)', () => {
         status: FileStatus.READY,
       };
 
+      (prismaMock as any).file.create.mockResolvedValue(created);
+      (storageMock.uploadStream as unknown as jest.Mock).mockImplementation(async (params: any) => {
+        if (params?.body && typeof params.body[Symbol.asyncIterator] === 'function') {
+          await drainStream(params.body);
+        }
+      });
+
       (prismaMock as any).file.findFirst.mockResolvedValue(existing);
+      (prismaMock as any).file.delete.mockResolvedValue(undefined);
+      (storageMock.deleteFile as any).mockResolvedValue(undefined);
 
       const res = await serviceWithBasePath.uploadFile({
         buffer: Buffer.from('abc'),
@@ -317,6 +338,18 @@ describe('FilesService (unit)', () => {
     });
 
     it('returns existing file (dedup) without uploading to storage', async () => {
+      const created = {
+        id: 'created-id',
+        filename: 'a.png',
+        mimeType: 'image/png',
+        size: null,
+        originalSize: null,
+        checksum: null,
+        uploadedAt: null,
+        status: FileStatus.UPLOADING,
+        s3Key: 'tmp/whatever',
+      };
+
       const existing = {
         id: 'file-id',
         filename: 'a.png',
@@ -329,7 +362,10 @@ describe('FilesService (unit)', () => {
         metadata: { a: 1 },
       };
 
+      (prismaMock as any).file.create.mockResolvedValue(created);
       (prismaMock as any).file.findFirst.mockResolvedValue(existing);
+      (prismaMock as any).file.delete.mockResolvedValue(undefined);
+      (storageMock.deleteFile as any).mockResolvedValue(undefined);
 
       const res = await service.uploadFile({
         buffer: Buffer.from('abc'),
@@ -350,8 +386,11 @@ describe('FilesService (unit)', () => {
         url: '/api/v1/files/file-id/download',
       });
 
-      expect((storageMock.uploadFile as jest.Mock).mock.calls).toHaveLength(0);
-      expect((prismaMock as any).file.create).not.toHaveBeenCalled();
+      expect(storageMock.uploadStream).toHaveBeenCalledTimes(1);
+      expect(storageMock.deleteFile).toHaveBeenCalledTimes(1);
+      expect((prismaMock as any).file.delete).toHaveBeenCalledWith({
+        where: { id: 'created-id' },
+      });
     });
 
     it('creates record, uploads to storage and marks READY', async () => {
@@ -359,23 +398,30 @@ describe('FilesService (unit)', () => {
         id: 'new-id',
         filename: 'a.txt',
         mimeType: 'text/plain',
-        size: 3n,
+        size: null,
         originalSize: null,
-        checksum: 'sha256:abc',
+        checksum: null,
         uploadedAt: null,
         status: FileStatus.UPLOADING,
+        s3Key: 'tmp/whatever',
       };
 
       const updated = {
-        ...created,
-        status: FileStatus.READY,
+        id: 'new-id',
+        filename: 'a.txt',
+        mimeType: 'text/plain',
+        size: 3n,
+        originalSize: null,
+        checksum: 'sha256:abc',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
+        status: FileStatus.READY,
       };
 
-      (prismaMock as any).file.findFirst.mockResolvedValue(null);
       (prismaMock as any).file.create.mockResolvedValue(created);
+      (prismaMock as any).file.findFirst.mockResolvedValue(null);
+      (storageMock.copyObject as any).mockResolvedValue(undefined);
+      (storageMock.deleteFile as any).mockResolvedValue(undefined);
       (prismaMock as any).file.update.mockResolvedValue(updated);
-      (prismaMock as any).file.updateMany.mockResolvedValue({ count: 0 });
 
       const res = await service.uploadFile({
         buffer: Buffer.from('abc'),
@@ -383,14 +429,16 @@ describe('FilesService (unit)', () => {
         mimeType: 'text/plain',
       });
 
-      expect(storageMock.uploadFile).toHaveBeenCalledTimes(1);
+      expect(storageMock.uploadStream).toHaveBeenCalledTimes(1);
+      expect(storageMock.copyObject).toHaveBeenCalledTimes(1);
+      expect(storageMock.deleteFile).toHaveBeenCalledTimes(1);
       expect((prismaMock as any).file.update).toHaveBeenCalledWith({
         where: { id: 'new-id' },
-        data: {
+        data: expect.objectContaining({
           status: FileStatus.READY,
           statusChangedAt: expect.any(Date),
           uploadedAt: expect.any(Date),
-        },
+        }),
       });
 
       expect(res.id).toBe('new-id');
@@ -402,16 +450,18 @@ describe('FilesService (unit)', () => {
         id: 'new-id',
         filename: 'a.txt',
         mimeType: 'text/plain',
-        size: 3n,
+        size: null,
         originalSize: null,
-        checksum: 'sha256:abc',
+        checksum: null,
         uploadedAt: null,
         status: FileStatus.UPLOADING,
+        s3Key: 'tmp/whatever',
       };
 
       (prismaMock as any).file.findFirst.mockResolvedValue(null);
       (prismaMock as any).file.create.mockResolvedValue(created);
-      (storageMock.uploadFile as any).mockRejectedValue(new Error('S3 down'));
+      (storageMock.uploadStream as any).mockRejectedValue(new Error('S3 down'));
+      (storageMock.deleteFile as any).mockResolvedValue(undefined);
 
       await expect(
         service.uploadFile({
