@@ -83,6 +83,7 @@ export class FilesService {
   private readonly basePath: string;
   private readonly optimizationWaitTimeout: number;
   private readonly forceCompression: boolean;
+  private readonly imageMaxBytes: number;
 
   constructor(
     @InjectPinoLogger(FilesService.name)
@@ -101,6 +102,31 @@ export class FilesService {
     this.optimizationWaitTimeout =
       this.configService.get<number>('heavyTasksQueue.timeoutMs') ?? 30000;
     this.forceCompression = this.configService.get<boolean>('compression.forceEnabled') ?? false;
+
+    const parsedImageMaxBytesMb = Number.parseFloat(process.env.IMAGE_MAX_BYTES_MB ?? '');
+    this.imageMaxBytes =
+      Number.isFinite(parsedImageMaxBytesMb) && parsedImageMaxBytesMb > 0
+        ? Math.floor(parsedImageMaxBytesMb * 1024 * 1024)
+        : 25 * 1024 * 1024;
+  }
+
+  private async readToBufferWithLimit(
+    stream: NodeJS.ReadableStream,
+    maxBytes: number,
+  ): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    let total = 0;
+
+    for await (const chunk of stream as any) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      total += buf.length;
+      if (total > maxBytes) {
+        throw new BadRequestException('Image is too large');
+      }
+      chunks.push(buf);
+    }
+
+    return Buffer.concat(chunks);
   }
 
   /**
@@ -119,6 +145,8 @@ export class FilesService {
     purpose?: string;
   }): Promise<FileResponseDto> {
     const { stream, filename, mimeType, metadata, appId, userId, purpose } = params;
+
+    const enforceImageLimit = mimeType.startsWith('image/');
 
     const needsOptimization = this.forceCompression && this.isImage(mimeType);
     const originalKey = needsOptimization
@@ -156,6 +184,10 @@ export class FilesService {
       transform: (chunk, _encoding, callback) => {
         const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
         size += buf.length;
+        if (enforceImageLimit && size > this.imageMaxBytes) {
+          callback(new BadRequestException('Image is too large'));
+          return;
+        }
         if (!hashFinalized) {
           hash.update(buf);
         }
@@ -213,15 +245,7 @@ export class FilesService {
           { fileId: file.id, needsOptimization: true },
           'File uploaded, optimization pending',
         );
-        const dto = this.toResponseDto(updated);
-        const exif = await this.exifService.tryExtractFromStorageKey({
-          key: originalKey,
-          mimeType,
-        });
-        if (exif) {
-          dto.exif = exif;
-        }
-        return dto;
+        return this.toResponseDto(updated);
       }
 
       const finalKey = this.generateS3Key(checksum, mimeType);
@@ -246,15 +270,7 @@ export class FilesService {
         await (this.prismaService as any).file.delete({
           where: { id: file.id },
         });
-        const dto = this.toResponseDto(existing);
-        const exif = await this.exifService.tryExtractFromStorageKey({
-          key: existing.s3Key,
-          mimeType: existing.mimeType,
-        });
-        if (exif) {
-          dto.exif = exif;
-        }
-        return dto;
+        return this.toResponseDto(existing);
       }
 
       await this.storageService.copyObject({
@@ -274,15 +290,7 @@ export class FilesService {
         mimeType,
       });
 
-      const dto = this.toResponseDto(updated);
-      const exif = await this.exifService.tryExtractFromStorageKey({
-        key: finalKey,
-        mimeType,
-      });
-      if (exif) {
-        dto.exif = exif;
-      }
-      return dto;
+      return this.toResponseDto(updated);
     } catch (error) {
       this.logger.error({ err: error, fileId: file.id }, 'File upload stream failed');
 
@@ -329,10 +337,9 @@ export class FilesService {
   async uploadFile(params: UploadFileParams): Promise<FileResponseDto> {
     const { buffer, filename, mimeType, compressParams, metadata, appId, userId, purpose } = params;
 
-    const exif = await this.exifService.tryExtractFromBuffer({
-      buffer,
-      mimeType,
-    });
+    if (mimeType.startsWith('image/') && buffer.length > this.imageMaxBytes) {
+      throw new BadRequestException('Image is too large');
+    }
 
     let processedBuffer = buffer;
     let processedMimeType = mimeType;
@@ -376,15 +383,7 @@ export class FilesService {
     });
 
     if (existing) {
-      const dto = this.toResponseDto(existing);
-      const exif = await this.exifService.tryExtractFromStorageKey({
-        key: existing.s3Key,
-        mimeType: existing.mimeType,
-      });
-      if (exif) {
-        dto.exif = exif;
-      }
-      return dto;
+      return this.toResponseDto(existing);
     }
 
     let file: any;
@@ -435,11 +434,7 @@ export class FilesService {
 
       this.logger.info({ fileId: updated.id }, 'File upload completed');
 
-      const dto = this.toResponseDto(updated);
-      if (exif) {
-        dto.exif = exif;
-      }
-      return dto;
+      return this.toResponseDto(updated);
     } catch (error) {
       this.logger.error({ err: error, fileId: file.id, s3Key }, 'Failed to upload file to storage');
 
@@ -620,6 +615,9 @@ export class FilesService {
 
     const candidates = (await (this.prismaService as any).file.findMany({
       where,
+      orderBy: {
+        createdAt: 'asc',
+      },
       take: limit,
       select: { id: true },
     })) as Array<{ id: string }>;
@@ -794,6 +792,24 @@ export class FilesService {
     });
   }
 
+  private async findAnyByChecksum(params: {
+    checksum: string;
+    mimeType: string;
+  }): Promise<any | null> {
+    const { checksum, mimeType } = params;
+    return (this.prismaService as any).file.findFirst({
+      where: {
+        checksum,
+        mimeType,
+      },
+      select: {
+        id: true,
+        status: true,
+        deletedAt: true,
+      },
+    });
+  }
+
   private async promoteUploadedFileToReady(params: {
     fileId: string;
     checksum: string;
@@ -825,7 +841,18 @@ export class FilesService {
         mimeType,
       });
       if (!existing) {
-        throw error;
+        const anyExisting = await this.findAnyByChecksum({ checksum, mimeType });
+        this.logger.warn(
+          {
+            fileId,
+            checksum,
+            mimeType,
+            existingFileId: anyExisting?.id,
+            existingStatus: anyExisting?.status,
+          },
+          'Unique constraint violation but READY file was not found',
+        );
+        throw new ConflictException('File with the same checksum already exists');
       }
 
       await (this.prismaService as any).file.delete({ where: { id: fileId } });
@@ -869,7 +896,7 @@ export class FilesService {
         throw new ConflictException('Image optimization failed');
       }
 
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
 
     throw new ConflictException('Image optimization timeout');
@@ -892,11 +919,7 @@ export class FilesService {
       this.logger.info({ fileId }, 'Starting image optimization');
 
       const { stream } = await this.storageService.downloadStream(file.originalS3Key);
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) {
-        chunks.push(Buffer.from(chunk));
-      }
-      const originalBuffer = Buffer.concat(chunks);
+      const originalBuffer = await this.readToBufferWithLimit(stream, this.imageMaxBytes);
 
       const result = await this.imageOptimizer.compressImage(
         originalBuffer,

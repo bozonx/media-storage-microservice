@@ -20,19 +20,8 @@ export class ExifService {
     private readonly storageService: StorageService,
     private readonly heavyTasksQueue: HeavyTasksQueueService,
   ) {
-    const parsedMb = this.parseMegabytes(process.env.EXIF_MAX_BYTES_MB);
-    if (parsedMb !== undefined) {
-      this.maxBytes = parsedMb;
-      return;
-    }
-
-    const parsedBytes = this.parseBytes(process.env.EXIF_MAX_BYTES);
-    if (parsedBytes !== undefined) {
-      this.maxBytes = parsedBytes;
-      return;
-    }
-
-    this.maxBytes = DEFAULT_MAX_BYTES;
+    const parsedMb = this.parseMegabytes(process.env.IMAGE_MAX_BYTES_MB);
+    this.maxBytes = parsedMb ?? DEFAULT_MAX_BYTES;
   }
 
   async tryExtractFromBuffer(params: {
@@ -153,18 +142,5 @@ export class ExifService {
     }
 
     return Math.floor(parsed * BYTES_PER_MEGABYTE);
-  }
-
-  private parseBytes(value: string | undefined): number | undefined {
-    if (value === undefined) {
-      return undefined;
-    }
-
-    const parsed = Number.parseInt(value, 10);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      return undefined;
-    }
-
-    return parsed;
   }
 }

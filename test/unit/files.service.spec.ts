@@ -87,6 +87,8 @@ describe('FilesService (unit)', () => {
     exifServiceMock.tryExtractFromBuffer.mockResolvedValue(undefined);
     exifServiceMock.tryExtractFromStorageKey.mockResolvedValue(undefined);
 
+    process.env.IMAGE_MAX_BYTES_MB = '25';
+
     (storageMock.uploadFile as any).mockResolvedValue(undefined);
     (storageMock.uploadStream as unknown as jest.Mock).mockImplementation(async (params: any) => {
       if (params?.body && typeof params.body[Symbol.asyncIterator] === 'function') {
@@ -175,6 +177,7 @@ describe('FilesService (unit)', () => {
 
   afterEach(async () => {
     await moduleRef.close();
+    delete process.env.IMAGE_MAX_BYTES_MB;
   });
 
   it('should be defined', () => {
@@ -612,6 +615,9 @@ describe('FilesService (unit)', () => {
           deletedAt: null,
           appId: 'app-1',
           userId: 'user-1',
+        },
+        orderBy: {
+          createdAt: 'asc',
         },
         take: 10,
         select: { id: true },

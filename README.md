@@ -143,15 +143,9 @@ curl -X POST http://localhost:8080/api/v1/files \
   "originalSize": 123456,
   "checksum": "sha256:abc123...",
   "uploadedAt": "2024-01-15T12:00:00Z",
-  "url": "/api/v1/files/550e8400-e29b-41d4-a716-446655440000/download",
-  "exif": {
-    "Make": "Canon",
-    "Model": "EOS 6D"
-  }
+  "url": "/api/v1/files/550e8400-e29b-41d4-a716-446655440000/download"
 }
 ```
-
-Поле `exif` является опциональным и возвращается только для изображений, если извлечение EXIF прошло успешно.
 
 #### Get File Metadata
 ```bash
@@ -170,8 +164,10 @@ curl http://localhost:8080/api/v1/files/550e8400-e29b-41d4-a716-446655440000/exi
 **Response:**
 ```json
 {
-  "Make": "Canon",
-  "Model": "EOS 6D"
+  "exif": {
+    "Make": "Canon",
+    "Model": "EOS 6D"
+  }
 }
 ```
 

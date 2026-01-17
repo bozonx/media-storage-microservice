@@ -19,12 +19,12 @@
   - `IMAGE_COMPRESSION_DEFAULT_FORMAT` -> `IMAGE_COMPRESSION_FORMAT`
   - `IMAGE_COMPRESSION_STRIP_METADATA_DEFAULT` -> `IMAGE_COMPRESSION_STRIP_METADATA`
   - `IMAGE_COMPRESSION_LOSSLESS_DEFAULT` -> `IMAGE_COMPRESSION_LOSSLESS`
-- EXIF: deprecate `EXIF_MAX_BYTES` in favor of megabyte-based `EXIF_MAX_BYTES_MB` (legacy bytes var still supported as fallback).
+- Images: add `IMAGE_MAX_BYTES_MB` env var as shared limit for in-memory image processing (EXIF/thumbnails/optimization) and image upload size.
 - Thumbnails (breaking): replace `THUMBNAIL_MAX_WIDTH`/`THUMBNAIL_MAX_HEIGHT` with `THUMBNAIL_MAX_DIMENSION`.
 - Files: add EXIF extraction (no persistence).
-  - Return optional `exif` field in upload response when available.
   - Add `GET /api/v1/files/:id/exif` endpoint to extract EXIF for stored images.
-  - Add `EXIF_MAX_BYTES` env var to limit bytes read for EXIF extraction (`0` disables EXIF).
+  - Remove EXIF extraction from upload response (client should call `/exif` explicitly when needed).
+- Shutdown: add `SHUTDOWN_TIMEOUT_MS` env var to limit graceful shutdown wait time for in-flight heavy tasks.
 - Errors: harden global exception responses and map Prisma errors to HTTP.
 - Cleanup: comprehensive cleanup service with TTL-based policies for bad status files and old thumbnails.
   - Add `statusChangedAt` field to track when file status changes.

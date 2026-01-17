@@ -43,6 +43,7 @@ export interface ThumbnailResult {
 export class ThumbnailService {
   private readonly config: ThumbnailConfig;
   private readonly bucket: string;
+  private readonly imageMaxBytes: number;
 
   constructor(
     @InjectPinoLogger(ThumbnailService.name)
@@ -56,6 +57,31 @@ export class ThumbnailService {
   ) {
     this.config = this.configService.get<ThumbnailConfig>('thumbnail')!;
     this.bucket = this.configService.get<string>('storage.bucket')!;
+
+    const parsedMb = Number.parseFloat(process.env.IMAGE_MAX_BYTES_MB ?? '');
+    this.imageMaxBytes =
+      Number.isFinite(parsedMb) && parsedMb > 0
+        ? Math.floor(parsedMb * 1024 * 1024)
+        : 25 * 1024 * 1024;
+  }
+
+  private async readToBufferWithLimit(
+    stream: NodeJS.ReadableStream,
+    maxBytes: number,
+  ): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    let total = 0;
+
+    for await (const chunk of stream as any) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      total += buf.length;
+      if (total > maxBytes) {
+        throw new BadRequestException('Image is too large');
+      }
+      chunks.push(buf);
+    }
+
+    return Buffer.concat(chunks);
   }
 
   async getThumbnail(fileId: string, params: ThumbnailParamsDto): Promise<ThumbnailResult> {
@@ -112,11 +138,7 @@ export class ThumbnailService {
       this.logger.info({ fileId, paramsHash }, 'Thumbnail cache hit');
 
       const { stream } = await this.storageService.downloadStream(thumbnail.s3Key);
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) {
-        chunks.push(Buffer.from(chunk));
-      }
-      const buffer = Buffer.concat(chunks);
+      const buffer = await this.readToBufferWithLimit(stream, this.imageMaxBytes);
 
       return {
         buffer,
@@ -130,11 +152,7 @@ export class ThumbnailService {
     this.logger.info({ fileId, paramsHash }, 'Generating new thumbnail');
 
     const { stream } = await this.storageService.downloadStream(fileS3Key);
-    const chunks: Buffer[] = [];
-    for await (const chunk of stream) {
-      chunks.push(Buffer.from(chunk));
-    }
-    const originalBuffer = Buffer.concat(chunks);
+    const originalBuffer = await this.readToBufferWithLimit(stream, this.imageMaxBytes);
     const thumbnailBuffer = await this.generateThumbnail(originalBuffer, width, height, quality);
 
     const thumbnailMimeType = format === 'webp' ? 'image/webp' : 'image/avif';
