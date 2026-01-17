@@ -73,7 +73,7 @@ model File {
   @@index([userId])
   @@index([purpose])
   @@index([appId, userId])
-  @@unique([checksum, mimeType, status])
+  @@unique([checksum, mimeType])
   @@map("files")
 }
 
