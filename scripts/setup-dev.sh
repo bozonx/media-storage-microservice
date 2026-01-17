@@ -8,6 +8,10 @@ if [ ! -f .env.development ]; then
   cp .env.development.example .env.development
 fi
 
+echo "Creating Garage directories..."
+mkdir -p test-data/garage/meta test-data/garage/data
+sudo chown -R 1000:1000 test-data/garage
+
 echo "Starting PostgreSQL and Garage..."
 docker compose -f docker-compose.yml up -d --remove-orphans postgres garage
 

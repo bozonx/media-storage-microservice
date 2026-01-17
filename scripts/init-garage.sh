@@ -9,14 +9,26 @@ exec_garage() {
   docker exec -i "$GARAGE_CONTAINER_NAME" /garage "$@"
 }
 
+is_container_running() {
+  docker inspect -f '{{.State.Running}}' "$GARAGE_CONTAINER_NAME" 2>/dev/null | grep -Fxq true
+}
+
 echo "Waiting for Garage to be ready..."
-for _ in $(seq 1 60); do
-  if exec_garage status >/dev/null 2>&1; then
-    break
+consecutive_ok=0
+for _ in $(seq 1 90); do
+  if is_container_running && exec_garage status >/dev/null 2>&1; then
+    consecutive_ok=$((consecutive_ok + 1))
+    if [ "$consecutive_ok" -ge 2 ]; then
+      break
+    fi
+  else
+    consecutive_ok=0
   fi
+
   sleep 1
-  if [ "$_" -eq 60 ]; then
-    echo "Garage is not ready after 60 seconds" >&2
+  if [ "$_" -eq 90 ]; then
+    echo "Garage is not ready after 90 seconds" >&2
+    docker logs --tail=50 "$GARAGE_CONTAINER_NAME" 2>/dev/null || true
     exit 1
   fi
 done

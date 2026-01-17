@@ -1,6 +1,5 @@
 # Development configuration
 
-[global]
 metadata_dir = "/var/lib/garage/meta"
 data_dir = "/var/lib/garage/data"
 db_engine = "sqlite"
