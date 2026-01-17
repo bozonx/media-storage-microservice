@@ -5,11 +5,12 @@ import { StorageModule } from '../storage/storage.module.js';
 import { OptimizationModule } from '../optimization/optimization.module.js';
 import { HeavyTasksQueueModule } from '../heavy-tasks-queue/heavy-tasks-queue.module.js';
 import { ExifService } from './exif.service.js';
+import { UrlDownloadService } from './url-download.service.js';
 
 @Module({
   imports: [StorageModule, OptimizationModule, HeavyTasksQueueModule],
   controllers: [FilesController],
-  providers: [FilesService, ExifService],
+  providers: [FilesService, ExifService, UrlDownloadService],
   exports: [FilesService],
 })
 export class FilesModule {}

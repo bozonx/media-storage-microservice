@@ -18,10 +18,12 @@ import { basename } from 'path';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { FilesService } from './files.service.js';
+import { UrlDownloadService } from './url-download.service.js';
 import { ListFilesDto } from './dto/list-files.dto.js';
 import { ListProblemFilesDto } from './dto/list-problem-files.dto.js';
 import { BulkDeleteFilesDto } from './dto/bulk-delete-files.dto.js';
 import { CompressParamsDto } from './dto/compress-params.dto.js';
+import { UploadFileFromUrlDto } from './dto/upload-file-from-url.dto.js';
 
 function sanitizeFilename(filename: string): string {
   const normalized = (filename ?? '').normalize('NFKC');
@@ -123,12 +125,25 @@ function isArchiveMimeType(mimeType: string): boolean {
 
 @Controller('api/v1/files')
 export class FilesController {
-  constructor(private readonly filesService: FilesService) {}
+  constructor(
+    private readonly filesService: FilesService,
+    private readonly urlDownloadService: UrlDownloadService,
+  ) {}
 
   private getOptionalMultipartField(data: any, fieldName: string): string | undefined {
     const field = data?.fields?.[fieldName] as any;
     const value = typeof field?.value === 'string' ? field.value.trim() : '';
     return value.length > 0 ? value : undefined;
+  }
+
+  private inferFilenameFromUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+      const lastSegment = parsed.pathname.split('/').filter(Boolean).pop();
+      return sanitizeFilename(lastSegment ?? 'file');
+    } catch {
+      return 'file';
+    }
   }
 
   /**
@@ -220,6 +235,73 @@ export class FilesController {
       appId,
       userId,
       purpose,
+    });
+  }
+
+  @Post('from-url')
+  @HttpCode(HttpStatus.CREATED)
+  async uploadFileFromUrl(@Body() body: UploadFileFromUrlDto) {
+    const filename = sanitizeFilename(body.filename ?? this.inferFilenameFromUrl(body.url));
+
+    if (body.optimize) {
+      const downloaded = await this.urlDownloadService.downloadToBuffer({ url: body.url });
+
+      const mimeType =
+        (typeof body.mimeType === 'string' && body.mimeType.trim().length > 0
+          ? body.mimeType.trim()
+          : undefined) ??
+        (typeof downloaded.mimeType === 'string' && downloaded.mimeType.trim().length > 0
+          ? downloaded.mimeType.trim()
+          : undefined) ??
+        'application/octet-stream';
+
+      if (isExecutableMimeType(mimeType)) {
+        throw new UnsupportedMediaTypeException('Executable file types are not allowed');
+      }
+
+      if (isArchiveMimeType(mimeType)) {
+        throw new UnsupportedMediaTypeException('Archive file types are not allowed');
+      }
+
+      return this.filesService.uploadFile({
+        buffer: downloaded.buffer,
+        filename,
+        mimeType,
+        compressParams: body.optimize,
+        metadata: body.metadata,
+        appId: body.appId,
+        userId: body.userId,
+        purpose: body.purpose,
+      });
+    }
+
+    const downloaded = await this.urlDownloadService.download({ url: body.url });
+
+    const mimeType =
+      (typeof body.mimeType === 'string' && body.mimeType.trim().length > 0
+        ? body.mimeType.trim()
+        : undefined) ??
+      (typeof downloaded.mimeType === 'string' && downloaded.mimeType.trim().length > 0
+        ? downloaded.mimeType.trim()
+        : undefined) ??
+      'application/octet-stream';
+
+    if (isExecutableMimeType(mimeType)) {
+      throw new UnsupportedMediaTypeException('Executable file types are not allowed');
+    }
+
+    if (isArchiveMimeType(mimeType)) {
+      throw new UnsupportedMediaTypeException('Archive file types are not allowed');
+    }
+
+    return this.filesService.uploadFileStream({
+      stream: downloaded.stream,
+      filename,
+      mimeType,
+      metadata: body.metadata,
+      appId: body.appId,
+      userId: body.userId,
+      purpose: body.purpose,
     });
   }
 

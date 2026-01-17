@@ -130,6 +130,27 @@ curl -X POST http://localhost:8080/api/v1/files \
 # Если FORCE_IMAGE_COMPRESSION_ENABLED=true, то оптимизация будет применена всегда, даже если файл уже оптимизирован.
 ```
 
+#### Upload File From URL
+```bash
+POST /api/v1/files/from-url
+Content-Type: application/json
+
+# Простая загрузка (только https)
+curl -X POST http://localhost:8080/api/v1/files/from-url \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com/image.jpg"}'
+
+# С метаданными и тегами
+curl -X POST http://localhost:8080/api/v1/files/from-url \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com/image.jpg","filename":"avatar.jpg","appId":"my-app","userId":"user-123","purpose":"avatar"}'
+
+# С оптимизацией (будет скачано в память, чтобы поддержать optimize)
+curl -X POST http://localhost:8080/api/v1/files/from-url \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com/image.jpg","optimize":{"format":"webp","quality":80,"maxDimension":1920}}'
+```
+
 **Response:**
 ```json
 {
@@ -325,6 +346,14 @@ curl http://localhost:8080/api/v1/health
 - `BLOCK_EXECUTABLE_UPLOADS` — блокировать загрузку исполняемых файлов (по умолчанию true)
 - `BLOCK_ARCHIVE_UPLOADS` — блокировать загрузку архивов (по умолчанию true)
 - `BLOCKED_MIME_TYPES` — дополнительные MIME типы для блокировки (через запятую)
+
+### Upload from URL
+- `URL_UPLOAD_BLOCK_UNSAFE_CONNECTIONS` — блокировать небезопасные подключения (по умолчанию true).
+  - Разрешён только `https`
+  - Блокируются localhost, локальные DNS имена и private IP ranges
+- `URL_UPLOAD_TIMEOUT_MS` — таймаут скачивания (мс, по умолчанию 15000)
+- `URL_UPLOAD_MAX_BYTES_MB` — максимальный размер скачиваемого файла (МБ, по умолчанию 100)
+- `URL_UPLOAD_MAX_REDIRECTS` — максимальное количество редиректов (по умолчанию 3)
 
 ### EXIF
 - `EXIF_MAX_BYTES_MB` — максимальный размер файла в мегабайтах для извлечения EXIF (по умолчанию 25).

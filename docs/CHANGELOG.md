@@ -51,6 +51,9 @@
   - Expose tags in file response DTO and list endpoint (`GET /api/v1/files`).
   - Add `POST /api/v1/files/bulk-delete` endpoint for mass soft delete by tags (requires at least one tag filter).
   - Update UI to display tags and support bulk delete by tag filters.
+- **Files: add upload from URL** (`POST /api/v1/files/from-url`).
+  - Adds SSRF protections (HTTPS-only, blocks localhost/local DNS names/private IP ranges by default).
+  - Adds env vars: `URL_UPLOAD_BLOCK_UNSAFE_CONNECTIONS`, `URL_UPLOAD_TIMEOUT_MS`, `URL_UPLOAD_MAX_BYTES_MB`, `URL_UPLOAD_MAX_REDIRECTS`.
 - Cleanup: rely on cleanup job expiration for `tmp/` and `originals/` objects.
 - Prisma: upgrade to Prisma v7 and add `prisma.config.ts`.
 - Env: unify Prisma CLI and NestJS env loading via `dotenv-cli` and `.env.*` files.

@@ -3,6 +3,7 @@ import { BadRequestException, HttpStatus, UnsupportedMediaTypeException } from '
 import { jest } from '@jest/globals';
 import { FilesController } from '../../src/modules/files/files.controller.js';
 import { FilesService } from '../../src/modules/files/files.service.js';
+import { UrlDownloadService } from '../../src/modules/files/url-download.service.js';
 
 describe('FilesController (unit)', () => {
   let controller: FilesController;
@@ -29,6 +30,13 @@ describe('FilesController (unit)', () => {
     listFiles: jest.fn<FilesService['listFiles']>(),
   };
 
+  const urlDownloadServiceMock: jest.Mocked<
+    Pick<UrlDownloadService, 'download' | 'downloadToBuffer'>
+  > = {
+    download: jest.fn<UrlDownloadService['download']>(),
+    downloadToBuffer: jest.fn<UrlDownloadService['downloadToBuffer']>(),
+  };
+
   beforeEach(async () => {
     jest.resetAllMocks();
 
@@ -38,7 +46,10 @@ describe('FilesController (unit)', () => {
 
     moduleRef = await Test.createTestingModule({
       controllers: [FilesController],
-      providers: [{ provide: FilesService, useValue: filesServiceMock }],
+      providers: [
+        { provide: FilesService, useValue: filesServiceMock },
+        { provide: UrlDownloadService, useValue: urlDownloadServiceMock },
+      ],
     }).compile();
 
     controller = moduleRef.get<FilesController>(FilesController);
@@ -98,6 +109,7 @@ describe('FilesController (unit)', () => {
         size: 0,
         checksum: 'sha256:x',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
+        statusChangedAt: new Date('2020-01-01T00:00:00.000Z'),
         url: '/api/v1/files/id/download',
       });
 
@@ -120,6 +132,7 @@ describe('FilesController (unit)', () => {
         size: 0,
         checksum: 'sha256:x',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
+        statusChangedAt: new Date('2020-01-01T00:00:00.000Z'),
         url: '/api/v1/files/id/download',
       });
       expect(filesServiceMock.uploadFileStream).toHaveBeenCalledWith({
@@ -139,6 +152,7 @@ describe('FilesController (unit)', () => {
         size: 0,
         checksum: 'sha256:x',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
+        statusChangedAt: new Date('2020-01-01T00:00:00.000Z'),
         url: '/api/v1/files/id/download',
       });
 
@@ -255,6 +269,86 @@ describe('FilesController (unit)', () => {
 
       expect(res).toEqual({ exif: { Make: 'Canon' } });
       expect(filesServiceMock.getFileExif).toHaveBeenCalledWith('id');
+    });
+  });
+
+  describe('uploadFileFromUrl', () => {
+    it('passes stream download to uploadFileStream when no optimize param', async () => {
+      const stream: any = { pipe: jest.fn() };
+
+      urlDownloadServiceMock.download.mockResolvedValue({
+        stream,
+        mimeType: 'text/plain',
+        contentLength: 3,
+      });
+
+      filesServiceMock.uploadFileStream.mockResolvedValue({
+        id: 'id',
+        filename: 'file',
+        mimeType: 'text/plain',
+        size: 3,
+        checksum: 'sha256:x',
+        uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
+        statusChangedAt: new Date('2020-01-01T00:00:00.000Z'),
+        url: '/api/v1/files/id/download',
+      });
+
+      const res = await controller.uploadFileFromUrl({
+        url: 'https://example.com/file.txt',
+        metadata: { a: 1 },
+      } as any);
+
+      expect(res.id).toBe('id');
+      expect(urlDownloadServiceMock.download).toHaveBeenCalledWith({
+        url: 'https://example.com/file.txt',
+      });
+      expect(filesServiceMock.uploadFileStream).toHaveBeenCalledWith({
+        stream,
+        filename: 'file.txt',
+        mimeType: 'text/plain',
+        metadata: { a: 1 },
+        appId: undefined,
+        userId: undefined,
+        purpose: undefined,
+      });
+    });
+
+    it('passes buffer download to uploadFile when optimize param is provided', async () => {
+      urlDownloadServiceMock.downloadToBuffer.mockResolvedValue({
+        buffer: Buffer.from('abc'),
+        mimeType: 'image/jpeg',
+      });
+
+      filesServiceMock.uploadFile.mockResolvedValue({
+        id: 'id',
+        filename: 'x.jpg',
+        mimeType: 'image/webp',
+        size: 1,
+        checksum: 'sha256:x',
+        uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
+        statusChangedAt: new Date('2020-01-01T00:00:00.000Z'),
+        url: '/api/v1/files/id/download',
+      });
+
+      await controller.uploadFileFromUrl({
+        url: 'https://example.com/x.jpg',
+        optimize: { format: 'webp' },
+        mimeType: 'image/jpeg',
+      } as any);
+
+      expect(urlDownloadServiceMock.downloadToBuffer).toHaveBeenCalledWith({
+        url: 'https://example.com/x.jpg',
+      });
+      expect(filesServiceMock.uploadFile).toHaveBeenCalledWith({
+        buffer: Buffer.from('abc'),
+        filename: 'x.jpg',
+        mimeType: 'image/jpeg',
+        compressParams: { format: 'webp' },
+        metadata: undefined,
+        appId: undefined,
+        userId: undefined,
+        purpose: undefined,
+      });
     });
   });
 });
