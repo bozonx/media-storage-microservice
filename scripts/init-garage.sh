@@ -23,10 +23,16 @@ done
 
 echo "Garage is ready. Ensuring cluster layout..."
 
-NODE_ID=$(exec_garage status 2>/dev/null | awk 'NF > 0 && $1 ~ /^[0-9a-f]{4,}$/ { print $1; exit }')
+STATUS_OUTPUT=$(exec_garage status 2>&1) || {
+  echo "Failed to run 'garage status'" >&2
+  echo "${STATUS_OUTPUT}" >&2
+  exit 1
+}
+
+NODE_ID=$(echo "${STATUS_OUTPUT}" | awk 'NF > 0 && $1 ~ /^[0-9a-f]{4,}$/ { print $1; exit }')
 if [ -z "${NODE_ID:-}" ]; then
   echo "Failed to detect Garage node id" >&2
-  exec_garage status || true
+  echo "${STATUS_OUTPUT}" >&2
   exit 1
 fi
 
