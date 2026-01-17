@@ -4,6 +4,11 @@
 
 - Logging: unify application logs on Pino (nestjs-pino) with structured error fields.
 - Compression (breaking): replace `IMAGE_COMPRESSION_MAX_WIDTH`/`IMAGE_COMPRESSION_MAX_HEIGHT` with `IMAGE_COMPRESSION_MAX_DIMENSION` and replace request optimize params `maxWidth`/`maxHeight` with `maxDimension`.
+- Thumbnails (breaking): replace `THUMBNAIL_MAX_WIDTH`/`THUMBNAIL_MAX_HEIGHT` with `THUMBNAIL_MAX_DIMENSION`.
+- Files: add EXIF extraction (no persistence).
+  - Return optional `exif` field in upload response when available.
+  - Add `GET /api/v1/files/:id/exif` endpoint to extract EXIF for stored images.
+  - Add `EXIF_MAX_BYTES` env var to limit bytes read for EXIF extraction.
 - Errors: harden global exception responses and map Prisma errors to HTTP.
 - Cleanup: comprehensive cleanup service with TTL-based policies for bad status files and old thumbnails.
   - Add `statusChangedAt` field to track when file status changes.

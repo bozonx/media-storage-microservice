@@ -144,9 +144,15 @@ curl -X POST http://localhost:8080/api/v1/files \
   "originalSize": 123456,
   "checksum": "sha256:abc123...",
   "uploadedAt": "2024-01-15T12:00:00Z",
-  "url": "/api/v1/files/550e8400-e29b-41d4-a716-446655440000/download"
+  "url": "/api/v1/files/550e8400-e29b-41d4-a716-446655440000/download",
+  "exif": {
+    "Make": "Canon",
+    "Model": "EOS 6D"
+  }
 }
 ```
+
+Поле `exif` является опциональным и возвращается только для изображений, если извлечение EXIF прошло успешно.
 
 #### Get File Metadata
 ```bash
@@ -154,6 +160,23 @@ GET /api/v1/files/:id
 
 curl http://localhost:8080/api/v1/files/550e8400-e29b-41d4-a716-446655440000
 ```
+
+#### Get File EXIF
+```bash
+GET /api/v1/files/:id/exif
+
+curl http://localhost:8080/api/v1/files/550e8400-e29b-41d4-a716-446655440000/exif
+```
+
+**Response:**
+```json
+{
+  "Make": "Canon",
+  "Model": "EOS 6D"
+}
+```
+
+Если EXIF отсутствует или не удалось извлечь данные, сервис вернёт `404 Not Found`.
 
 #### Download File
 ```bash
@@ -308,6 +331,9 @@ curl http://localhost:8080/api/v1/health
 - `BLOCK_ARCHIVE_UPLOADS` — блокировать загрузку архивов (по умолчанию true)
 - `BLOCKED_MIME_TYPES` — дополнительные MIME типы для блокировки (через запятую)
 
+### EXIF
+- `EXIF_MAX_BYTES` — максимальный размер файла в байтах для извлечения EXIF (по умолчанию 26214400)
+
 ### Компрессия изображений
 - `FORCE_IMAGE_COMPRESSION_ENABLED` — принудительная компрессия для всех загрузок (true/false, по умолчанию false)
 - `IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS` — максимальное время ожидания ленивой оптимизации (мс, по умолчанию 30000)
@@ -327,8 +353,7 @@ curl http://localhost:8080/api/v1/health
 
 ### Миниатюры (Thumbnails)
 - `THUMBNAIL_FORMAT` — формат миниатюр (webp/avif, по умолчанию webp)
-- `THUMBNAIL_MAX_WIDTH` — максимальная ширина (px, по умолчанию 2048)
-- `THUMBNAIL_MAX_HEIGHT` — максимальная высота (px, по умолчанию 2048)
+- `THUMBNAIL_MAX_DIMENSION` — максимальная длина стороны (px, по умолчанию 2048)
 - `THUMBNAIL_CACHE_MAX_AGE_DAYS` — время кеширования в днях (по умолчанию 365)
 
 **Настройки качества для миниатюр:**

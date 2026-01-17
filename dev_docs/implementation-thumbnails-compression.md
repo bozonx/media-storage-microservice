@@ -63,8 +63,7 @@ ETag: "<thumbnail-hash>"
 ```bash
 ###### Thumbnails
 THUMBNAIL_FORMAT=webp
-THUMBNAIL_MAX_WIDTH=2048
-THUMBNAIL_MAX_HEIGHT=2048
+THUMBNAIL_MAX_DIMENSION=2048
 THUMBNAIL_CACHE_MAX_AGE_DAYS=365
 
 THUMBNAIL_QUALITY=80
@@ -119,8 +118,8 @@ export default () => ({
     format: (process.env.THUMBNAIL_FORMAT || 'webp') as 'webp' | 'avif',
     quality: parseInt(process.env.THUMBNAIL_QUALITY || '80', 10),
     effort: parseInt(process.env.THUMBNAIL_EFFORT || '6', 10),
-    maxWidth: parseInt(process.env.THUMBNAIL_MAX_WIDTH || '2048', 10),
-    maxHeight: parseInt(process.env.THUMBNAIL_MAX_HEIGHT || '2048', 10),
+    maxWidth: parseInt(process.env.THUMBNAIL_MAX_DIMENSION || '2048', 10),
+    maxHeight: parseInt(process.env.THUMBNAIL_MAX_DIMENSION || '2048', 10),
     minWidth: THUMBNAIL_MIN_SIZE,
     minHeight: THUMBNAIL_MIN_SIZE,
     cacheMaxAgeSeconds: parseInt(process.env.THUMBNAIL_CACHE_MAX_AGE_DAYS || '365', 10) * 24 * 60 * 60,
