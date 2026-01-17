@@ -16,6 +16,7 @@ import { BulkDeleteFilesDto } from './dto/bulk-delete-files.dto.js';
 import { ListFilesDto } from './dto/list-files.dto.js';
 import { FileResponseDto } from './dto/file-response.dto.js';
 import { ListFilesResponseDto } from './dto/list-files-response.dto.js';
+import { ProblemFileDto, type ProblemItemDto } from './dto/problem-file.dto.js';
 import { plainToInstance } from 'class-transformer';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { FileStatus } from './file-status.js';
@@ -29,7 +30,6 @@ function isPrismaKnownRequestError(error: unknown): error is {
   if (typeof error !== 'object' || error === null) {
     return false;
   }
-
   const e = error as Record<string, unknown>;
   return e.name === 'PrismaClientKnownRequestError' && typeof e.code === 'string';
 }
@@ -84,6 +84,9 @@ export class FilesService {
   private readonly optimizationWaitTimeout: number;
   private readonly forceCompression: boolean;
   private readonly imageMaxBytes: number;
+  private readonly stuckUploadTimeoutMs: number;
+  private readonly stuckDeleteTimeoutMs: number;
+  private readonly stuckOptimizationTimeoutMs: number;
 
   constructor(
     @InjectPinoLogger(FilesService.name)
@@ -102,6 +105,13 @@ export class FilesService {
     this.optimizationWaitTimeout =
       this.configService.get<number>('heavyTasksQueue.timeoutMs') ?? 30000;
     this.forceCompression = this.configService.get<boolean>('compression.forceEnabled') ?? false;
+
+    this.stuckUploadTimeoutMs =
+      this.configService.get<number>('cleanup.stuckUploadTimeoutMs') ?? 30 * 60 * 1000;
+    this.stuckDeleteTimeoutMs =
+      this.configService.get<number>('cleanup.stuckDeleteTimeoutMs') ?? 30 * 60 * 1000;
+    this.stuckOptimizationTimeoutMs =
+      this.configService.get<number>('cleanup.stuckOptimizationTimeoutMs') ?? 30 * 60 * 1000;
 
     const parsedImageMaxBytesMb = Number.parseFloat(process.env.IMAGE_MAX_BYTES_MB ?? '');
     this.imageMaxBytes =
@@ -706,6 +716,201 @@ export class FilesService {
       limit,
       offset,
     };
+  }
+
+  async listProblemFiles(params: { limit?: number }): Promise<{ items: ProblemFileDto[] }> {
+    const limit = typeof params.limit === 'number' && params.limit > 0 ? params.limit : 10;
+    const now = Date.now();
+    const stuckUploadingAt = new Date(now - this.stuckUploadTimeoutMs);
+    const stuckDeletingAt = new Date(now - this.stuckDeleteTimeoutMs);
+    const stuckOptimizationAt = new Date(now - this.stuckOptimizationTimeoutMs);
+
+    const candidates = (await (this.prismaService as any).file.findMany({
+      where: {
+        OR: [
+          { status: FileStatus.FAILED },
+          { status: FileStatus.MISSING },
+          { status: FileStatus.UPLOADING, statusChangedAt: { lt: stuckUploadingAt } },
+          { status: FileStatus.DELETING, statusChangedAt: { lt: stuckDeletingAt } },
+          { optimizationStatus: OptimizationStatus.FAILED },
+          {
+            optimizationStatus: OptimizationStatus.PENDING,
+            optimizationStartedAt: { lt: stuckOptimizationAt },
+          },
+          {
+            optimizationStatus: OptimizationStatus.PROCESSING,
+            optimizationStartedAt: { lt: stuckOptimizationAt },
+          },
+          { deletedAt: { not: null }, status: { not: FileStatus.DELETED } },
+          { status: FileStatus.DELETED, deletedAt: null },
+          {
+            status: FileStatus.READY,
+            OR: [{ s3Key: '' }, { checksum: null }, { size: null }, { uploadedAt: null }],
+          },
+        ],
+      },
+      orderBy: {
+        statusChangedAt: 'desc',
+      },
+      take: Math.max(limit * 5, 50),
+      select: {
+        id: true,
+        filename: true,
+        appId: true,
+        userId: true,
+        purpose: true,
+        status: true,
+        statusChangedAt: true,
+        uploadedAt: true,
+        deletedAt: true,
+        s3Key: true,
+        size: true,
+        checksum: true,
+        optimizationStatus: true,
+        optimizationError: true,
+        optimizationStartedAt: true,
+      },
+    })) as Array<any>;
+
+    const items: ProblemFileDto[] = [];
+    for (const file of candidates) {
+      const problems = this.detectFileProblems(file, {
+        stuckUploadingAt,
+        stuckDeletingAt,
+        stuckOptimizationAt,
+      });
+      if (problems.length === 0) {
+        continue;
+      }
+
+      const dto = plainToInstance(
+        ProblemFileDto,
+        {
+          id: file.id,
+          filename: file.filename,
+          appId: file.appId ?? undefined,
+          userId: file.userId ?? undefined,
+          purpose: file.purpose ?? undefined,
+          status: file.status ?? undefined,
+          optimizationStatus: file.optimizationStatus ?? undefined,
+          uploadedAt: file.uploadedAt ?? undefined,
+          statusChangedAt: file.statusChangedAt,
+          problems,
+          url: `${this.basePath ? `/${this.basePath}` : ''}/api/v1/files/${file.id}/download`,
+        },
+        {
+          excludeExtraneousValues: true,
+        },
+      );
+
+      items.push(dto);
+      if (items.length >= limit) {
+        break;
+      }
+    }
+
+    return { items };
+  }
+
+  private detectFileProblems(
+    file: {
+      status?: FileStatus | null;
+      deletedAt?: Date | null;
+      statusChangedAt?: Date | null;
+      s3Key?: string | null;
+      checksum?: string | null;
+      size?: bigint | null;
+      uploadedAt?: Date | null;
+      optimizationStatus?: OptimizationStatus | null;
+      optimizationError?: string | null;
+      optimizationStartedAt?: Date | null;
+    },
+    thresholds: {
+      stuckUploadingAt: Date;
+      stuckDeletingAt: Date;
+      stuckOptimizationAt: Date;
+    },
+  ): ProblemItemDto[] {
+    const problems: ProblemItemDto[] = [];
+    const status = file.status ?? undefined;
+
+    if (status === FileStatus.FAILED) {
+      problems.push({ code: 'status_failed', message: 'File status is FAILED' });
+    }
+    if (status === FileStatus.MISSING) {
+      problems.push({ code: 'status_missing', message: 'File status is MISSING' });
+    }
+    if (
+      status === FileStatus.UPLOADING &&
+      file.statusChangedAt instanceof Date &&
+      file.statusChangedAt.getTime() < thresholds.stuckUploadingAt.getTime()
+    ) {
+      problems.push({ code: 'upload_stuck', message: 'Upload is stuck' });
+    }
+    if (
+      status === FileStatus.DELETING &&
+      file.statusChangedAt instanceof Date &&
+      file.statusChangedAt.getTime() < thresholds.stuckDeletingAt.getTime()
+    ) {
+      problems.push({ code: 'delete_stuck', message: 'Delete is stuck' });
+    }
+
+    if (file.deletedAt && status !== FileStatus.DELETED) {
+      problems.push({
+        code: 'deleted_at_mismatch',
+        message: 'deletedAt is set but status is not DELETED',
+      });
+    }
+    if (!file.deletedAt && status === FileStatus.DELETED) {
+      problems.push({
+        code: 'deleted_at_missing',
+        message: 'status is DELETED but deletedAt is not set',
+      });
+    }
+
+    if (file.optimizationStatus === OptimizationStatus.FAILED) {
+      problems.push({
+        code: 'optimization_failed',
+        message:
+          typeof file.optimizationError === 'string' && file.optimizationError.trim().length > 0
+            ? `Optimization failed: ${file.optimizationError.trim()}`
+            : 'Optimization failed',
+      });
+    }
+    if (
+      (file.optimizationStatus === OptimizationStatus.PENDING ||
+        file.optimizationStatus === OptimizationStatus.PROCESSING) &&
+      file.optimizationStartedAt instanceof Date &&
+      file.optimizationStartedAt.getTime() < thresholds.stuckOptimizationAt.getTime()
+    ) {
+      problems.push({
+        code: 'optimization_stuck',
+        message: `Optimization is stuck (${file.optimizationStatus})`,
+      });
+    }
+
+    if (status === FileStatus.READY) {
+      if (typeof file.s3Key !== 'string' || file.s3Key.trim().length === 0) {
+        problems.push({ code: 'ready_missing_s3_key', message: 'READY file has empty s3Key' });
+      }
+      if (typeof file.checksum !== 'string' || file.checksum.trim().length === 0) {
+        problems.push({
+          code: 'ready_missing_checksum',
+          message: 'READY file has empty checksum',
+        });
+      }
+      if (typeof file.size !== 'bigint') {
+        problems.push({ code: 'ready_missing_size', message: 'READY file has missing size' });
+      }
+      if (!(file.uploadedAt instanceof Date)) {
+        problems.push({
+          code: 'ready_missing_uploaded_at',
+          message: 'READY file has missing uploadedAt',
+        });
+      }
+    }
+
+    return problems;
   }
 
   private toResponseDto(file: {

@@ -19,6 +19,7 @@ import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { FilesService } from './files.service.js';
 import { ListFilesDto } from './dto/list-files.dto.js';
+import { ListProblemFilesDto } from './dto/list-problem-files.dto.js';
 import { BulkDeleteFilesDto } from './dto/bulk-delete-files.dto.js';
 import { CompressParamsDto } from './dto/compress-params.dto.js';
 
@@ -225,6 +226,11 @@ export class FilesController {
   @Post('bulk-delete')
   async bulkDelete(@Body() body: BulkDeleteFilesDto) {
     return this.filesService.bulkDeleteFiles(body);
+  }
+
+  @Get('problems')
+  async listProblemFiles(@Query() query: ListProblemFilesDto) {
+    return this.filesService.listProblemFiles({ limit: query.limit });
   }
 
   @Get(':id')

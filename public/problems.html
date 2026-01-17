@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Storage - Problems</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📁 Media Storage</h1>
+            <p>Latest problematic records</p>
+            <nav class="nav">
+                <a class="nav-link" href="./">Upload</a>
+                <a class="nav-link" href="files.html">Files</a>
+                <a class="nav-link active" href="problems.html">Problems</a>
+            </nav>
+        </header>
+
+        <main>
+            <div class="files-controls">
+                <div class="hint">Showing up to 10 latest problematic items. No pagination.</div>
+                <div class="control-actions">
+                    <button type="button" class="btn btn-primary" id="refreshBtn">Refresh</button>
+                </div>
+            </div>
+
+            <div class="files-status" id="status"></div>
+            <div class="files-list" id="problemsList"></div>
+        </main>
+    </div>
+
+    <script src="problems.js"></script>
+</body>
+</html>
