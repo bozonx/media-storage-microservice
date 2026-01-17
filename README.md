@@ -126,9 +126,8 @@ curl -X POST http://localhost:8080/api/v1/files \
   -F "userId=user-123" \
   -F "purpose=avatar"
 
-# Примечание: Оптимизация изображений применяется автоматически при включенном
-# FORCE_IMAGE_COMPRESSION_ENABLED=true. Оптимизация выполняется лениво при первом
-# запросе download, если файл еще не оптимизирован.
+# Примечание: Оптимизация изображений применяется лениво при первом запросе download, если файл еще не оптимизирован.
+# Если FORCE_IMAGE_COMPRESSION_ENABLED=true, то оптимизация будет применена всегда, даже если файл уже оптимизирован.
 ```
 
 **Response:**
@@ -332,15 +331,23 @@ curl http://localhost:8080/api/v1/health
 - `BLOCKED_MIME_TYPES` — дополнительные MIME типы для блокировки (через запятую)
 
 ### EXIF
-- `EXIF_MAX_BYTES` — максимальный размер файла в байтах для извлечения EXIF (по умолчанию 26214400)
+- `EXIF_MAX_BYTES` — максимальный размер файла в байтах для извлечения EXIF (по умолчанию 26214400).
+  - Необязательная переменная: если не задана, используется значение по умолчанию.
+  - Значение `0` отключает извлечение EXIF.
 
 ### Компрессия изображений
 - `FORCE_IMAGE_COMPRESSION_ENABLED` — принудительная компрессия для всех загрузок (true/false, по умолчанию false)
 - `IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS` — максимальное время ожидания ленивой оптимизации (мс, по умолчанию 30000)
-- `IMAGE_COMPRESSION_DEFAULT_FORMAT` — формат по умолчанию (webp/avif, по умолчанию webp)
+
+Режимы работы:
+- `FORCE_IMAGE_COMPRESSION_ENABLED=true`: параметры компрессии из запроса игнорируются, используются переменные окружения ниже.
+- `FORCE_IMAGE_COMPRESSION_ENABLED=false`: компрессия применяется только если в запросе переданы параметры `optimize`.
+  В этом режиме переменные окружения ниже работают как defaults/limits (например, `maxDimension` ограничивается сверху).
+
+- `IMAGE_COMPRESSION_FORMAT` — формат по умолчанию (webp/avif, по умолчанию webp)
 - `IMAGE_COMPRESSION_MAX_DIMENSION` — максимальная длина стороны (px, по умолчанию 3840)
-- `IMAGE_COMPRESSION_STRIP_METADATA_DEFAULT` — удалять метаданные по умолчанию (true/false, по умолчанию false)
-- `IMAGE_COMPRESSION_LOSSLESS_DEFAULT` — использовать lossless сжатие (true/false, по умолчанию false)
+- `IMAGE_COMPRESSION_STRIP_METADATA` — удалять метаданные (true/false, по умолчанию false)
+- `IMAGE_COMPRESSION_LOSSLESS` — использовать lossless сжатие (true/false, по умолчанию false)
 
 **WebP настройки:**
 - `IMAGE_COMPRESSION_WEBP_QUALITY` — качество WebP (1-100, по умолчанию 80)
@@ -354,7 +361,7 @@ curl http://localhost:8080/api/v1/health
 ### Миниатюры (Thumbnails)
 - `THUMBNAIL_FORMAT` — формат миниатюр (webp/avif, по умолчанию webp)
 - `THUMBNAIL_MAX_DIMENSION` — максимальная длина стороны (px, по умолчанию 2048)
-- `THUMBNAIL_CACHE_MAX_AGE_DAYS` — время кеширования в днях (по умолчанию 365)
+- `THUMBNAIL_MAX_AGE_DAYS` — время кеширования в днях и TTL для cleanup (по умолчанию 365)
 
 **Настройки качества для миниатюр:**
 - `THUMBNAIL_QUALITY` — качество (1-100, по умолчанию 80)

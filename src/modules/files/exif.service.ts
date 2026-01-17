@@ -12,13 +12,29 @@ export class ExifService {
     private readonly logger: PinoLogger,
     private readonly storageService: StorageService,
   ) {
-    this.maxBytes = parseInt(process.env.EXIF_MAX_BYTES ?? '26214400', 10);
+    const envValue = process.env.EXIF_MAX_BYTES;
+    if (envValue === undefined) {
+      this.maxBytes = 26214400;
+      return;
+    }
+
+    const parsed = parseInt(envValue, 10);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      this.maxBytes = 26214400;
+      return;
+    }
+
+    this.maxBytes = parsed;
   }
 
   async tryExtractFromBuffer(params: {
     buffer: Buffer;
     mimeType: string;
   }): Promise<Record<string, any> | undefined> {
+    if (this.maxBytes === 0) {
+      return undefined;
+    }
+
     if (!this.isImage(params.mimeType)) {
       return undefined;
     }
@@ -53,6 +69,10 @@ export class ExifService {
     key: string;
     mimeType: string;
   }): Promise<Record<string, any> | undefined> {
+    if (this.maxBytes === 0) {
+      return undefined;
+    }
+
     if (!this.isImage(params.mimeType)) {
       return undefined;
     }

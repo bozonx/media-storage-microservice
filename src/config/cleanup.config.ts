@@ -39,7 +39,7 @@ export default registerAs(
     enabled: process.env.CLEANUP_ENABLED !== 'false',
     cron: parseCron(process.env.CLEANUP_CRON, '0 */6 * * *'),
     badStatusTtlDays: parsePositiveInt(process.env.CLEANUP_BAD_STATUS_TTL_DAYS, 30),
-    thumbnailsTtlDays: parsePositiveInt(process.env.CLEANUP_THUMBNAILS_TTL_DAYS, 90),
+    thumbnailsTtlDays: parsePositiveInt(process.env.THUMBNAIL_MAX_AGE_DAYS, 90),
     batchSize: parsePositiveInt(process.env.CLEANUP_BATCH_SIZE, 200),
   }),
 );

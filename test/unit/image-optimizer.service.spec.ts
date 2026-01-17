@@ -28,10 +28,10 @@ describe('ImageOptimizerService (unit)', () => {
               if (key === 'compression') {
                 return {
                   forceEnabled: false,
-                  defaultFormat: 'webp',
+                  format: 'webp',
                   maxDimension: 3840,
-                  stripMetadataDefault: false,
-                  losslessDefault: false,
+                  stripMetadata: false,
+                  lossless: false,
                   webp: {
                     quality: 80,
                     effort: 6,

@@ -4,16 +4,20 @@
 
 - Logging: unify application logs on Pino (nestjs-pino) with structured error fields.
 - Compression (breaking): replace `IMAGE_COMPRESSION_MAX_WIDTH`/`IMAGE_COMPRESSION_MAX_HEIGHT` with `IMAGE_COMPRESSION_MAX_DIMENSION` and replace request optimize params `maxWidth`/`maxHeight` with `maxDimension`.
+- Compression (breaking): rename env vars to remove DEFAULT suffixes/prefixes:
+  - `IMAGE_COMPRESSION_DEFAULT_FORMAT` -> `IMAGE_COMPRESSION_FORMAT`
+  - `IMAGE_COMPRESSION_STRIP_METADATA_DEFAULT` -> `IMAGE_COMPRESSION_STRIP_METADATA`
+  - `IMAGE_COMPRESSION_LOSSLESS_DEFAULT` -> `IMAGE_COMPRESSION_LOSSLESS`
 - Thumbnails (breaking): replace `THUMBNAIL_MAX_WIDTH`/`THUMBNAIL_MAX_HEIGHT` with `THUMBNAIL_MAX_DIMENSION`.
 - Files: add EXIF extraction (no persistence).
   - Return optional `exif` field in upload response when available.
   - Add `GET /api/v1/files/:id/exif` endpoint to extract EXIF for stored images.
-  - Add `EXIF_MAX_BYTES` env var to limit bytes read for EXIF extraction.
+  - Add `EXIF_MAX_BYTES` env var to limit bytes read for EXIF extraction (`0` disables EXIF).
 - Errors: harden global exception responses and map Prisma errors to HTTP.
 - Cleanup: comprehensive cleanup service with TTL-based policies for bad status files and old thumbnails.
   - Add `statusChangedAt` field to track when file status changes.
   - Replace `CLEANUP_ORPHAN_TIMEOUT_MINUTES` with `CLEANUP_BAD_STATUS_TTL_DAYS` (default 30 days).
-  - Add `CLEANUP_THUMBNAILS_TTL_DAYS` for unused thumbnail cleanup (default 90 days).
+  - Add `THUMBNAIL_MAX_AGE_DAYS` for unused thumbnail cleanup and thumbnail cache max-age (default 365 days).
   - Add `CLEANUP_BATCH_SIZE` for controlling cleanup batch operations.
   - Unified cleanup pipeline: corrupted records, bad status files, and old thumbnails.
 - Files: harden download headers and improve deduplication behavior.

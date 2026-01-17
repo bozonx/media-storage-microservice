@@ -12,10 +12,10 @@ export interface OptimizationResult {
 
 interface CompressionConfig {
   forceEnabled: boolean;
-  defaultFormat: 'webp' | 'avif';
+  format: 'webp' | 'avif';
   maxDimension: number;
-  stripMetadataDefault: boolean;
-  losslessDefault: boolean;
+  stripMetadata: boolean;
+  lossless: boolean;
   webp: {
     quality: number;
     effort: number;
@@ -55,8 +55,8 @@ export class ImageOptimizerService {
 
     try {
       const format = forceCompress
-        ? this.compressionConfig.defaultFormat
-        : (params.format ?? this.compressionConfig.defaultFormat);
+        ? this.compressionConfig.format
+        : (params.format ?? this.compressionConfig.format);
 
       const maxDimension = forceCompress
         ? this.compressionConfig.maxDimension
@@ -66,11 +66,11 @@ export class ImageOptimizerService {
           );
 
       const stripMetadata = forceCompress
-        ? this.compressionConfig.stripMetadataDefault
-        : (params.stripMetadata ?? this.compressionConfig.stripMetadataDefault);
+        ? this.compressionConfig.stripMetadata
+        : (params.stripMetadata ?? this.compressionConfig.stripMetadata);
       const lossless = forceCompress
-        ? this.compressionConfig.losslessDefault
-        : (params.lossless ?? this.compressionConfig.losslessDefault);
+        ? this.compressionConfig.lossless
+        : (params.lossless ?? this.compressionConfig.lossless);
 
       const autoOrient = params.autoOrient ?? true;
 

@@ -64,7 +64,7 @@ ETag: "<thumbnail-hash>"
 ###### Thumbnails
 THUMBNAIL_FORMAT=webp
 THUMBNAIL_MAX_DIMENSION=2048
-THUMBNAIL_CACHE_MAX_AGE_DAYS=365
+THUMBNAIL_MAX_AGE_DAYS=365
 
 THUMBNAIL_QUALITY=80
 THUMBNAIL_EFFORT=6
@@ -122,7 +122,7 @@ export default () => ({
     maxHeight: parseInt(process.env.THUMBNAIL_MAX_DIMENSION || '2048', 10),
     minWidth: THUMBNAIL_MIN_SIZE,
     minHeight: THUMBNAIL_MIN_SIZE,
-    cacheMaxAgeSeconds: parseInt(process.env.THUMBNAIL_CACHE_MAX_AGE_DAYS || '365', 10) * 24 * 60 * 60,
+    cacheMaxAgeSeconds: parseInt(process.env.THUMBNAIL_MAX_AGE_DAYS || '365', 10) * 24 * 60 * 60,
   },
 });
 ```
@@ -255,11 +255,11 @@ Content-Type: multipart/form-data
 
 Fields:
 - file: binary data (required)
-- compress: JSON string (optional)
+- optimize: JSON string (optional)
   {
     "quality": 85,        // 1-100, optional (uses env default if compress specified)
     "maxDimension": 1920, // optional (uses env max if compress specified)
-    "format": "webp",     // optional: "webp" or "avif" (required if compress specified)
+    "format": "webp",     // optional: "webp" or "avif" (required if optimize specified)
     "stripMetadata": true // optional: remove EXIF/metadata (default: false)
   }
 ```
@@ -267,21 +267,23 @@ Fields:
 #### Compression Logic
 
 **Сценарий 1: Force Compression (FORCE_IMAGE_COMPRESSION_ENABLED=true)**
-- Всегда применяется сжатие независимо от наличия `compress` параметра
+- Всегда применяется сжатие независимо от наличия `optimize` параметра
 - Используются env переменные как параметры сжатия:
-  - `IMAGE_COMPRESSION_DEFAULT_QUALITY`
   - `IMAGE_COMPRESSION_MAX_DIMENSION`
-  - `IMAGE_COMPRESSION_DEFAULT_FORMAT` (webp или avif)
-- Если `compress` указан в запросе - игнорируется (force режим приоритетнее)
+  - `IMAGE_COMPRESSION_FORMAT` (webp или avif)
+  - `IMAGE_COMPRESSION_STRIP_METADATA`
+  - `IMAGE_COMPRESSION_LOSSLESS`
+  - `IMAGE_COMPRESSION_WEBP_QUALITY` / `IMAGE_COMPRESSION_AVIF_QUALITY`
+- Если `optimize` указан в запросе - игнорируется (force режим приоритетнее)
 
-**Сценарий 2: Optional Compression (FORCE_IMAGE_COMPRESSION_ENABLED=false, compress указан)**
-- Применяется сжатие с параметрами из `compress`
+**Сценарий 2: Optional Compression (FORCE_IMAGE_COMPRESSION_ENABLED=false, optimize указан)**
+- Применяется сжатие с параметрами из `optimize`
 - Env переменные выступают как defaults и ограничения:
-  - `quality`: используется из `compress.quality` или `IMAGE_COMPRESSION_DEFAULT_QUALITY`
-  - `maxDimension`: `min(compress.maxDimension, IMAGE_COMPRESSION_MAX_DIMENSION)`
-  - `format`: используется из `compress.format` или `IMAGE_COMPRESSION_DEFAULT_FORMAT`
+  - `quality`: используется из `optimize.quality` или `IMAGE_COMPRESSION_WEBP_QUALITY` / `IMAGE_COMPRESSION_AVIF_QUALITY`
+  - `maxDimension`: `min(optimize.maxDimension, IMAGE_COMPRESSION_MAX_DIMENSION)`
+  - `format`: используется из `optimize.format` или `IMAGE_COMPRESSION_FORMAT`
 
-**Сценарий 3: No Compression (FORCE_IMAGE_COMPRESSION_ENABLED=false, compress не указан)**
+**Сценарий 3: No Compression (FORCE_IMAGE_COMPRESSION_ENABLED=false, optimize не указан)**
 - Сохраняется оригинал без изменений
 - Env переменные не влияют
 
@@ -303,9 +305,10 @@ Fields:
 FORCE_IMAGE_COMPRESSION_ENABLED=false
 
 # Default/max values used when compression is applied
-IMAGE_COMPRESSION_DEFAULT_QUALITY=85
 IMAGE_COMPRESSION_MAX_DIMENSION=3840
-IMAGE_COMPRESSION_DEFAULT_FORMAT=webp  # webp or avif
+IMAGE_COMPRESSION_FORMAT=webp  # webp or avif
+IMAGE_COMPRESSION_STRIP_METADATA=false
+IMAGE_COMPRESSION_LOSSLESS=false
 ```
 
 ### 2.3 Implementation Steps
