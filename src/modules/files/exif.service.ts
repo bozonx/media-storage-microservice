@@ -3,6 +3,9 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import exifr from 'exifr';
 import { StorageService } from '../storage/storage.service.js';
 
+const BYTES_PER_MEGABYTE = 1024 * 1024;
+const DEFAULT_MAX_BYTES = 25 * BYTES_PER_MEGABYTE;
+
 @Injectable()
 export class ExifService {
   private readonly maxBytes: number;
@@ -12,19 +15,19 @@ export class ExifService {
     private readonly logger: PinoLogger,
     private readonly storageService: StorageService,
   ) {
-    const envValue = process.env.EXIF_MAX_BYTES;
-    if (envValue === undefined) {
-      this.maxBytes = 26214400;
+    const parsedMb = this.parseMegabytes(process.env.EXIF_MAX_BYTES_MB);
+    if (parsedMb !== undefined) {
+      this.maxBytes = parsedMb;
       return;
     }
 
-    const parsed = parseInt(envValue, 10);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      this.maxBytes = 26214400;
+    const parsedBytes = this.parseBytes(process.env.EXIF_MAX_BYTES);
+    if (parsedBytes !== undefined) {
+      this.maxBytes = parsedBytes;
       return;
     }
 
-    this.maxBytes = parsed;
+    this.maxBytes = DEFAULT_MAX_BYTES;
   }
 
   async tryExtractFromBuffer(params: {
@@ -112,5 +115,31 @@ export class ExifService {
     }
 
     return Buffer.concat(chunks);
+  }
+
+  private parseMegabytes(value: string | undefined): number | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    const parsed = Number.parseFloat(value);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return undefined;
+    }
+
+    return Math.floor(parsed * BYTES_PER_MEGABYTE);
+  }
+
+  private parseBytes(value: string | undefined): number | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return undefined;
+    }
+
+    return parsed;
   }
 }

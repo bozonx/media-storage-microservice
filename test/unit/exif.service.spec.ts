@@ -32,6 +32,7 @@ describe('ExifService (unit)', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
 
+    delete process.env.EXIF_MAX_BYTES_MB;
     delete process.env.EXIF_MAX_BYTES;
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -55,6 +56,28 @@ describe('ExifService (unit)', () => {
     expect(parseMock).not.toHaveBeenCalled();
   });
 
+  it('disables extraction when EXIF_MAX_BYTES=0 (legacy bytes)', async () => {
+    process.env.EXIF_MAX_BYTES = '0';
+
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      providers: [
+        ExifService,
+        { provide: getLoggerToken('ExifService'), useValue: loggerMock },
+        { provide: StorageService, useValue: storageMock },
+      ],
+    }).compile();
+
+    service = moduleRef.get(ExifService);
+
+    const res = await service.tryExtractFromBuffer({
+      buffer: Buffer.from('abc'),
+      mimeType: 'image/jpeg',
+    });
+
+    expect(res).toBeUndefined();
+    expect(parseMock).not.toHaveBeenCalled();
+  });
+
   it('returns undefined when exifr returns undefined', async () => {
     parseMock.mockImplementationOnce(async () => undefined);
 
@@ -67,8 +90,8 @@ describe('ExifService (unit)', () => {
     expect(parseMock).toHaveBeenCalledTimes(1);
   });
 
-  it('disables extraction when EXIF_MAX_BYTES=0', async () => {
-    process.env.EXIF_MAX_BYTES = '0';
+  it('disables extraction when EXIF_MAX_BYTES_MB=0', async () => {
+    process.env.EXIF_MAX_BYTES_MB = '0';
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
