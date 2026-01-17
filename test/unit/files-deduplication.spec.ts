@@ -7,13 +7,14 @@ import { StorageService } from '../../src/modules/storage/storage.service.js';
 import { ImageOptimizerService } from '../../src/modules/optimization/image-optimizer.service.js';
 import { FileStatus } from '../../src/modules/files/file-status.js';
 import { OptimizationStatus } from '../../src/modules/files/optimization-status.js';
+import { ExifService } from '../../src/modules/files/exif.service.js';
 import { Readable } from 'stream';
 
 describe('FilesService - Deduplication', () => {
   let service: FilesService;
-  let prismaService: PrismaService;
-  let storageService: StorageService;
-  let imageOptimizer: ImageOptimizerService;
+  let prismaService: any;
+  let storageService: any;
+  let imageOptimizer: any;
 
   const mockLogger = {
     info: jest.fn(),
@@ -75,6 +76,13 @@ describe('FilesService - Deduplication', () => {
           provide: ConfigService,
           useValue: mockConfigService,
         },
+        {
+          provide: ExifService,
+          useValue: {
+            tryExtractFromBuffer: async () => undefined,
+            tryExtractFromStorageKey: async () => undefined,
+          },
+        },
       ],
     }).compile();
 
@@ -104,7 +112,7 @@ describe('FilesService - Deduplication', () => {
         uploadedAt: new Date(),
       };
 
-      (prismaService.file.findFirst as jest.Mock).mockResolvedValue(existingFile);
+      (prismaService.file.findFirst as any).mockResolvedValue(existingFile);
 
       const result = await service.uploadFile({
         buffer,
@@ -134,12 +142,12 @@ describe('FilesService - Deduplication', () => {
         uploadedAt: new Date(),
       };
 
-      (prismaService.file.findFirst as jest.Mock).mockResolvedValueOnce(null);
-      (prismaService.file.create as jest.Mock).mockRejectedValueOnce({
+      (prismaService.file.findFirst as any).mockResolvedValueOnce(null);
+      (prismaService.file.create as any).mockRejectedValueOnce({
         name: 'PrismaClientKnownRequestError',
         code: 'P2002',
       });
-      (prismaService.file.findFirst as jest.Mock).mockResolvedValueOnce(existingFile);
+      (prismaService.file.findFirst as any).mockResolvedValueOnce(existingFile);
 
       const result = await service.uploadFile({
         buffer,
@@ -177,10 +185,10 @@ describe('FilesService - Deduplication', () => {
         status: FileStatus.UPLOADING,
       });
 
-      (storageService.uploadStream as jest.Mock).mockResolvedValue(undefined);
-      (prismaService.file.findFirst as jest.Mock).mockResolvedValue(existingFile);
-      (storageService.deleteFile as jest.Mock).mockResolvedValue(undefined);
-      (prismaService.file.delete as jest.Mock).mockResolvedValue(undefined);
+      (storageService.uploadStream as any).mockResolvedValue(undefined);
+      (prismaService.file.findFirst as any).mockResolvedValue(existingFile);
+      (storageService.deleteFile as any).mockResolvedValue(undefined);
+      (prismaService.file.delete as any).mockResolvedValue(undefined);
 
       const stream = Readable.from([Buffer.from('test content')]);
 
@@ -190,8 +198,7 @@ describe('FilesService - Deduplication', () => {
         mimeType: 'text/plain',
       });
 
-      const uploadedKey = ((storageService.uploadStream as jest.Mock).mock.calls[0]?.[0] as any)
-        ?.key;
+      const uploadedKey = ((storageService.uploadStream as any).mock.calls[0]?.[0] as any)?.key;
 
       expect(result.id).toBe('existing-id');
       expect(storageService.deleteFile).toHaveBeenCalledWith(uploadedKey);
@@ -208,9 +215,9 @@ describe('FilesService - Deduplication', () => {
         status: FileStatus.UPLOADING,
       });
 
-      (storageService.uploadStream as jest.Mock).mockRejectedValue(new Error('S3 error'));
-      (prismaService.file.update as jest.Mock).mockResolvedValue(undefined);
-      (storageService.deleteFile as jest.Mock).mockResolvedValue(undefined);
+      (storageService.uploadStream as any).mockRejectedValue(new Error('S3 error'));
+      (prismaService.file.update as any).mockResolvedValue(undefined);
+      (storageService.deleteFile as any).mockResolvedValue(undefined);
 
       const stream = Readable.from([Buffer.from('test content')]);
 
@@ -252,12 +259,12 @@ describe('FilesService - Deduplication', () => {
         uploadedAt: new Date(),
       };
 
-      (prismaService.file.update as jest.Mock).mockRejectedValueOnce({
+      (prismaService.file.update as any).mockRejectedValueOnce({
         name: 'PrismaClientKnownRequestError',
         code: 'P2002',
       });
-      (prismaService.file.findFirst as jest.Mock).mockResolvedValue(existingFile);
-      (prismaService.file.delete as jest.Mock).mockResolvedValue(undefined);
+      (prismaService.file.findFirst as any).mockResolvedValue(existingFile);
+      (prismaService.file.delete as any).mockResolvedValue(undefined);
 
       const result = await (service as any).promoteUploadedFileToReady({
         fileId,
@@ -299,20 +306,20 @@ describe('FilesService - Deduplication', () => {
         uploadedAt: new Date(),
       };
 
-      (prismaService.file.findUnique as jest.Mock).mockResolvedValue(fileToOptimize);
-      (storageService.downloadStream as jest.Mock).mockResolvedValue({
+      (prismaService.file.findUnique as any).mockResolvedValue(fileToOptimize);
+      (storageService.downloadStream as any).mockResolvedValue({
         stream: (async function* () {
           yield Buffer.from('original');
         })(),
       });
-      (imageOptimizer.compressImage as jest.Mock).mockResolvedValue({
+      (imageOptimizer.compressImage as any).mockResolvedValue({
         buffer: Buffer.from('optimized'),
         format: 'image/webp',
         size: 50,
       });
-      (prismaService.file.findFirst as jest.Mock).mockResolvedValue(existingOptimized);
-      (prismaService.file.delete as jest.Mock).mockResolvedValue(undefined);
-      (storageService.deleteFile as jest.Mock).mockResolvedValue(undefined);
+      (prismaService.file.findFirst as any).mockResolvedValue(existingOptimized);
+      (prismaService.file.delete as any).mockResolvedValue(undefined);
+      (storageService.deleteFile as any).mockResolvedValue(undefined);
 
       await (service as any).optimizeImage(fileId);
 
@@ -347,26 +354,26 @@ describe('FilesService - Deduplication', () => {
         uploadedAt: new Date(),
       };
 
-      (prismaService.file.findUnique as jest.Mock).mockResolvedValue(fileToOptimize);
-      (storageService.downloadStream as jest.Mock).mockResolvedValue({
+      (prismaService.file.findUnique as any).mockResolvedValue(fileToOptimize);
+      (storageService.downloadStream as any).mockResolvedValue({
         stream: (async function* () {
           yield Buffer.from('original');
         })(),
       });
-      (imageOptimizer.compressImage as jest.Mock).mockResolvedValue({
+      (imageOptimizer.compressImage as any).mockResolvedValue({
         buffer: Buffer.from('optimized'),
         format: 'image/webp',
         size: 50,
       });
-      (prismaService.file.findFirst as jest.Mock).mockResolvedValueOnce(null);
-      (storageService.uploadFile as jest.Mock).mockResolvedValue(undefined);
-      (prismaService.file.update as jest.Mock).mockRejectedValueOnce({
+      (prismaService.file.findFirst as any).mockResolvedValueOnce(null);
+      (storageService.uploadFile as any).mockResolvedValue(undefined);
+      (prismaService.file.update as any).mockRejectedValueOnce({
         name: 'PrismaClientKnownRequestError',
         code: 'P2002',
       });
-      (prismaService.file.findFirst as jest.Mock).mockResolvedValueOnce(existingOptimized);
-      (prismaService.file.delete as jest.Mock).mockResolvedValue(undefined);
-      (storageService.deleteFile as jest.Mock).mockResolvedValue(undefined);
+      (prismaService.file.findFirst as any).mockResolvedValueOnce(existingOptimized);
+      (prismaService.file.delete as any).mockResolvedValue(undefined);
+      (storageService.deleteFile as any).mockResolvedValue(undefined);
 
       await (service as any).optimizeImage(fileId);
 
@@ -390,10 +397,10 @@ describe('FilesService - Deduplication', () => {
         optimizationStatus: OptimizationStatus.PROCESSING,
       };
 
-      (prismaService.file.findUnique as jest.Mock).mockResolvedValue(fileToOptimize);
-      (storageService.downloadStream as jest.Mock).mockRejectedValue(new Error('Download failed'));
-      (prismaService.file.update as jest.Mock).mockResolvedValue(undefined);
-      (storageService.deleteFile as jest.Mock).mockResolvedValue(undefined);
+      (prismaService.file.findUnique as any).mockResolvedValue(fileToOptimize);
+      (storageService.downloadStream as any).mockRejectedValue(new Error('Download failed'));
+      (prismaService.file.update as any).mockResolvedValue(undefined);
+      (storageService.deleteFile as any).mockResolvedValue(undefined);
 
       await expect((service as any).optimizeImage(fileId)).rejects.toThrow('Download failed');
 

@@ -259,8 +259,7 @@ Fields:
 - compress: JSON string (optional)
   {
     "quality": 85,        // 1-100, optional (uses env default if compress specified)
-    "maxWidth": 1920,     // optional (uses env max if compress specified)
-    "maxHeight": 1080,    // optional (uses env max if compress specified)
+    "maxDimension": 1920, // optional (uses env max if compress specified)
     "format": "webp",     // optional: "webp" or "avif" (required if compress specified)
     "stripMetadata": true // optional: remove EXIF/metadata (default: false)
   }
@@ -272,8 +271,7 @@ Fields:
 - Всегда применяется сжатие независимо от наличия `compress` параметра
 - Используются env переменные как параметры сжатия:
   - `IMAGE_COMPRESSION_DEFAULT_QUALITY`
-  - `IMAGE_COMPRESSION_MAX_WIDTH`
-  - `IMAGE_COMPRESSION_MAX_HEIGHT`
+  - `IMAGE_COMPRESSION_MAX_DIMENSION`
   - `IMAGE_COMPRESSION_DEFAULT_FORMAT` (webp или avif)
 - Если `compress` указан в запросе - игнорируется (force режим приоритетнее)
 
@@ -281,8 +279,7 @@ Fields:
 - Применяется сжатие с параметрами из `compress`
 - Env переменные выступают как defaults и ограничения:
   - `quality`: используется из `compress.quality` или `IMAGE_COMPRESSION_DEFAULT_QUALITY`
-  - `maxWidth`: `min(compress.maxWidth, IMAGE_COMPRESSION_MAX_WIDTH)`
-  - `maxHeight`: `min(compress.maxHeight, IMAGE_COMPRESSION_MAX_HEIGHT)`
+  - `maxDimension`: `min(compress.maxDimension, IMAGE_COMPRESSION_MAX_DIMENSION)`
   - `format`: используется из `compress.format` или `IMAGE_COMPRESSION_DEFAULT_FORMAT`
 
 **Сценарий 3: No Compression (FORCE_IMAGE_COMPRESSION_ENABLED=false, compress не указан)**
@@ -308,8 +305,7 @@ FORCE_IMAGE_COMPRESSION_ENABLED=false
 
 # Default/max values used when compression is applied
 IMAGE_COMPRESSION_DEFAULT_QUALITY=85
-IMAGE_COMPRESSION_MAX_WIDTH=3840
-IMAGE_COMPRESSION_MAX_HEIGHT=2160
+IMAGE_COMPRESSION_MAX_DIMENSION=3840
 IMAGE_COMPRESSION_DEFAULT_FORMAT=webp  # webp or avif
 ```
 
@@ -326,8 +322,7 @@ export default () => ({
     
     // Default/max values
     defaultQuality: parseInt(process.env.IMAGE_COMPRESSION_DEFAULT_QUALITY || '85', 10),
-    maxWidth: parseInt(process.env.IMAGE_COMPRESSION_MAX_WIDTH || '3840', 10),
-    maxHeight: parseInt(process.env.IMAGE_COMPRESSION_MAX_HEIGHT || '2160', 10),
+    maxDimension: parseInt(process.env.IMAGE_COMPRESSION_MAX_DIMENSION || '3840', 10),
     defaultFormat: (process.env.IMAGE_COMPRESSION_DEFAULT_FORMAT || 'webp') as 'webp' | 'avif',
   },
 });
@@ -353,14 +348,7 @@ export class CompressParamsDto {
   @Min(1)
   @Max(8192)
   @IsOptional()
-  maxWidth?: number;
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(8192)
-  @IsOptional()
-  maxHeight?: number;
+  maxDimension?: number;
 
   @IsIn(['webp', 'avif'])
   @IsOptional()
@@ -387,23 +375,20 @@ async optimizeImage(
 ): Promise<{ buffer: Buffer; format: string; size: number }> {
   // Determine compression parameters based on mode
   let quality: number;
-  let maxWidth: number;
-  let maxHeight: number;
+  let maxDimension: number;
   let format: 'webp' | 'avif';
   let stripMetadata: boolean;
 
   if (forceCompress) {
     // Force mode: use only env defaults, ignore params
     quality = envDefaults.defaultQuality;
-    maxWidth = envDefaults.maxWidth;
-    maxHeight = envDefaults.maxHeight;
+    maxDimension = envDefaults.maxDimension;
     format = envDefaults.defaultFormat;
     stripMetadata = false; // Can be configured via env if needed
   } else {
     // Optional mode: merge params with env defaults
     quality = params.quality ?? envDefaults.defaultQuality;
-    maxWidth = Math.min(params.maxWidth ?? Infinity, envDefaults.maxWidth);
-    maxHeight = Math.min(params.maxHeight ?? Infinity, envDefaults.maxHeight);
+    maxDimension = Math.min(params.maxDimension ?? Infinity, envDefaults.maxDimension);
     format = params.format ?? envDefaults.defaultFormat;
     stripMetadata = params.stripMetadata ?? false;
   }
@@ -415,15 +400,15 @@ async optimizeImage(
   let resizeWidth = metadata.width ?? 0;
   let resizeHeight = metadata.height ?? 0;
   
-  if (resizeWidth > maxWidth || resizeHeight > maxHeight) {
+  if (resizeWidth > maxDimension || resizeHeight > maxDimension) {
     const aspectRatio = resizeWidth / resizeHeight;
-    if (resizeWidth > maxWidth) {
-      resizeWidth = maxWidth;
-      resizeHeight = Math.round(maxWidth / aspectRatio);
+    if (resizeWidth > maxDimension) {
+      resizeWidth = maxDimension;
+      resizeHeight = Math.round(maxDimension / aspectRatio);
     }
-    if (resizeHeight > maxHeight) {
-      resizeHeight = maxHeight;
-      resizeWidth = Math.round(maxHeight * aspectRatio);
+    if (resizeHeight > maxDimension) {
+      resizeHeight = maxDimension;
+      resizeWidth = Math.round(maxDimension * aspectRatio);
     }
   }
 

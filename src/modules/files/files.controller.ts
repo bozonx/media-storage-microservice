@@ -232,6 +232,13 @@ export class FilesController {
     return this.filesService.getFileMetadata(id);
   }
 
+  @Get(':id/exif')
+  async getFileExif(@Param('id') id: string) {
+    return {
+      exif: await this.filesService.getFileExif(id),
+    };
+  }
+
   /**
    * Downloads a file by streaming it from storage.
    *

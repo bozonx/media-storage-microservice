@@ -14,14 +14,7 @@ export class CompressParamsDto {
   @Min(1)
   @Max(8192)
   @IsOptional()
-  maxWidth?: number;
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(8192)
-  @IsOptional()
-  maxHeight?: number;
+  maxDimension?: number;
 
   @IsIn(['webp', 'avif'])
   @IsOptional()

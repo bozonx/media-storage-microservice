@@ -14,6 +14,7 @@ import { ConfigService } from '@nestjs/config';
 import { FileStatus } from '../../src/modules/files/file-status.js';
 import { getLoggerToken } from 'nestjs-pino';
 import { OptimizationStatus } from '../../src/modules/files/optimization-status.js';
+import { ExifService } from '../../src/modules/files/exif.service.js';
 
 async function drainStream(stream: AsyncIterable<unknown>): Promise<void> {
   for await (const _chunk of stream) {
@@ -48,6 +49,13 @@ describe('FilesService (unit)', () => {
     copyObject: jest.fn(),
   };
 
+  const exifServiceMock: jest.Mocked<
+    Pick<ExifService, 'tryExtractFromBuffer' | 'tryExtractFromStorageKey'>
+  > = {
+    tryExtractFromBuffer: jest.fn<ExifService['tryExtractFromBuffer']>(),
+    tryExtractFromStorageKey: jest.fn<ExifService['tryExtractFromStorageKey']>(),
+  };
+
   const imageOptimizerMock = {
     compressImage: jest.fn(),
   } as unknown as jest.Mocked<Pick<ImageOptimizerService, 'compressImage'>>;
@@ -76,6 +84,9 @@ describe('FilesService (unit)', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
 
+    exifServiceMock.tryExtractFromBuffer.mockResolvedValue(undefined);
+    exifServiceMock.tryExtractFromStorageKey.mockResolvedValue(undefined);
+
     (storageMock.uploadFile as any).mockResolvedValue(undefined);
     (storageMock.uploadStream as unknown as jest.Mock).mockImplementation(async (params: any) => {
       if (params?.body && typeof params.body[Symbol.asyncIterator] === 'function') {
@@ -101,6 +112,7 @@ describe('FilesService (unit)', () => {
         { provide: StorageService, useValue: storageMock },
         { provide: ImageOptimizerService, useValue: imageOptimizerMock },
         { provide: ConfigService, useValue: configServiceMock },
+        { provide: ExifService, useValue: exifServiceMock },
       ],
     }).compile();
 
@@ -210,6 +222,7 @@ describe('FilesService (unit)', () => {
           { provide: StorageService, useValue: storageMock },
           { provide: ImageOptimizerService, useValue: imageOptimizerMock },
           { provide: ConfigService, useValue: basePathConfigServiceMock },
+          { provide: ExifService, useValue: exifServiceMock },
         ],
       }).compile();
 
@@ -435,6 +448,7 @@ describe('FilesService (unit)', () => {
           { provide: StorageService, useValue: storageMock },
           { provide: ImageOptimizerService, useValue: imageOptimizerMock },
           { provide: ConfigService, useValue: configServiceMock },
+          { provide: ExifService, useValue: exifServiceMock },
         ],
       }).compile();
       service = moduleRef.get<FilesService>(FilesService);

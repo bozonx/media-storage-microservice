@@ -29,8 +29,7 @@ describe('ImageOptimizerService (unit)', () => {
                 return {
                   forceEnabled: false,
                   defaultFormat: 'webp',
-                  maxWidth: 3840,
-                  maxHeight: 2160,
+                  maxDimension: 3840,
                   stripMetadataDefault: false,
                   losslessDefault: false,
                   webp: {
@@ -136,13 +135,13 @@ describe('ImageOptimizerService (unit)', () => {
       const result = await service.compressImage(
         inputBuffer,
         'image/png',
-        { format: 'webp', quality: 80, maxWidth: 1920, maxHeight: 1080 },
+        { format: 'webp', quality: 80, maxDimension: 1920 },
         false,
       );
 
       const metadata = await sharp(result.buffer).metadata();
       expect(metadata.width).toBeLessThanOrEqual(1920);
-      expect(metadata.height).toBeLessThanOrEqual(1080);
+      expect(metadata.height).toBeLessThanOrEqual(1920);
     });
 
     it('should use default quality from config when not provided', async () => {
@@ -201,7 +200,7 @@ describe('ImageOptimizerService (unit)', () => {
       );
     });
 
-    it('should respect max width/height limits from config', async () => {
+    it('should respect max dimension limit from config', async () => {
       const inputBuffer = await sharp({
         create: {
           width: 5000,
@@ -216,7 +215,7 @@ describe('ImageOptimizerService (unit)', () => {
       const result = await service.compressImage(
         inputBuffer,
         'image/png',
-        { format: 'webp', quality: 80, maxWidth: 10000 },
+        { format: 'webp', quality: 80, maxDimension: 10000 },
         false,
       );
 

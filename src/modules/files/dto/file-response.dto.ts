@@ -34,4 +34,7 @@ export class FileResponseDto {
 
   @Expose()
   url!: string;
+
+  @Expose()
+  exif?: Record<string, any>;
 }

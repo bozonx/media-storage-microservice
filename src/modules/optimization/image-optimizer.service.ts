@@ -13,8 +13,7 @@ export interface OptimizationResult {
 interface CompressionConfig {
   forceEnabled: boolean;
   defaultFormat: 'webp' | 'avif';
-  maxWidth: number;
-  maxHeight: number;
+  maxDimension: number;
   stripMetadataDefault: boolean;
   losslessDefault: boolean;
   webp: {
@@ -59,13 +58,12 @@ export class ImageOptimizerService {
         ? this.compressionConfig.defaultFormat
         : (params.format ?? this.compressionConfig.defaultFormat);
 
-      const maxWidth = forceCompress
-        ? this.compressionConfig.maxWidth
-        : Math.min(params.maxWidth ?? Number.POSITIVE_INFINITY, this.compressionConfig.maxWidth);
-
-      const maxHeight = forceCompress
-        ? this.compressionConfig.maxHeight
-        : Math.min(params.maxHeight ?? Number.POSITIVE_INFINITY, this.compressionConfig.maxHeight);
+      const maxDimension = forceCompress
+        ? this.compressionConfig.maxDimension
+        : Math.min(
+            params.maxDimension ?? Number.POSITIVE_INFINITY,
+            this.compressionConfig.maxDimension,
+          );
 
       const stripMetadata = forceCompress
         ? this.compressionConfig.stripMetadataDefault
@@ -81,7 +79,7 @@ export class ImageOptimizerService {
         pipeline = pipeline.autoOrient();
       }
 
-      pipeline = pipeline.resize(maxWidth, maxHeight, {
+      pipeline = pipeline.resize(maxDimension, maxDimension, {
         fit: sharp.fit.inside,
         withoutEnlargement: true,
       });

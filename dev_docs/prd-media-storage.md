@@ -149,8 +149,7 @@ Request:
   {
     "compress": true,           // сжатие изображения
     "quality": 85,              // качество JPEG/WebP (1-100)
-    "maxWidth": 1920,           // максимальная ширина
-    "maxHeight": 1080,          // максимальная высота
+    "maxDimension": 1920,       // максимальная длина стороны
     "format": "webp"            // конвертация формата (jpeg, png, webp)
   }
 - metadata: JSON string (optional)

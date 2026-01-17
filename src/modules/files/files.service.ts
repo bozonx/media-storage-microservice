@@ -20,6 +20,7 @@ import { plainToInstance } from 'class-transformer';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { FileStatus } from './file-status.js';
 import { OptimizationStatus } from './optimization-status.js';
+import { ExifService } from './exif.service.js';
 
 function isPrismaKnownRequestError(error: unknown): error is {
   name: string;
@@ -90,6 +91,7 @@ export class FilesService {
     private readonly storageService: StorageService,
     private readonly imageOptimizer: ImageOptimizerService,
     private readonly configService: ConfigService,
+    private readonly exifService: ExifService,
   ) {
     this.bucket = this.configService.get<string>('storage.bucket')!;
     this.basePath =
@@ -213,7 +215,15 @@ export class FilesService {
           { fileId: file.id, needsOptimization: true },
           'File uploaded, optimization pending',
         );
-        return this.toResponseDto(updated);
+        const dto = this.toResponseDto(updated);
+        const exif = await this.exifService.tryExtractFromStorageKey({
+          key: originalKey,
+          mimeType,
+        });
+        if (exif) {
+          dto.exif = exif;
+        }
+        return dto;
       }
 
       const finalKey = this.generateS3Key(checksum, mimeType);
@@ -238,7 +248,15 @@ export class FilesService {
         await (this.prismaService as any).file.delete({
           where: { id: file.id },
         });
-        return this.toResponseDto(existing);
+        const dto = this.toResponseDto(existing);
+        const exif = await this.exifService.tryExtractFromStorageKey({
+          key: existing.s3Key,
+          mimeType: existing.mimeType,
+        });
+        if (exif) {
+          dto.exif = exif;
+        }
+        return dto;
       }
 
       await this.storageService.copyObject({
@@ -258,7 +276,15 @@ export class FilesService {
         mimeType,
       });
 
-      return this.toResponseDto(updated);
+      const dto = this.toResponseDto(updated);
+      const exif = await this.exifService.tryExtractFromStorageKey({
+        key: finalKey,
+        mimeType,
+      });
+      if (exif) {
+        dto.exif = exif;
+      }
+      return dto;
     } catch (error) {
       this.logger.error({ err: error, fileId: file.id }, 'File upload stream failed');
 
@@ -305,6 +331,11 @@ export class FilesService {
   async uploadFile(params: UploadFileParams): Promise<FileResponseDto> {
     const { buffer, filename, mimeType, compressParams, metadata, appId, userId, purpose } = params;
 
+    const exif = await this.exifService.tryExtractFromBuffer({
+      buffer,
+      mimeType,
+    });
+
     let processedBuffer = buffer;
     let processedMimeType = mimeType;
     let originalSize: number | null = null;
@@ -347,7 +378,15 @@ export class FilesService {
     });
 
     if (existing) {
-      return this.toResponseDto(existing);
+      const dto = this.toResponseDto(existing);
+      const exif = await this.exifService.tryExtractFromStorageKey({
+        key: existing.s3Key,
+        mimeType: existing.mimeType,
+      });
+      if (exif) {
+        dto.exif = exif;
+      }
+      return dto;
     }
 
     let file: any;
@@ -398,7 +437,11 @@ export class FilesService {
 
       this.logger.info({ fileId: updated.id }, 'File upload completed');
 
-      return this.toResponseDto(updated);
+      const dto = this.toResponseDto(updated);
+      if (exif) {
+        dto.exif = exif;
+      }
+      return dto;
     } catch (error) {
       this.logger.error({ err: error, fileId: file.id, s3Key }, 'Failed to upload file to storage');
 
@@ -429,6 +472,28 @@ export class FilesService {
     }
 
     return this.toResponseDto(file);
+  }
+
+  async getFileExif(id: string): Promise<Record<string, any> | undefined> {
+    const file = await (this.prismaService as any).file.findFirst({
+      where: { id, status: FileStatus.READY, deletedAt: null },
+    });
+
+    if (!file) {
+      throw new NotFoundException('File not found');
+    }
+
+    const mimeType: string =
+      typeof file.originalMimeType === 'string' && file.originalMimeType.length > 0
+        ? file.originalMimeType
+        : file.mimeType;
+
+    const key: string =
+      typeof file.originalS3Key === 'string' && file.originalS3Key.length > 0
+        ? file.originalS3Key
+        : file.s3Key;
+
+    return this.exifService.tryExtractFromStorageKey({ key, mimeType });
   }
 
   /**

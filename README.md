@@ -112,7 +112,7 @@ curl -X POST http://localhost:8080/api/v1/files \
 # С метаданными
 curl -X POST http://localhost:8080/api/v1/files \
   -F "file=@./my-image.jpg" \
-  -F 'optimize={"format":"webp","quality":80,"maxWidth":1920,"maxHeight":1080}'
+  -F 'optimize={"format":"webp","quality":80,"maxDimension":1920}'
 
 # Отключить авто-ориентацию (по умолчанию true)
 curl -X POST http://localhost:8080/api/v1/files \
@@ -312,8 +312,7 @@ curl http://localhost:8080/api/v1/health
 - `FORCE_IMAGE_COMPRESSION_ENABLED` — принудительная компрессия для всех загрузок (true/false, по умолчанию false)
 - `IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS` — максимальное время ожидания ленивой оптимизации (мс, по умолчанию 30000)
 - `IMAGE_COMPRESSION_DEFAULT_FORMAT` — формат по умолчанию (webp/avif, по умолчанию webp)
-- `IMAGE_COMPRESSION_MAX_WIDTH` — максимальная ширина (px, по умолчанию 3840)
-- `IMAGE_COMPRESSION_MAX_HEIGHT` — максимальная высота (px, по умолчанию 2160)
+- `IMAGE_COMPRESSION_MAX_DIMENSION` — максимальная длина стороны (px, по умолчанию 3840)
 - `IMAGE_COMPRESSION_STRIP_METADATA_DEFAULT` — удалять метаданные по умолчанию (true/false, по умолчанию false)
 - `IMAGE_COMPRESSION_LOSSLESS_DEFAULT` — использовать lossless сжатие (true/false, по умолчанию false)
 

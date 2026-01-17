@@ -15,6 +15,7 @@ describe('FilesController (unit)', () => {
       | 'uploadFileStream'
       | 'downloadFileStream'
       | 'getFileMetadata'
+      | 'getFileExif'
       | 'deleteFile'
       | 'listFiles'
     >
@@ -23,6 +24,7 @@ describe('FilesController (unit)', () => {
     uploadFileStream: jest.fn<FilesService['uploadFileStream']>(),
     downloadFileStream: jest.fn<FilesService['downloadFileStream']>(),
     getFileMetadata: jest.fn<FilesService['getFileMetadata']>(),
+    getFileExif: jest.fn<FilesService['getFileExif']>(),
     deleteFile: jest.fn<FilesService['deleteFile']>(),
     listFiles: jest.fn<FilesService['listFiles']>(),
   };
@@ -242,6 +244,17 @@ describe('FilesController (unit)', () => {
       expect(state.headers['ETag']).toBe('"etag123"');
       expect(state.headers['Content-Length']).toBe('3');
       expect(state.sent).toBe(stream);
+    });
+  });
+
+  describe('getFileExif', () => {
+    it('returns exif wrapped in object', async () => {
+      filesServiceMock.getFileExif.mockResolvedValue({ Make: 'Canon' } as any);
+
+      const res = await controller.getFileExif('id');
+
+      expect(res).toEqual({ exif: { Make: 'Canon' } });
+      expect(filesServiceMock.getFileExif).toHaveBeenCalledWith('id');
     });
   });
 });

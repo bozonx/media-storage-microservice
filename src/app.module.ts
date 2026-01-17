@@ -15,7 +15,6 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import appConfig from './config/app.config.js';
 import databaseConfig from './config/database.config.js';
 import storageConfig from './config/storage.config.js';
-import optimizationConfig from './config/optimization.config.js';
 import compressionConfig from './config/compression.config.js';
 import thumbnailConfig from './config/thumbnail.config.js';
 import cleanupConfig from './config/cleanup.config.js';
@@ -30,7 +29,6 @@ import pkg from '../package.json' with { type: 'json' };
         appConfig,
         databaseConfig,
         storageConfig,
-        optimizationConfig,
         compressionConfig,
         thumbnailConfig,
         cleanupConfig,

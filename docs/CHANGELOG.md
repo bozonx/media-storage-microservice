@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Logging: unify application logs on Pino (nestjs-pino) with structured error fields.
+- Compression (breaking): replace `IMAGE_COMPRESSION_MAX_WIDTH`/`IMAGE_COMPRESSION_MAX_HEIGHT` with `IMAGE_COMPRESSION_MAX_DIMENSION` and replace request optimize params `maxWidth`/`maxHeight` with `maxDimension`.
 - Errors: harden global exception responses and map Prisma errors to HTTP.
 - Cleanup: comprehensive cleanup service with TTL-based policies for bad status files and old thumbnails.
   - Add `statusChangedAt` field to track when file status changes.
