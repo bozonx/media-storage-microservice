@@ -349,19 +349,19 @@ curl http://localhost:8080/api/v1/health
 - `IMAGE_COMPRESSION_STRIP_METADATA` — удалять метаданные (true/false, по умолчанию false)
 - `IMAGE_COMPRESSION_LOSSLESS` — использовать lossless сжатие (true/false, по умолчанию false)
 
-**WebP настройки:**
-- `IMAGE_COMPRESSION_WEBP_QUALITY` — качество WebP (1-100, по умолчанию 80)
-- `IMAGE_COMPRESSION_WEBP_EFFORT` — усилие сжатия WebP (0-6, по умолчанию 6)
-
-**AVIF настройки:**
-- `IMAGE_COMPRESSION_AVIF_QUALITY` — качество AVIF (1-100, по умолчанию 60)
-- `IMAGE_COMPRESSION_AVIF_EFFORT` — усилие сжатия AVIF (0-9, по умолчанию 6)
+**Настройки качества (единые для WebP и AVIF):**
+- `IMAGE_COMPRESSION_QUALITY` — качество (1-100, по умолчанию 80)
+- `IMAGE_COMPRESSION_EFFORT` — усилие сжатия (WebP: 0-6, AVIF: 0-9, по умолчанию 6)
 - `IMAGE_COMPRESSION_AVIF_CHROMA_SUBSAMPLING` — субдискретизация цветности (4:2:0 или 4:4:4, по умолчанию 4:4:4)
+
+Примечание: legacy-переменные `IMAGE_COMPRESSION_WEBP_QUALITY`, `IMAGE_COMPRESSION_WEBP_EFFORT`,
+`IMAGE_COMPRESSION_AVIF_QUALITY`, `IMAGE_COMPRESSION_AVIF_EFFORT` всё ещё поддерживаются как fallback,
+но использовать рекомендуется новые `IMAGE_COMPRESSION_QUALITY`/`IMAGE_COMPRESSION_EFFORT`.
 
 ### Миниатюры (Thumbnails)
 - `THUMBNAIL_FORMAT` — формат миниатюр (webp/avif, по умолчанию webp)
 - `THUMBNAIL_MAX_DIMENSION` — максимальная длина стороны (px, по умолчанию 2048)
-- `THUMBNAIL_MAX_AGE_DAYS` — время кеширования в днях и TTL для cleanup (по умолчанию 365)
+- `THUMBNAIL_MAX_AGE_DAYS` — время кеширования в днях и TTL для cleanup (по умолчанию 90)
 
 **Настройки качества для миниатюр:**
 - `THUMBNAIL_QUALITY` — качество (1-100, по умолчанию 80)

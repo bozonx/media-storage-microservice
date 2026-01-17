@@ -64,7 +64,7 @@ ETag: "<thumbnail-hash>"
 ###### Thumbnails
 THUMBNAIL_FORMAT=webp
 THUMBNAIL_MAX_DIMENSION=2048
-THUMBNAIL_MAX_AGE_DAYS=365
+THUMBNAIL_MAX_AGE_DAYS=90
 
 THUMBNAIL_QUALITY=80
 THUMBNAIL_EFFORT=6
@@ -273,13 +273,13 @@ Fields:
   - `IMAGE_COMPRESSION_FORMAT` (webp или avif)
   - `IMAGE_COMPRESSION_STRIP_METADATA`
   - `IMAGE_COMPRESSION_LOSSLESS`
-  - `IMAGE_COMPRESSION_WEBP_QUALITY` / `IMAGE_COMPRESSION_AVIF_QUALITY`
+  - `IMAGE_COMPRESSION_QUALITY`
 - Если `optimize` указан в запросе - игнорируется (force режим приоритетнее)
 
 **Сценарий 2: Optional Compression (FORCE_IMAGE_COMPRESSION_ENABLED=false, optimize указан)**
 - Применяется сжатие с параметрами из `optimize`
 - Env переменные выступают как defaults и ограничения:
-  - `quality`: используется из `optimize.quality` или `IMAGE_COMPRESSION_WEBP_QUALITY` / `IMAGE_COMPRESSION_AVIF_QUALITY`
+  - `quality`: используется из `optimize.quality` или `IMAGE_COMPRESSION_QUALITY`
   - `maxDimension`: `min(optimize.maxDimension, IMAGE_COMPRESSION_MAX_DIMENSION)`
   - `format`: используется из `optimize.format` или `IMAGE_COMPRESSION_FORMAT`
 
