@@ -558,13 +558,17 @@ describe('FilesService (unit)', () => {
           appId: 'app-1',
           userId: 'user-1',
           purpose: 'avatar',
+          originalMimeType: 'text/plain',
           mimeType: 'text/plain',
           size: 1n,
           originalSize: null,
           checksum: 'sha256:x',
           uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
+          statusChangedAt: new Date('2020-01-01T00:00:10.000Z'),
           status: FileStatus.READY,
           metadata: { a: 1 },
+          optimizationStatus: null,
+          optimizationError: null,
         },
       ];
 
@@ -585,6 +589,10 @@ describe('FilesService (unit)', () => {
       expect(res.items[0]?.purpose).toBe('avatar');
       expect(res.items[0]?.status).toBe(FileStatus.READY);
       expect(res.items[0]?.metadata).toEqual({ a: 1 });
+      expect(res.items[0]?.statusChangedAt).toBeInstanceOf(Date);
+      expect(res.items[0]?.originalMimeType).toBe('text/plain');
+      expect(res.items[0]?.optimizationStatus).toBeUndefined();
+      expect(res.items[0]?.optimizationError).toBeUndefined();
     });
   });
 

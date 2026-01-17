@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
@@ -19,6 +19,7 @@ interface ThumbnailRow {
 export class CleanupService implements OnModuleInit, OnModuleDestroy {
   private static readonly jobName = 'cleanup';
   private readonly config: CleanupConfig;
+  private isRunning = false;
 
   constructor(
     @InjectPinoLogger(CleanupService.name)
@@ -57,14 +58,94 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.logger.info('Starting cleanup job');
+    if (this.isRunning) {
+      this.logger.warn('Cleanup job is already running, skipping this run');
+      return;
+    }
 
-    await this.cleanupSoftDeletedFiles();
-    await this.cleanupCorruptedRecords();
-    await this.cleanupBadStatusFiles();
-    await this.cleanupOldThumbnails();
+    this.isRunning = true;
 
-    this.logger.info('Cleanup job completed');
+    try {
+      this.logger.info('Starting cleanup job');
+
+      await this.cleanupTemporaryObjects({
+        prefix: 'tmp/',
+        ttlDays: this.config.tmpTtlDays,
+      });
+      await this.cleanupTemporaryObjects({
+        prefix: 'originals/',
+        ttlDays: this.config.originalsTtlDays,
+      });
+
+      await this.cleanupSoftDeletedFiles();
+      await this.cleanupCorruptedRecords();
+      await this.cleanupBadStatusFiles();
+      await this.cleanupOldThumbnails();
+
+      this.logger.info('Cleanup job completed');
+    } finally {
+      this.isRunning = false;
+    }
+  }
+
+  private async cleanupTemporaryObjects(params: { prefix: string; ttlDays: number }) {
+    const { prefix, ttlDays } = params;
+    this.logger.info({ prefix, ttlDays }, 'Starting temporary objects cleanup');
+
+    const cutoffTime = new Date(Date.now() - ttlDays * MS_PER_DAY);
+
+    let continuationToken: string | undefined;
+    let scanned = 0;
+    let deleted = 0;
+
+    do {
+      const page = await this.storageService.listObjects({
+        prefix,
+        continuationToken,
+        maxKeys: this.config.s3ListPageSize,
+      });
+
+      continuationToken = page.nextContinuationToken;
+
+      scanned += page.items.length;
+      const keysToDelete: string[] = [];
+      for (const item of page.items) {
+        const lastModified = item.lastModified;
+        if (lastModified && lastModified < cutoffTime) {
+          keysToDelete.push(item.key);
+        }
+      }
+
+      if (keysToDelete.length > 0) {
+        try {
+          const { deletedKeys, errors } = await this.storageService.deleteFiles(keysToDelete);
+
+          deleted += deletedKeys.size;
+
+          for (const err of errors) {
+            this.logger.warn(
+              { s3Key: err.key, code: err.code, message: err.message, prefix },
+              'Failed to delete temporary object from storage',
+            );
+          }
+        } catch (error) {
+          this.logger.error(
+            { err: error, prefix },
+            'Failed to cleanup temporary objects from storage',
+          );
+          return;
+        }
+      }
+    } while (continuationToken);
+
+    this.logger.info(
+      {
+        prefix,
+        scanned,
+        deleted,
+      },
+      'Temporary objects cleanup completed',
+    );
   }
 
   private async cleanupSoftDeletedFiles() {
@@ -215,7 +296,10 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
       WHERE
         (status = ${PrismaFileStatus.deleting} AND deleted_at IS NULL)
         OR
-        (status = ${PrismaFileStatus.ready} AND (s3_key = '' OR mime_type = ''))
+        (status = ${PrismaFileStatus.ready} AND (
+          s3_key IS NULL OR s3_key = '' OR
+          mime_type IS NULL OR mime_type = ''
+        ))
       LIMIT ${this.config.batchSize}
     `);
 
@@ -286,7 +370,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
           continue;
         }
 
-        await this.retryDeletion(file.id, file.s3Key);
+        await this.deleteFileCompletely(file.id, file.s3Key, file.originalS3Key);
       } else {
         const claimed = await this.claimFileForDeletion({
           fileId: file.id,
@@ -396,6 +480,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
         },
       },
       data: {
+        deletedAt: new Date(),
         statusChangedAt: new Date(),
       },
     });
@@ -430,36 +515,6 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     });
 
     return result.count === 1;
-  }
-
-  private async retryDeletion(fileId: string, s3Key: string) {
-    try {
-      await this.storageService.deleteFile(s3Key);
-
-      await (this.prismaService as any).file.update({
-        where: { id: fileId },
-        data: {
-          status: PrismaFileStatus.deleted,
-          statusChangedAt: new Date(),
-        },
-      });
-
-      this.logger.info({ fileId }, 'Successfully deleted file on retry');
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        await (this.prismaService as any).file.update({
-          where: { id: fileId },
-          data: {
-            status: PrismaFileStatus.deleted,
-            statusChangedAt: new Date(),
-          },
-        });
-
-        this.logger.info({ fileId }, 'File not found in storage (treated as deleted)');
-      } else {
-        this.logger.error({ err: error, fileId }, 'Failed to delete file on retry');
-      }
-    }
   }
 
   private async deleteFileCompletely(

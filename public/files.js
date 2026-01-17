@@ -125,12 +125,22 @@ function renderFiles(items) {
             const filename = escapeHtml(item.filename);
             const mimeType = escapeHtml(item.mimeType);
             const size = formatFileSize(item.size);
+            const originalSize = typeof item.originalSize === 'number' ? formatFileSize(item.originalSize) : '—';
             const uploadedAt = item.uploadedAt ? new Date(item.uploadedAt).toLocaleString() : '';
+            const statusChangedAt = item.statusChangedAt
+                ? new Date(item.statusChangedAt).toLocaleString()
+                : '';
             const url = escapeHtml(item.url);
             const appId = escapeHtml(item.appId || '—');
             const userId = escapeHtml(item.userId || '—');
             const purpose = escapeHtml(item.purpose || '—');
             const status = escapeHtml(item.status || '—');
+            const originalMimeType = escapeHtml(item.originalMimeType || '—');
+            const optimizationStatus = escapeHtml(item.optimizationStatus || '—');
+            const optimizationError =
+                typeof item.optimizationError === 'string' && item.optimizationError.trim().length > 0
+                    ? escapeHtml(item.optimizationError)
+                    : '';
 
             const metadataValue = item && typeof item === 'object' ? item.metadata : undefined;
             const hasMetadata =
@@ -171,9 +181,13 @@ function renderFiles(items) {
                             <span><strong>purpose:</strong> ${purpose}</span>
                             <span><strong>MIME:</strong> ${mimeType}</span>
                             <span><strong>Size:</strong> ${size}</span>
+                            <span><strong>Original:</strong> ${originalMimeType} / ${originalSize}</span>
                             <span><strong>Uploaded:</strong> ${escapeHtml(uploadedAt)}</span>
                             <span><strong>Status:</strong> ${status}</span>
+                            <span><strong>Status changed:</strong> ${escapeHtml(statusChangedAt || '—')}</span>
+                            <span><strong>Optimization:</strong> ${optimizationStatus}</span>
                         </div>
+                        ${optimizationError ? `<div class="file-row-warning"><strong>Optimization error:</strong> ${optimizationError}</div>` : ''}
                         ${
                             hasMetadata
                                 ? `<details class="file-row-details">

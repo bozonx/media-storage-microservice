@@ -15,6 +15,7 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
+  ListObjectsV2Command,
   HeadBucketCommand,
   HeadObjectCommand,
   CopyObjectCommand,
@@ -31,6 +32,16 @@ export interface StorageDeleteManyError {
 export interface StorageDeleteManyResult {
   deletedKeys: Set<string>;
   errors: StorageDeleteManyError[];
+}
+
+export interface StorageListObjectItem {
+  key: string;
+  lastModified?: Date;
+}
+
+export interface StorageListObjectsResult {
+  items: StorageListObjectItem[];
+  nextContinuationToken?: string;
 }
 
 @Injectable()
@@ -307,6 +318,45 @@ export class StorageService implements OnModuleDestroy {
     }
 
     return { deletedKeys, errors };
+  }
+
+  async listObjects(params: {
+    prefix: string;
+    continuationToken?: string;
+    maxKeys?: number;
+  }): Promise<StorageListObjectsResult> {
+    try {
+      const command = new ListObjectsV2Command({
+        Bucket: this.bucket,
+        Prefix: params.prefix,
+        ContinuationToken: params.continuationToken,
+        MaxKeys: params.maxKeys,
+      });
+
+      const response = await this.s3Client.send(command);
+
+      const items: StorageListObjectItem[] = [];
+      for (const entry of response.Contents ?? []) {
+        if (!entry.Key) {
+          continue;
+        }
+        items.push({
+          key: entry.Key,
+          lastModified: entry.LastModified,
+        });
+      }
+
+      return {
+        items,
+        nextContinuationToken: response.NextContinuationToken,
+      };
+    } catch (error) {
+      this.logger.error(
+        { err: error, prefix: params.prefix },
+        'Failed to list objects from storage',
+      );
+      throw this.mapS3Error(error, 'Failed to list objects from storage');
+    }
   }
 
   async checkConnection(): Promise<boolean> {

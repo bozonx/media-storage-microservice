@@ -714,13 +714,17 @@ export class FilesService {
     appId?: string | null;
     userId?: string | null;
     purpose?: string | null;
+    originalMimeType?: string | null;
     mimeType: string;
     size: bigint | null;
     originalSize: bigint | null;
     checksum: string | null;
     uploadedAt: Date | null;
+    statusChangedAt?: Date | null;
     status?: FileStatus | null;
     metadata?: Record<string, any> | null;
+    optimizationStatus?: OptimizationStatus | null;
+    optimizationError?: string | null;
   }): FileResponseDto {
     const dto = plainToInstance(FileResponseDto, file, {
       excludeExtraneousValues: true,
@@ -730,12 +734,17 @@ export class FilesService {
     dto.originalSize = file.originalSize === null ? undefined : Number(file.originalSize);
     dto.checksum = file.checksum ?? '';
     dto.uploadedAt = file.uploadedAt ?? new Date(0);
+    dto.statusChangedAt = file.statusChangedAt ?? new Date(0);
     dto.appId = file.appId ?? undefined;
     dto.userId = file.userId ?? undefined;
     dto.purpose = file.purpose ?? undefined;
 
     dto.status = file.status ?? undefined;
     dto.metadata = file.metadata ?? undefined;
+
+    dto.originalMimeType = file.originalMimeType ?? undefined;
+    dto.optimizationStatus = file.optimizationStatus ?? undefined;
+    dto.optimizationError = file.optimizationError ?? undefined;
 
     dto.url = `${this.basePath ? `/${this.basePath}` : ''}/api/v1/files/${file.id}/download`;
 

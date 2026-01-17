@@ -7,6 +7,9 @@ export interface CleanupConfig {
   badStatusTtlDays: number;
   thumbnailsTtlDays: number;
   batchSize: number;
+  tmpTtlDays: number;
+  originalsTtlDays: number;
+  s3ListPageSize: number;
 }
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
@@ -41,5 +44,8 @@ export default registerAs(
     badStatusTtlDays: parsePositiveInt(process.env.CLEANUP_BAD_STATUS_TTL_DAYS, 7),
     thumbnailsTtlDays: parsePositiveInt(process.env.THUMBNAIL_MAX_AGE_DAYS, 90),
     batchSize: parsePositiveInt(process.env.CLEANUP_BATCH_SIZE, 200),
+    tmpTtlDays: parsePositiveInt(process.env.CLEANUP_TMP_TTL_DAYS, 2),
+    originalsTtlDays: parsePositiveInt(process.env.CLEANUP_ORIGINALS_TTL_DAYS, 14),
+    s3ListPageSize: parsePositiveInt(process.env.CLEANUP_S3_LIST_PAGE_SIZE, 1000),
   }),
 );
