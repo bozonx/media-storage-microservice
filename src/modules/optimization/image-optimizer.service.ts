@@ -74,6 +74,7 @@ export class ImageOptimizerService {
         ? this.compressionConfig.lossless
         : (params.lossless ?? this.compressionConfig.lossless);
       const autoOrient = params.autoOrient ?? true;
+      const removeAlpha = params.removeAlpha;
 
       let quality: number;
       let effort: number;
@@ -87,14 +88,18 @@ export class ImageOptimizerService {
         quality = forceCompress
           ? this.compressionConfig.webp.quality
           : (params.quality ?? this.compressionConfig.webp.quality);
-        effort = this.compressionConfig.webp.effort;
+        effort = forceCompress
+          ? this.compressionConfig.webp.effort
+          : (params.effort ?? this.compressionConfig.webp.effort);
         output.quality = quality;
         output.effort = effort;
       } else if (format === 'avif') {
         quality = forceCompress
           ? this.compressionConfig.avif.quality
           : (params.quality ?? this.compressionConfig.avif.quality);
-        effort = this.compressionConfig.avif.effort;
+        effort = forceCompress
+          ? this.compressionConfig.avif.effort
+          : (params.effort ?? this.compressionConfig.avif.effort);
         output.quality = quality;
         output.effort = effort;
 
@@ -113,10 +118,11 @@ export class ImageOptimizerService {
         transform: {
           resize: {
             maxDimension,
-            fit: 'inside',
+            fit: 'cover',
             withoutEnlargement: true,
           },
           autoOrient,
+          removeAlpha,
         },
         output,
       });

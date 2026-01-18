@@ -34,4 +34,16 @@ export class CompressParamsDto {
   @IsBoolean()
   @IsOptional()
   autoOrient?: boolean;
+
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  @IsOptional()
+  removeAlpha?: boolean;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9)
+  @IsOptional()
+  effort?: number;
 }
