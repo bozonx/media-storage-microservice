@@ -1,4 +1,4 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { jest } from '@jest/globals';
 import { FilesService } from '../../src/modules/files/files.service.js';
@@ -81,7 +81,7 @@ describe('FilesService - Problems', () => {
   });
 
   it('should return items with detected problems (FAILED status)', async () => {
-    (prismaService.file.findMany as any).mockResolvedValue([
+    prismaService.file.findMany.mockResolvedValue([
       {
         id: 'file-1',
         filename: 'broken.jpg',
@@ -104,13 +104,13 @@ describe('FilesService - Problems', () => {
     const result = await service.listProblemFiles({ limit: 10 });
 
     expect(Array.isArray(result.items)).toBe(true);
-    expect(result.items.length).toBe(1);
+    expect(result.items).toHaveLength(1);
     expect(result.items[0]?.id).toBe('file-1');
     expect(result.items[0]?.problems.some(p => p.code === 'status_failed')).toBe(true);
   });
 
   it('should include optimization_failed problem when optimizationStatus is FAILED', async () => {
-    (prismaService.file.findMany as any).mockResolvedValue([
+    prismaService.file.findMany.mockResolvedValue([
       {
         id: 'file-2',
         filename: 'opt.jpg',
@@ -132,7 +132,7 @@ describe('FilesService - Problems', () => {
 
     const result = await service.listProblemFiles({ limit: 10 });
 
-    expect(result.items.length).toBe(1);
+    expect(result.items).toHaveLength(1);
     expect(result.items[0]?.problems.some(p => p.code === 'optimization_failed')).toBe(true);
   });
 });

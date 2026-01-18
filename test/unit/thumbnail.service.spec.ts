@@ -120,7 +120,7 @@ describe('ThumbnailService (unit)', () => {
     };
 
     it('should throw NotFoundException when file does not exist', async () => {
-      (prismaMock.file.findFirst as any).mockResolvedValue(null as any);
+      prismaMock.file.findFirst.mockResolvedValue(null as any);
 
       await expect(service.getThumbnail(fileId, { width: 100, height: 100 })).rejects.toThrow(
         NotFoundException,
@@ -128,7 +128,7 @@ describe('ThumbnailService (unit)', () => {
     });
 
     it('should throw BadRequestException when file is not an image', async () => {
-      (prismaMock.file.findFirst as any).mockResolvedValue({
+      prismaMock.file.findFirst.mockResolvedValue({
         ...mockFile,
         mimeType: 'application/pdf',
       } as any);
@@ -153,10 +153,10 @@ describe('ThumbnailService (unit)', () => {
 
       const thumbnailBuffer = Buffer.from('cached thumbnail');
 
-      (prismaMock.file.findFirst as any).mockResolvedValue(mockFile as any);
-      (prismaMock.thumbnail.findUnique as any).mockResolvedValue(cachedThumbnail as any);
-      (prismaMock.thumbnail.update as any).mockResolvedValue(cachedThumbnail as any);
-      (storageMock.downloadStream as any).mockResolvedValue({
+      prismaMock.file.findFirst.mockResolvedValue(mockFile as any);
+      prismaMock.thumbnail.findUnique.mockResolvedValue(cachedThumbnail as any);
+      prismaMock.thumbnail.update.mockResolvedValue(cachedThumbnail as any);
+      storageMock.downloadStream.mockResolvedValue({
         stream: (async function* () {
           yield thumbnailBuffer;
         })(),
@@ -187,15 +187,15 @@ describe('ThumbnailService (unit)', () => {
         mimeType: 'image/webp',
       });
 
-      (prismaMock.file.findFirst as any).mockResolvedValue(mockFile as any);
-      (prismaMock.thumbnail.findUnique as any).mockResolvedValue(null as any);
-      (storageMock.downloadStream as any).mockResolvedValue({
+      prismaMock.file.findFirst.mockResolvedValue(mockFile as any);
+      prismaMock.thumbnail.findUnique.mockResolvedValue(null as any);
+      storageMock.downloadStream.mockResolvedValue({
         stream: (async function* () {
           yield originalBuffer;
         })(),
       });
-      (storageMock.uploadFile as any).mockResolvedValue(undefined as any);
-      (prismaMock.thumbnail.create as any).mockResolvedValue({
+      storageMock.uploadFile.mockResolvedValue(undefined as any);
+      prismaMock.thumbnail.create.mockResolvedValue({
         id: 'new-thumb-id',
         fileId,
         width: 100,
@@ -238,15 +238,15 @@ describe('ThumbnailService (unit)', () => {
         mimeType: 'image/webp',
       });
 
-      (prismaMock.file.findFirst as any).mockResolvedValue(mockFile as any);
-      (prismaMock.thumbnail.findUnique as any).mockResolvedValue(null as any);
-      (storageMock.downloadStream as any).mockResolvedValue({
+      prismaMock.file.findFirst.mockResolvedValue(mockFile as any);
+      prismaMock.thumbnail.findUnique.mockResolvedValue(null as any);
+      storageMock.downloadStream.mockResolvedValue({
         stream: (async function* () {
           yield originalBuffer;
         })(),
       });
-      (storageMock.uploadFile as any).mockResolvedValue(undefined as any);
-      (prismaMock.thumbnail.create as any).mockResolvedValue({
+      storageMock.uploadFile.mockResolvedValue(undefined as any);
+      prismaMock.thumbnail.create.mockResolvedValue({
         id: 'new-thumb-id',
         fileId,
         width: 100,
@@ -278,15 +278,15 @@ describe('ThumbnailService (unit)', () => {
         mimeType: 'image/webp',
       });
 
-      (prismaMock.file.findFirst as any).mockResolvedValue(mockFile as any);
-      (prismaMock.thumbnail.findUnique as any).mockResolvedValue(null as any);
-      (storageMock.downloadStream as any).mockResolvedValue({
+      prismaMock.file.findFirst.mockResolvedValue(mockFile as any);
+      prismaMock.thumbnail.findUnique.mockResolvedValue(null as any);
+      storageMock.downloadStream.mockResolvedValue({
         stream: (async function* () {
           yield originalBuffer;
         })(),
       });
-      (storageMock.uploadFile as any).mockResolvedValue(undefined as any);
-      (prismaMock.thumbnail.create as any).mockResolvedValue({
+      storageMock.uploadFile.mockResolvedValue(undefined as any);
+      prismaMock.thumbnail.create.mockResolvedValue({
         id: 'new-thumb-id',
         fileId,
         width: 100,
@@ -313,15 +313,15 @@ describe('ThumbnailService (unit)', () => {
         mimeType: 'image/webp',
       });
 
-      (prismaMock.file.findFirst as any).mockResolvedValue(mockFile as any);
-      (prismaMock.thumbnail.findUnique as any).mockResolvedValue(null as any);
-      (storageMock.downloadStream as any).mockResolvedValue({
+      prismaMock.file.findFirst.mockResolvedValue(mockFile as any);
+      prismaMock.thumbnail.findUnique.mockResolvedValue(null as any);
+      storageMock.downloadStream.mockResolvedValue({
         stream: (async function* () {
           yield originalBuffer;
         })(),
       });
-      (storageMock.uploadFile as any).mockResolvedValue(undefined as any);
-      (prismaMock.thumbnail.create as any).mockResolvedValue({
+      storageMock.uploadFile.mockResolvedValue(undefined as any);
+      prismaMock.thumbnail.create.mockResolvedValue({
         id: 'new-thumb-id',
         fileId,
         width: 100,
@@ -355,15 +355,15 @@ describe('ThumbnailService (unit)', () => {
         dimensions: { width: 200, height: 100 },
       });
 
-      (prismaMock.file.findFirst as any).mockResolvedValue(mockFile as any);
-      (prismaMock.thumbnail.findUnique as any).mockResolvedValue(null as any);
-      (storageMock.downloadStream as any).mockResolvedValue({
+      prismaMock.file.findFirst.mockResolvedValue(mockFile as any);
+      prismaMock.thumbnail.findUnique.mockResolvedValue(null as any);
+      storageMock.downloadStream.mockResolvedValue({
         stream: (async function* () {
           yield originalBuffer;
         })(),
       });
-      (storageMock.uploadFile as any).mockResolvedValue(undefined as any);
-      (prismaMock.thumbnail.create as any).mockResolvedValue({
+      storageMock.uploadFile.mockResolvedValue(undefined as any);
+      prismaMock.thumbnail.create.mockResolvedValue({
         id: 'new-thumb-id',
         fileId,
         width: 200,
@@ -387,9 +387,9 @@ describe('ThumbnailService (unit)', () => {
 
       imageProcessingClientMock.process.mockRejectedValueOnce(new Error('boom'));
 
-      (prismaMock.file.findFirst as any).mockResolvedValue(mockFile as any);
-      (prismaMock.thumbnail.findUnique as any).mockResolvedValue(null as any);
-      (storageMock.downloadStream as any).mockResolvedValue({
+      prismaMock.file.findFirst.mockResolvedValue(mockFile as any);
+      prismaMock.thumbnail.findUnique.mockResolvedValue(null as any);
+      storageMock.downloadStream.mockResolvedValue({
         stream: (async function* () {
           yield invalidBuffer;
         })(),
@@ -414,9 +414,9 @@ describe('ThumbnailService (unit)', () => {
         new ServiceUnavailableException('Image processing failed'),
       );
 
-      (prismaMock.file.findFirst as any).mockResolvedValue(mockFile as any);
-      (prismaMock.thumbnail.findUnique as any).mockResolvedValue(null as any);
-      (storageMock.downloadStream as any).mockResolvedValue({
+      prismaMock.file.findFirst.mockResolvedValue(mockFile as any);
+      prismaMock.thumbnail.findUnique.mockResolvedValue(null as any);
+      storageMock.downloadStream.mockResolvedValue({
         stream: (async function* () {
           yield invalidBuffer;
         })(),

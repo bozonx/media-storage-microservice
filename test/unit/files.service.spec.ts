@@ -90,7 +90,7 @@ describe('FilesService (unit)', () => {
 
     process.env.IMAGE_MAX_BYTES_MB = '25';
 
-    (storageMock.uploadFile as any).mockResolvedValue(undefined);
+    storageMock.uploadFile.mockResolvedValue(undefined);
     (storageMock.uploadStream as unknown as jest.Mock).mockImplementation(async (params: any) => {
       if (params?.body && typeof params.body[Symbol.asyncIterator] === 'function') {
         await drainStream(params.body);
@@ -217,7 +217,7 @@ describe('FilesService (unit)', () => {
         checksum: 'sha256:abc',
       });
 
-      (storageMock.downloadStreamWithRange as any).mockResolvedValue({
+      storageMock.downloadStreamWithRange.mockResolvedValue({
         stream: (await import('stream')).Readable.from([Buffer.from('x')]),
         etag: 'etag',
         contentLength: 1,
@@ -324,7 +324,7 @@ describe('FilesService (unit)', () => {
 
       (prismaMock as any).file.findFirst.mockResolvedValue(existing);
       (prismaMock as any).file.delete.mockResolvedValue(undefined);
-      (storageMock.deleteFile as any).mockResolvedValue(undefined);
+      storageMock.deleteFile.mockResolvedValue(undefined);
 
       const res = await serviceWithBasePath.uploadFile({
         buffer: Buffer.from('abc'),
@@ -365,7 +365,7 @@ describe('FilesService (unit)', () => {
       (prismaMock as any).file.create.mockResolvedValue(created);
       (prismaMock as any).file.findFirst.mockResolvedValue(existing);
       (prismaMock as any).file.delete.mockResolvedValue(undefined);
-      (storageMock.deleteFile as any).mockResolvedValue(undefined);
+      storageMock.deleteFile.mockResolvedValue(undefined);
 
       const res = await service.uploadFile({
         buffer: Buffer.from('abc'),
@@ -419,8 +419,8 @@ describe('FilesService (unit)', () => {
 
       (prismaMock as any).file.create.mockResolvedValue(created);
       (prismaMock as any).file.findFirst.mockResolvedValue(null);
-      (storageMock.copyObject as any).mockResolvedValue(undefined);
-      (storageMock.deleteFile as any).mockResolvedValue(undefined);
+      storageMock.copyObject.mockResolvedValue(undefined);
+      storageMock.deleteFile.mockResolvedValue(undefined);
       (prismaMock as any).file.update.mockResolvedValue(updated);
 
       const res = await service.uploadFile({
@@ -460,8 +460,8 @@ describe('FilesService (unit)', () => {
 
       (prismaMock as any).file.findFirst.mockResolvedValue(null);
       (prismaMock as any).file.create.mockResolvedValue(created);
-      (storageMock.uploadStream as any).mockRejectedValue(new Error('S3 down'));
-      (storageMock.deleteFile as any).mockResolvedValue(undefined);
+      storageMock.uploadStream.mockRejectedValue(new Error('S3 down'));
+      storageMock.deleteFile.mockResolvedValue(undefined);
 
       await expect(
         service.uploadFile({
@@ -531,7 +531,7 @@ describe('FilesService (unit)', () => {
     });
 
     it('creates READY record with original* fields when forced optimization enabled for images', async () => {
-      (configServiceMock.get as any).mockImplementation((key: string) => {
+      configServiceMock.get.mockImplementation((key: string) => {
         if (key === 'storage.bucket') {
           return 'test-bucket';
         }

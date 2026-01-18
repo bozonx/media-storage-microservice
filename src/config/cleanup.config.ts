@@ -30,7 +30,7 @@ function parseCron(value: string | undefined, fallback: string): string {
 
   try {
     // Validate cron expression
-    // eslint-disable-next-line no-new
+
     new CronTime(candidate);
     return candidate;
   } catch {

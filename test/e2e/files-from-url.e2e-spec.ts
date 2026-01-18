@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter } from '@nestjs/platform-fastify';
 import { createServer, type Server } from 'http';
-import { AddressInfo } from 'net';
+import type { AddressInfo } from 'net';
 import { AppModule } from '../../src/app.module.js';
 import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
 import { StorageService } from '../../src/modules/storage/storage.service.js';

@@ -131,7 +131,7 @@ export class FilesController {
   ) {}
 
   private getOptionalMultipartField(data: any, fieldName: string): string | undefined {
-    const field = data?.fields?.[fieldName] as any;
+    const field = data?.fields?.[fieldName];
     const value = typeof field?.value === 'string' ? field.value.trim() : '';
     return value.length > 0 ? value : undefined;
   }

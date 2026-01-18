@@ -128,7 +128,7 @@ export class FilesService {
     const chunks: Buffer[] = [];
     let total = 0;
 
-    for await (const chunk of stream as any) {
+    for await (const chunk of stream) {
       const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       total += buf.length;
       if (total > maxBytes) {
@@ -165,7 +165,7 @@ export class FilesService {
       ? `originals/${cryptoRandomId()}`
       : `tmp/${cryptoRandomId()}`;
 
-    const file = await (this.prismaService as any).file.create({
+    const file = await this.prismaService.file.create({
       data: {
         filename,
         appId: appId ?? null,
@@ -175,7 +175,7 @@ export class FilesService {
         originalSize: null,
         originalChecksum: null,
         originalS3Key: wantsOptimization ? originalKey : null,
-        mimeType: wantsOptimization ? null : mimeType,
+        mimeType,
         size: null,
         checksum: null,
         s3Key: wantsOptimization ? '' : originalKey,
@@ -183,12 +183,9 @@ export class FilesService {
         status: FileStatus.UPLOADING,
         optimizationStatus: wantsOptimization ? OptimizationStatus.PENDING : null,
         optimizationParams: wantsOptimization
-          ? ((this.forceCompression ? {} : (compressParams ?? {})) as unknown as Record<
-              string,
-              any
-            >)
+          ? ((this.forceCompression ? {} : (compressParams ?? {})) as any)
           : null,
-        metadata: metadata ?? null,
+        metadata: (metadata ?? null) as any,
         uploadedAt: null,
       },
     });
@@ -220,7 +217,7 @@ export class FilesService {
         if (tmpKeyToCleanup) {
           await this.storageService.deleteFile(tmpKeyToCleanup);
         }
-        await (this.prismaService as any).file.update({
+        await this.prismaService.file.update({
           where: { id: file.id },
           data: {
             status: FileStatus.FAILED,
@@ -245,7 +242,7 @@ export class FilesService {
       const checksum = `sha256:${hash.digest('hex')}`;
 
       if (wantsOptimization) {
-        const updated = await (this.prismaService as any).file.update({
+        const updated = await this.prismaService.file.update({
           where: { id: file.id },
           data: {
             originalChecksum: checksum,
@@ -270,7 +267,7 @@ export class FilesService {
 
       const finalKey = this.generateS3Key(checksum, mimeType);
 
-      const existing = await (this.prismaService as any).file.findFirst({
+      const existing = await this.prismaService.file.findFirst({
         where: {
           checksum,
           mimeType,
@@ -287,7 +284,7 @@ export class FilesService {
         await this.storageService.deleteFile(originalKey);
         tmpKeyToCleanup = null;
 
-        await (this.prismaService as any).file.delete({
+        await this.prismaService.file.delete({
           where: { id: file.id },
         });
         return this.toResponseDto(existing);
@@ -316,7 +313,7 @@ export class FilesService {
       this.logger.error({ err: error, fileId: file.id }, 'File upload stream failed');
 
       try {
-        await (this.prismaService as any).file.update({
+        await this.prismaService.file.update({
           where: { id: file.id },
           data: {
             status: FileStatus.FAILED,
@@ -859,11 +856,11 @@ export class FilesService {
     checksum: string | null;
     uploadedAt: Date | null;
     statusChangedAt?: Date | null;
-    status?: FileStatus | null;
-    metadata?: Record<string, any> | null;
-    optimizationStatus?: OptimizationStatus | null;
+    status?: any;
+    metadata?: any;
+    optimizationStatus?: any;
     optimizationError?: string | null;
-    exif?: Record<string, any> | null;
+    exif?: any;
   }): FileResponseDto {
     const dto = plainToInstance(FileResponseDto, file, {
       excludeExtraneousValues: true,
@@ -1087,7 +1084,7 @@ export class FilesService {
         where: { id: fileId },
       });
 
-      if (!file || !file.originalS3Key || !file.originalMimeType) {
+      if (!file?.originalS3Key || !file.originalMimeType) {
         throw new Error('File or original not found');
       }
 
