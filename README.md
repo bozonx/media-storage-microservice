@@ -1,122 +1,193 @@
 # Media Storage Microservice
 
-Микросервис для загрузки, хранения и выдачи медиафайлов.
+A robust microservice for uploading, storing, and serving media files with built-in image optimization, dynamic thumbnail generation, and SHA-256 deduplication.
 
-Хранение бинарных данных: S3-совместимое хранилище.
+## Features
 
-Метаданные: PostgreSQL (Prisma).
+- **Storage**: S3-compatible backend (supports AWS S3, MinIO, Garage, etc.).
+- **Metadata**: PostgreSQL (via Prisma ORM) for fast searching and filtering.
+- **Image Processing**:
+  - Automatic optimization to WebP or AVIF.
+  - On-the-fly dynamic thumbnail generation.
+  - EXIF data extraction and storage.
+  - Metadata stripping and auto-orientation.
+- **Deduplication**: Content-addressable storage using SHA-256 checksums to save space.
+- **Security**: Blocking of executable and archive file uploads by default.
+- **Resilience**: Streaming uploads/downloads for low memory footprint and partial content support (Range requests).
 
-Дополнительно для изображений:
-- Оптимизация (WebP/AVIF)
-- Динамические миниатюры
-- Дедупликация по чексумме (sha256)
+---
 
-## Требования
+## Quick Start
 
-- Docker & Docker Compose
+### Docker Compose (Recommended)
 
-## Быстрый старт (Docker Compose)
+1. Create a production environment file:
+   ```bash
+   cp .env.production.example .env.production
+   ```
+2. Edit `.env.production` and provide your credentials (PostgreSQL and S3).
+3. Start the services:
+   ```bash
+   docker compose -f docker/docker-compose.yml up -d
+   ```
+4. Check health:
+   ```bash
+   curl http://localhost:8080/api/v1/health
+   ```
 
-1. Создайте `.env.production` на основе примера:
+Default API Base URL: `http://localhost:8080/api/v1`
+Utility UI: `http://localhost:8080/ui`
 
-```bash
-cp .env.production.example .env.production
-```
+---
 
-2. Отредактируйте `.env.production`:
-- Укажите `DATABASE_URL` для PostgreSQL
-- Укажите `S3_*` для вашего S3 (или Garage из compose)
+## Configuration
 
-3. Запустите сервис:
+The service is configured via environment variables. See `.env.production.example` for the full list.
 
-```bash
-docker compose -f docker/docker-compose.yml up -d
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | Required |
+| `S3_ENDPOINT` | S3 API endpoint | Required |
+| `S3_REGION` | S3 region | `us-east-1` |
+| `S3_BUCKET` | S3 bucket name | Required |
+| `LISTEN_PORT` | Port for the service | `8080` |
+| `LISTEN_HOST` | Host for the service | `0.0.0.0` |
+| `BASE_PATH`| URL prefix for API/UI | (empty) |
+| `BLOCK_EXECUTABLE_UPLOADS` | Reject executables | `true` |
+| `BLOCK_ARCHIVE_UPLOADS` | Reject archives | `true` |
 
-4. Проверьте доступность:
+---
 
-```bash
-curl http://localhost:8080/api/v1/health
-```
+## API Documentation
 
-По умолчанию API доступен по адресу:
-`http://localhost:8080/api/v1`
+Base Path: `/api/v1`
 
-UI (простая страница для проверки):
-`http://localhost:8080/ui`
+### 1. File Upload
 
-## Конфигурация
+#### POST `/files`
+Upload a file using `multipart/form-data`.
 
-Полный список переменных окружения см. в `.env.production.example` (основной источник конфигурации).
+**Fields:**
+- `file` (Required): The binary file to upload.
+- `optimize` (Optional): JSON string containing `Optimization Parameters`.
+- `metadata` (Optional): JSON string with custom key-value pairs.
+- `appId` (Optional): String to group files by application.
+- `userId` (Optional): String to associate file with a user.
+- `purpose` (Optional): String to categorize file use (e.g., `avatar`, `post`).
 
-Минимально необходимое:
-- `DATABASE_URL`
-- `S3_ENDPOINT`
-- `S3_REGION`
-- `S3_ACCESS_KEY_ID`
-- `S3_SECRET_ACCESS_KEY`
-- `S3_BUCKET`
-
-Основные настройки:
-- `LISTEN_HOST` (для Docker обычно `0.0.0.0`)
-- `LISTEN_PORT` (по умолчанию `8080`)
-- `BASE_PATH` (префикс для API и UI, например `media`)
-
-## API Endpoints
-
-Базовый префикс: `/api/v1`.
-
-Основные эндпоинты:
-- `POST /files` — загрузка файла (multipart)
-- `POST /files/from-url` — загрузка по URL
-- `GET /files/:id` — получение метаданных
-- `GET /files/:id/download` — скачивание файла
-- `GET /files/:id/thumbnail` — генерация миниатюры (только для изображений)
-- `DELETE /files/:id` — удаление (soft delete)
-- `GET /health` — проверка состояния сервиса
-
-Примеры использования:
-
+**Example:**
 ```bash
 curl -X POST http://localhost:8080/api/v1/files \
-  -F "file=@./image.jpg"
+  -F "file=@./photo.jpg" \
+  -F 'optimize={"format":"webp","quality":80}' \
+  -F 'appId=my-app'
 ```
 
+#### POST `/files/from-url`
+Upload a file by providing a remote URL.
+
+**Body (JSON):**
+- `url` (Required): Remote URL of the file.
+- `filename` (Optional): Override the filename.
+- `metadata`, `appId`, `userId`, `purpose`, `optimize`: Same as above.
+
+---
+
+### 2. Optimization Parameters (`optimize` object)
+
+When uploading images, you can control the optimization process:
+
+| Parameter | Type | Range | Description |
+|-----------|------|-------|-------------|
+| `format` | string | `webp`, `avif` | Target output format. |
+| `quality` | number | 1-100 | Compression quality (default ~80). |
+| `maxDimension` | number | 1-8192 | Resize the image if its width or height exceeds this value. |
+| `lossless` | boolean | - | Use lossless compression (WebP only). |
+| `stripMetadata` | boolean | - | Remove EXIF and other metadata from the binary. |
+| `autoOrient` | boolean | - | Automatically rotate image based on EXIF Orientation tag. |
+| `removeAlpha` | boolean | - | Remove transparency channel (useful for conversion to JPEG). |
+| `effort` | number | 0-9 | CPU effort for compression (higher is slower but better). |
+
+---
+
+### 3. File Retrieval & Management
+
+#### GET `/files/:id`
+Retrieve file metadata (JSON).
+
+#### GET `/files/:id/download`
+Download the raw file. Supports `Range` headers for partial downloads and `If-None-Match` for caching.
+
+#### GET `/files/:id/exif`
+Retrieve extracted EXIF data from the image.
+
+#### DELETE `/files/:id`
+Mark a file as deleted (Soft Delete).
+
+---
+
+### 4. Dynamic Thumbnails
+
+#### GET `/files/:id/thumbnail`
+Generate and cache a thumbnail for an image.
+
+**Query Parameters:**
+- `width` (Required): Width in pixels (10-4096).
+- `height` (Required): Height in pixels (10-4096).
+- `quality` (Optional): 1-100 (default 80).
+- `fit` (Optional): How the image should fit the dimensions:
+  - `cover` (Default): Crop to fit.
+  - `contain`: Add letterboxing.
+  - `fill`: Stretch.
+  - `inside`: Resize to be within dimensions.
+  - `outside`: Resize to cover dimensions.
+
+**Example:**
 ```bash
-curl -O http://localhost:8080/api/v1/files/<file-id>/download
+<img src="http://localhost:8080/api/v1/files/abc-123/thumbnail?width=300&height=300&fit=cover" />
 ```
 
-## Разработка (Development)
+---
 
-Требования:
+### 5. File Listing
+
+#### GET `/files`
+Search and filter files.
+
+**Query Parameters:**
+- `limit` (default 50), `offset` (default 0).
+- `sortBy`: `uploadedAt`, `size`, `filename`.
+- `order`: `asc`, `desc`.
+- `q`: Search by filename or original name.
+- `mimeType`: Filter by MIME type.
+- `appId`, `userId`, `purpose`: Filter by tags provided during upload.
+
+---
+
+## Development
+
+### Requirements
 - Node.js 22+
 - pnpm 10+
+- Docker (for database and storage)
 
-Быстрый запуск dev-окружения (PostgreSQL + Garage через Docker):
-
-```bash
-pnpm setup:dev
-pnpm start:dev
-```
-
-Альтернативный запуск (вручную):
-
+### Local Setup
 ```bash
 pnpm install
 cp .env.development.example .env.development
-docker compose -f docker-compose.yml up -d
+# Start DB and Garage (S3)
+docker compose up -d
+# Initialize storage buckets
 bash scripts/init-garage.sh
+# Run NestJS
 pnpm start:dev
 ```
 
-Тестирование:
+### Testing
+- `pnpm test:unit` - Run unit tests.
+- `pnpm test:e2e` - Run end-to-end tests.
 
-```bash
-pnpm test:unit
-pnpm test:e2e
-pnpm test:cov
-```
-
-## Лицензия
+## License
 
 MIT
+
