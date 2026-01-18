@@ -32,7 +32,6 @@
     "@aws-sdk/lib-storage": "^3.970.0",
     "@fastify/multipart": "^9.3.0",
     "@fastify/static": "^9.0.0",
-    "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^11.1.12",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.12",
@@ -40,7 +39,6 @@
     "@nestjs/schedule": "^6.1.0",
     "@prisma/adapter-pg": "^7.0.0",
     "@prisma/client": "^7.0.0",
-    "axios": "^1.7.9",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
     "cron": "^4.3.5",
@@ -50,7 +48,8 @@
     "pino": "^10.2.0",
     "prisma": "^7.0.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "undici": "^7.18.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
