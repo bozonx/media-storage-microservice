@@ -100,6 +100,20 @@ If running in production with the bundled Garage:
    ```
    (This script automatically detects the running `media-storage-garage` container and sets up buckets/keys).
 
+   **Tip: If you don't have the source code on the Host (Docker only):**
+   You can run the script directly from the image by piping it to your host's bash:
+   ```bash
+   docker exec media-storage-microservice cat scripts/init-garage.sh | bash
+   ```
+
+   **Alternative: Running fully inside the container:**
+   If you really want to run it *inside* the microservice container (e.g. for CI/CD or automated setups), you must mount the Docker socket in your `docker-compose.yml`:
+   ```yaml
+   volumes:
+     - /var/run/docker.sock:/var/run/docker.sock
+   ```
+   Then you can run it normally: `docker exec media-storage-microservice bash scripts/init-garage.sh`.
+
 3. **Configure Keys:**
    **Copy the `Access Key ID` and `Secret Access Key`** from the script output.
    Add them to your `.env.production` file:

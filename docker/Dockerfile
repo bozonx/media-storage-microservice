@@ -11,10 +11,10 @@ ENV LOG_LEVEL=warn
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    wget \
-    libheif1 \
-    libaom3 \
+  ca-certificates \
+  wget \
+  libheif1 \
+  libaom3 \
   && rm -rf /var/lib/apt/lists/*
 
 # Install pnpm
@@ -30,8 +30,8 @@ RUN pnpm install --prod --frozen-lockfile --prefer-offline --ignore-scripts || p
 COPY dist ./dist
 COPY public ./public
 
-COPY scripts/docker-entrypoint.sh ./scripts/docker-entrypoint.sh
-RUN chmod +x ./scripts/docker-entrypoint.sh
+COPY scripts/*.sh ./scripts/
+RUN chmod +x ./scripts/*.sh
 
 EXPOSE 8080
 
