@@ -19,7 +19,12 @@
         </header>
 
         <main>
-            <div class="upload-section">
+            <div class="mode-switcher">
+                <button type="button" class="mode-btn active" id="modeFile">File Upload</button>
+                <button type="button" class="mode-btn" id="modeUrl">Import from URL</button>
+            </div>
+
+            <div class="upload-section" id="sectionFile">
                 <div class="drop-zone" id="dropZone">
                     <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -30,8 +35,56 @@
                     <input type="file" id="fileInput" multiple hidden>
                     <button type="button" class="browse-btn" id="browseBtn">Browse Files</button>
                 </div>
-
                 <div class="file-list" id="fileList"></div>
+            </div>
+
+            <div class="upload-section" id="sectionUrl" style="display: none;">
+                <div class="control-group">
+                    <label class="control-label" for="urlInput">File URL</label>
+                    <input type="url" class="control-input" id="urlInput" placeholder="https://example.com/image.jpg">
+                </div>
+            </div>
+
+            <div class="optimization-settings">
+                <details>
+                    <summary>Optimization Settings</summary>
+                    <div class="settings-grid">
+                        <div class="control-group">
+                            <label class="control-label" for="optQuality">Quality (1-100)</label>
+                            <input type="number" class="control-input" id="optQuality" min="1" max="100" placeholder="Default">
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label" for="optMaxDimension">Max Dimension (px)</label>
+                            <input type="number" class="control-input" id="optMaxDimension" min="1" max="8192" placeholder="Original">
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label" for="optFormat">Format</label>
+                            <select class="control-input" id="optFormat">
+                                <option value="">Original</option>
+                                <option value="webp">WebP</option>
+                                <option value="avif">AVIF</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label" for="optEffort">Effort (0-9)</label>
+                            <input type="number" class="control-input" id="optEffort" min="0" max="9" placeholder="Default">
+                        </div>
+                    </div>
+                    <div class="checkbox-grid">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="optLossless"> Lossless
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="optStripMetadata"> Strip Metadata
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="optRemoveAlpha"> Remove Alpha
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="optAutoOrient"> Auto Orient
+                        </label>
+                    </div>
+                </details>
             </div>
 
             <div class="upload-controls" id="uploadControls" style="display: none;">

@@ -7,7 +7,15 @@ const uploadBtn = document.getElementById('uploadBtn');
 const clearBtn = document.getElementById('clearBtn');
 const results = document.getElementById('results');
 
+// Mode Switcher Elements
+const modeFileBtn = document.getElementById('modeFile');
+const modeUrlBtn = document.getElementById('modeUrl');
+const sectionFile = document.getElementById('sectionFile');
+const sectionUrl = document.getElementById('sectionUrl');
+const urlInput = document.getElementById('urlInput');
+
 let selectedFiles = [];
+let currentMode = 'file'; // 'file' or 'url'
 
 function getBasePathPrefix() {
     const path = window.location.pathname;
@@ -31,6 +39,58 @@ function buildThumbnailUrl(fileId, params) {
         ...(typeof params.quality === 'number' ? { quality: String(params.quality) } : {}),
     });
     return `${basePathPrefix}/api/v1/files/${encodeURIComponent(fileId)}/thumbnail?${search.toString()}`;
+}
+
+// Mode Switching Logic
+function setMode(mode) {
+    currentMode = mode;
+    const btnText = document.querySelector('.btn-text');
+
+    if (mode === 'file') {
+        modeFileBtn.classList.add('active');
+        modeUrlBtn.classList.remove('active');
+        sectionFile.style.display = 'block';
+        sectionUrl.style.display = 'none';
+        btnText.textContent = 'Upload Files';
+        renderFileList(); // Update controls visibility based on files
+    } else {
+        modeFileBtn.classList.remove('active');
+        modeUrlBtn.classList.add('active');
+        sectionFile.style.display = 'none';
+        sectionUrl.style.display = 'block';
+        btnText.textContent = 'Import from URL';
+        uploadControls.style.display = 'flex'; // Always show controls for URL mode
+    }
+}
+
+modeFileBtn.addEventListener('click', () => setMode('file'));
+modeUrlBtn.addEventListener('click', () => setMode('url'));
+
+// Optimization Parameters
+function getOptimizationParams() {
+    const params = {};
+
+    const quality = document.getElementById('optQuality').value;
+    if (quality) params.quality = parseInt(quality, 10);
+
+    const maxDimension = document.getElementById('optMaxDimension').value;
+    if (maxDimension) params.maxDimension = parseInt(maxDimension, 10);
+
+    const format = document.getElementById('optFormat').value;
+    if (format) params.format = format;
+
+    const effort = document.getElementById('optEffort').value;
+    if (effort) params.effort = parseInt(effort, 10);
+
+    if (document.getElementById('optLossless').checked) params.lossless = true;
+    if (document.getElementById('optStripMetadata').checked) params.stripMetadata = true;
+    if (document.getElementById('optRemoveAlpha').checked) params.removeAlpha = true;
+    if (document.getElementById('optAutoOrient').checked) params.autoOrient = true;
+
+    // Return undefined if no params are set to keep request clean, 
+    // or return the object if you always want to send it.
+    // The backend expects key-value pairs allowed in DTO.
+    return Object.keys(params).length > 0 ? params : undefined;
 }
 
 browseBtn.addEventListener('click', () => {
@@ -67,32 +127,44 @@ fileInput.addEventListener('change', (e) => {
 });
 
 clearBtn.addEventListener('click', () => {
-    selectedFiles = [];
-    renderFileList();
+    if (currentMode === 'file') {
+        selectedFiles = [];
+        renderFileList();
+    } else {
+        urlInput.value = '';
+    }
     results.innerHTML = '';
 });
 
 uploadBtn.addEventListener('click', async () => {
-    if (selectedFiles.length === 0) return;
+    if (currentMode === 'file' && selectedFiles.length === 0) return;
+    if (currentMode === 'url' && !urlInput.value.trim()) return;
 
     uploadBtn.disabled = true;
     document.querySelector('.btn-text').style.display = 'none';
     document.querySelector('.btn-loader').style.display = 'block';
     results.innerHTML = '';
 
-    for (const file of selectedFiles) {
-        await uploadFile(file);
+    const optimize = getOptimizationParams();
+
+    if (currentMode === 'file') {
+        for (const file of selectedFiles) {
+            await uploadFile(file, optimize);
+        }
+        selectedFiles = [];
+        renderFileList();
+    } else {
+        await uploadFromUrl(urlInput.value.trim(), optimize);
     }
 
     uploadBtn.disabled = false;
     document.querySelector('.btn-text').style.display = 'block';
     document.querySelector('.btn-loader').style.display = 'none';
-
-    selectedFiles = [];
-    renderFileList();
 });
 
 function addFiles(files) {
+    if (currentMode !== 'file') setMode('file');
+
     files.forEach(file => {
         if (!selectedFiles.find(f => f.name === file.name && f.size === file.size)) {
             selectedFiles.push(file);
@@ -109,11 +181,15 @@ function removeFile(index) {
 function renderFileList() {
     if (selectedFiles.length === 0) {
         fileList.innerHTML = '';
-        uploadControls.style.display = 'none';
+        if (currentMode === 'file') {
+            uploadControls.style.display = 'none';
+        }
         return;
     }
 
-    uploadControls.style.display = 'flex';
+    if (currentMode === 'file') {
+        uploadControls.style.display = 'flex';
+    }
 
     fileList.innerHTML = selectedFiles.map((file, index) => `
         <div class="file-item">
@@ -129,9 +205,12 @@ function renderFileList() {
     `).join('');
 }
 
-async function uploadFile(file) {
+async function uploadFile(file, optimize) {
     const formData = new FormData();
     formData.append('file', file);
+    if (optimize) {
+        formData.append('optimize', JSON.stringify(optimize));
+    }
 
     try {
         const response = await fetch(buildApiUrl('/api/v1/files'), {
@@ -148,6 +227,33 @@ async function uploadFile(file) {
         showResult(file.name, data, true);
     } catch (error) {
         showResult(file.name, { error: error.message }, false);
+    }
+}
+
+async function uploadFromUrl(url, optimize) {
+    try {
+        const body = { url };
+        if (optimize) {
+            body.optimize = optimize;
+        }
+
+        const response = await fetch(buildApiUrl('/api/v1/files/from-url'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Upload failed');
+        }
+
+        const data = await response.json();
+        showResult(url, data, true);
+    } catch (error) {
+        showResult(url, { error: error.message }, false);
     }
 }
 
