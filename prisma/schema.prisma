@@ -7,39 +7,28 @@ datasource db {
   provider = "postgresql"
 }
 
-enum FileStatus {
-  uploading
-  ready
-  deleting
-  deleted
-  failed
-  missing
-}
-
-enum OptimizationStatus {
-  pending
-  processing
-  ready
-  failed
-}
-
 model File {
   id                      String              @id @default(uuid()) @db.Uuid
   filename                String              @db.VarChar(255)
+  // Identifier of the application that owns this file
   appId                   String?             @map("app_id") @db.VarChar(100)
+  // Identifier of the user who uploaded this file
   userId                  String?             @map("user_id") @db.VarChar(100)
+  // Categorization of the file (e.g., 'avatar', 'cover', 'attachment')
   purpose                 String?             @db.VarChar(50)
   
   // Original (temporary, for optimization only)
   originalS3Key           String?             @map("original_s3_key") @db.VarChar(500)
   originalMimeType        String?             @map("original_mime_type") @db.VarChar(100)
   originalSize            BigInt?             @map("original_size")
+  // Hash of the original file content to detect duplicates or corruption
   originalChecksum        String?             @map("original_checksum") @db.VarChar(100)
   
   // Optimized (final version to serve)
   s3Key                   String              @map("s3_key") @db.VarChar(500)
   mimeType                String              @map("mime_type") @db.VarChar(100)
   size                    BigInt?
+  // Hash of the optimized file content
   checksum                String?             @db.VarChar(100)
   
   s3Bucket                String              @map("s3_bucket") @db.VarChar(100)
@@ -47,6 +36,7 @@ model File {
   
   // Optimization tracking
   optimizationStatus      OptimizationStatus? @map("optimization_status")
+  // Configuration used for image processing (e.g., resize, format, quality)
   optimizationParams      Json?               @map("optimization_params")
   optimizationError       String?             @map("optimization_error") @db.Text
   optimizationStartedAt   DateTime?           @map("optimization_started_at") @db.Timestamp(6)
@@ -55,6 +45,7 @@ model File {
   metadata                Json?
   uploadedAt              DateTime?           @map("uploaded_at") @db.Timestamp(6)
   deletedAt               DateTime?           @map("deleted_at") @db.Timestamp(6)
+  // Timestamp of the last lifecycle status transition
   statusChangedAt         DateTime            @default(now()) @map("status_changed_at") @db.Timestamp(6)
   createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt               DateTime            @updatedAt @map("updated_at") @db.Timestamp(6)
@@ -82,11 +73,13 @@ model Thumbnail {
   width          Int
   height         Int
   quality        Int
+  // Deterministic hash of resizing parameters to identify existing thumbnails
   paramsHash     String   @map("params_hash") @db.VarChar(64)
   s3Key          String   @map("s3_key") @db.VarChar(500)
   s3Bucket       String   @map("s3_bucket") @db.VarChar(100)
   size           BigInt
   mimeType       String   @map("mime_type") @db.VarChar(100)
+  // Tracked for cache eviction policies (LRU cleanup)
   lastAccessedAt DateTime @default(now()) @map("last_accessed_at") @db.Timestamp(6)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
 
@@ -97,4 +90,20 @@ model Thumbnail {
   @@index([paramsHash])
   @@index([lastAccessedAt])
   @@map("thumbnails")
+}
+
+enum FileStatus {
+  uploading
+  ready
+  deleting
+  deleted
+  failed
+  missing
+}
+
+enum OptimizationStatus {
+  pending
+  processing
+  ready
+  failed
 }
