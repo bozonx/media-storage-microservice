@@ -31,7 +31,7 @@ export class HealthService {
 
   private async checkDatabase(): Promise<boolean> {
     try {
-      await (this.prismaService as any).$queryRaw`SELECT 1`;
+      await this.prismaService.$queryRaw`SELECT 1`;
       return true;
     } catch (error) {
       this.logger.error({ err: error }, 'Database health check failed');

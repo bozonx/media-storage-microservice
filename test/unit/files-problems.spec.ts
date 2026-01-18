@@ -8,6 +8,8 @@ import { ImageOptimizerService } from '../../src/modules/optimization/image-opti
 import { ExifService } from '../../src/modules/files/exif.service.js';
 import { FileStatus } from '../../src/modules/files/file-status.js';
 import { OptimizationStatus } from '../../src/modules/files/optimization-status.js';
+import { FilesMapper } from '../../src/modules/files/files.mapper.js';
+import { FileProblemDetector } from '../../src/modules/files/file-problem.detector.js';
 
 describe('FilesService - Problems', () => {
   let service: FilesService;
@@ -71,6 +73,8 @@ describe('FilesService - Problems', () => {
             tryExtractFromStorageKey: async () => undefined,
           },
         },
+        FilesMapper,
+        FileProblemDetector,
       ],
     }).compile();
 

@@ -8,6 +8,8 @@ import { ImageOptimizerService } from '../../src/modules/optimization/image-opti
 import { FileStatus } from '../../src/modules/files/file-status.js';
 import { OptimizationStatus } from '../../src/modules/files/optimization-status.js';
 import { ExifService } from '../../src/modules/files/exif.service.js';
+import { FilesMapper } from '../../src/modules/files/files.mapper.js';
+import { FileProblemDetector } from '../../src/modules/files/file-problem.detector.js';
 import { Readable } from 'stream';
 
 describe('FilesService - Deduplication', () => {
@@ -83,6 +85,8 @@ describe('FilesService - Deduplication', () => {
             tryExtractFromStorageKey: async () => undefined,
           },
         },
+        FilesMapper,
+        FileProblemDetector,
       ],
     }).compile();
 

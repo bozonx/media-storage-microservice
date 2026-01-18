@@ -82,7 +82,7 @@ export class ThumbnailService {
   }
 
   async getThumbnail(fileId: string, params: ThumbnailParamsDto): Promise<ThumbnailResult> {
-    let file = await (this.prismaService as any).file.findFirst({
+    let file = await this.prismaService.file.findFirst({
       where: { id: fileId, status: FileStatus.READY },
     });
 
@@ -102,6 +102,10 @@ export class ThumbnailService {
       file = await this.filesService.ensureOptimized(fileId);
     }
 
+    if (!file) {
+      throw new NotFoundException('File not found after optimization');
+    }
+
     if (file.optimizationStatus === OptimizationStatus.FAILED) {
       throw new BadRequestException('Image optimization failed');
     }
@@ -118,7 +122,7 @@ export class ThumbnailService {
     const quality = params.quality ?? this.config.quality;
     const paramsHash = this.calculateParamsHash({ width, height, quality, format, fit });
 
-    let thumbnail = await (this.prismaService as any).thumbnail.findUnique({
+    let thumbnail = await this.prismaService.thumbnail.findUnique({
       where: {
         fileId_paramsHash: {
           fileId,
@@ -128,7 +132,7 @@ export class ThumbnailService {
     });
 
     if (thumbnail) {
-      await (this.prismaService as any).thumbnail.update({
+      await this.prismaService.thumbnail.update({
         where: { id: thumbnail.id },
         data: { lastAccessedAt: new Date() },
       });
@@ -165,7 +169,7 @@ export class ThumbnailService {
 
     await this.storageService.uploadFile(thumbnailS3Key, thumbnailBuffer, thumbnailMimeType);
 
-    thumbnail = await (this.prismaService as any).thumbnail.create({
+    thumbnail = await this.prismaService.thumbnail.create({
       data: {
         fileId,
         width,

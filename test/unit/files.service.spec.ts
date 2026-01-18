@@ -16,6 +16,8 @@ import { FileStatus } from '../../src/modules/files/file-status.js';
 import { getLoggerToken } from 'nestjs-pino';
 import { OptimizationStatus } from '../../src/modules/files/optimization-status.js';
 import { ExifService } from '../../src/modules/files/exif.service.js';
+import { FilesMapper } from '../../src/modules/files/files.mapper.js';
+import { FileProblemDetector } from '../../src/modules/files/file-problem.detector.js';
 
 async function drainStream(stream: AsyncIterable<unknown>): Promise<void> {
   for await (const _chunk of stream) {
@@ -117,6 +119,8 @@ describe('FilesService (unit)', () => {
         { provide: ImageOptimizerService, useValue: imageOptimizerMock },
         { provide: ConfigService, useValue: configServiceMock },
         { provide: ExifService, useValue: exifServiceMock },
+        FilesMapper,
+        FileProblemDetector,
       ],
     }).compile();
 
@@ -166,6 +170,8 @@ describe('FilesService (unit)', () => {
           { provide: ImageOptimizerService, useValue: imageOptimizerMock },
           { provide: ConfigService, useValue: timeoutConfigServiceMock },
           { provide: ExifService, useValue: exifServiceMock },
+          FilesMapper,
+          FileProblemDetector,
         ],
       }).compile();
 
@@ -287,6 +293,8 @@ describe('FilesService (unit)', () => {
           { provide: ImageOptimizerService, useValue: imageOptimizerMock },
           { provide: ConfigService, useValue: basePathConfigServiceMock },
           { provide: ExifService, useValue: exifServiceMock },
+          FilesMapper,
+          FileProblemDetector,
         ],
       }).compile();
 
@@ -567,6 +575,8 @@ describe('FilesService (unit)', () => {
           { provide: ImageOptimizerService, useValue: imageOptimizerMock },
           { provide: ConfigService, useValue: configServiceMock },
           { provide: ExifService, useValue: exifServiceMock },
+          FilesMapper,
+          FileProblemDetector,
         ],
       }).compile();
       service = moduleRef.get<FilesService>(FilesService);

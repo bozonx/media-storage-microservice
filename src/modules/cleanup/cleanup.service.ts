@@ -225,7 +225,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
           );
         }
 
-        const claimed = await (this.prismaService as any).file.updateMany({
+        const claimed = await this.prismaService.file.updateMany({
           where: {
             id: file.id,
             deletedAt: { not: null },
@@ -256,7 +256,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
           );
         }
 
-        const thumbnails = (await (this.prismaService as any).thumbnail.findMany({
+        const thumbnails = (await this.prismaService.thumbnail.findMany({
           where: { fileId: file.id },
           select: { id: true, s3Key: true },
         })) as ThumbnailRow[];
@@ -351,7 +351,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
       return true;
     }
 
-    const otherFilesWithSameBlob = await (this.prismaService as any).file.count({
+    const otherFilesWithSameBlob = await this.prismaService.file.count({
       where: {
         checksum,
         mimeType,
@@ -411,7 +411,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     const ttlDays = this.config.badStatusTtlDays;
     const cutoffTime = new Date(Date.now() - ttlDays * MS_PER_DAY);
 
-    const badFiles = await (this.prismaService as any).file.findMany({
+    const badFiles = await this.prismaService.file.findMany({
       where: {
         status: {
           in: [
@@ -552,7 +552,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     fileId: string;
     cutoffTime: Date;
   }): Promise<boolean> {
-    const result = await (this.prismaService as any).file.updateMany({
+    const result = await this.prismaService.file.updateMany({
       where: {
         id: params.fileId,
         status: PrismaFileStatus.deleting,
@@ -574,7 +574,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     expectedStatuses: PrismaFileStatus[];
     cutoffTime?: Date;
   }): Promise<boolean> {
-    const result = await (this.prismaService as any).file.updateMany({
+    const result = await this.prismaService.file.updateMany({
       where: {
         id: params.fileId,
         status: {
@@ -603,7 +603,7 @@ export class CleanupService implements OnModuleInit, OnModuleDestroy {
     s3Key: string | null,
     originalS3Key: string | null,
   ) {
-    const thumbnails = (await (this.prismaService as any).thumbnail.findMany({
+    const thumbnails = (await this.prismaService.thumbnail.findMany({
       where: { fileId },
       select: { id: true, s3Key: true },
     })) as ThumbnailRow[];
