@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { FileStatus } from './file-status.js';
-import { OptimizationStatus } from './optimization-status.js';
+import { FileStatus, OptimizationStatus } from '../../generated/prisma/enums.js';
 import { ProblemItemDto } from './dto/problem-file.dto.js';
 
 export interface ProblemThresholds {
@@ -29,41 +28,41 @@ export class FileProblemDetector {
     const problems: ProblemItemDto[] = [];
     const status = file.status;
 
-    if (status === FileStatus.FAILED) {
+    if (status === FileStatus.failed) {
       problems.push({ code: 'status_failed', message: 'File status is FAILED' });
     }
-    if (status === FileStatus.MISSING) {
+    if (status === FileStatus.missing) {
       problems.push({ code: 'status_missing', message: 'File status is MISSING' });
     }
     if (
-      status === FileStatus.UPLOADING &&
+      status === FileStatus.uploading &&
       file.statusChangedAt instanceof Date &&
       file.statusChangedAt.getTime() < thresholds.stuckUploadingAt.getTime()
     ) {
       problems.push({ code: 'upload_stuck', message: 'Upload is stuck' });
     }
     if (
-      status === FileStatus.DELETING &&
+      status === FileStatus.deleting &&
       file.statusChangedAt instanceof Date &&
       file.statusChangedAt.getTime() < thresholds.stuckDeletingAt.getTime()
     ) {
       problems.push({ code: 'delete_stuck', message: 'Delete is stuck' });
     }
 
-    if (file.deletedAt && status !== FileStatus.DELETED) {
+    if (file.deletedAt && status !== FileStatus.deleted) {
       problems.push({
         code: 'deleted_at_mismatch',
         message: 'deletedAt is set but status is not DELETED',
       });
     }
-    if (!file.deletedAt && status === FileStatus.DELETED) {
+    if (!file.deletedAt && status === FileStatus.deleted) {
       problems.push({
         code: 'deleted_at_missing',
         message: 'status is DELETED but deletedAt is not set',
       });
     }
 
-    if (status === FileStatus.READY) {
+    if (status === FileStatus.ready) {
       if (!file.s3Key) {
         problems.push({ code: 's3_key_missing', message: 'READY file has no S3 key' });
       }
@@ -78,7 +77,7 @@ export class FileProblemDetector {
       }
     }
 
-    if (file.optimizationStatus === OptimizationStatus.FAILED) {
+    if (file.optimizationStatus === OptimizationStatus.failed) {
       problems.push({
         code: 'optimization_failed',
         message: `Optimization failed: ${file.optimizationError || 'Unknown error'}`,
@@ -86,8 +85,8 @@ export class FileProblemDetector {
     }
 
     if (
-      (file.optimizationStatus === OptimizationStatus.PENDING ||
-        file.optimizationStatus === OptimizationStatus.PROCESSING) &&
+      (file.optimizationStatus === OptimizationStatus.pending ||
+        file.optimizationStatus === OptimizationStatus.processing) &&
       file.optimizationStartedAt instanceof Date &&
       file.optimizationStartedAt.getTime() < thresholds.stuckOptimizationAt.getTime()
     ) {

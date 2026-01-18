@@ -12,8 +12,7 @@ import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { ThumbnailParamsDto } from '../files/dto/thumbnail-params.dto.js';
-import { FileStatus } from '../files/file-status.js';
-import { OptimizationStatus } from '../files/optimization-status.js';
+import { FileStatus, OptimizationStatus } from '../../generated/prisma/enums.js';
 import { FilesService } from '../files/files.service.js';
 import { ImageProcessingClient } from '../image-processing/image-processing.client.js';
 
@@ -83,7 +82,7 @@ export class ThumbnailService {
 
   async getThumbnail(fileId: string, params: ThumbnailParamsDto): Promise<ThumbnailResult> {
     let file = await this.prismaService.file.findFirst({
-      where: { id: fileId, status: FileStatus.READY },
+      where: { id: fileId, status: FileStatus.ready },
     });
 
     if (!file) {
@@ -96,8 +95,8 @@ export class ThumbnailService {
     }
 
     if (
-      file.optimizationStatus === OptimizationStatus.PENDING ||
-      file.optimizationStatus === OptimizationStatus.PROCESSING
+      file.optimizationStatus === OptimizationStatus.pending ||
+      file.optimizationStatus === OptimizationStatus.processing
     ) {
       file = await this.filesService.ensureOptimized(fileId);
     }
@@ -106,7 +105,7 @@ export class ThumbnailService {
       throw new NotFoundException('File not found after optimization');
     }
 
-    if (file.optimizationStatus === OptimizationStatus.FAILED) {
+    if (file.optimizationStatus === OptimizationStatus.failed) {
       throw new BadRequestException('Image optimization failed');
     }
 

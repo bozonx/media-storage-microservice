@@ -1,4 +1,4 @@
-export { FileStatus } from '../file-status.js';
+export { FileStatus } from '../../../generated/prisma/enums.js';
 
 export interface FileEntity {
   id: string;

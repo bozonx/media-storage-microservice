@@ -19,8 +19,7 @@ import { FileResponseDto } from './dto/file-response.dto.js';
 import { ListFilesResponseDto } from './dto/list-files-response.dto.js';
 import { ProblemFileDto } from './dto/problem-file.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { FileStatus } from './file-status.js';
-import { OptimizationStatus } from './optimization-status.js';
+import { FileStatus, OptimizationStatus } from '../../generated/prisma/enums.js';
 import { ExifService } from './exif.service.js';
 import { FilesMapper } from './files.mapper.js';
 import { FileProblemDetector } from './file-problem.detector.js';
@@ -131,8 +130,8 @@ export class FilesService {
         mimeType,
         s3Key: wantsOptimization ? '' : originalKey,
         s3Bucket: this.bucket,
-        status: FileStatus.UPLOADING,
-        optimizationStatus: wantsOptimization ? OptimizationStatus.PENDING : null,
+        status: FileStatus.uploading,
+        optimizationStatus: wantsOptimization ? OptimizationStatus.pending : null,
         optimizationParams: wantsOptimization
           ? ((this.forceCompression ? {} : (compressParams ?? {})) as any)
           : null,
@@ -148,7 +147,7 @@ export class FilesService {
         data: {
           originalChecksum: checksum,
           originalSize: BigInt(size),
-          status: FileStatus.READY,
+          status: FileStatus.ready,
           statusChangedAt: new Date(),
           uploadedAt: new Date(),
         },
@@ -197,7 +196,7 @@ export class FilesService {
 
   async getFileMetadata(id: string): Promise<FileResponseDto> {
     const file = await this.prismaService.file.findFirst({
-      where: { id, status: FileStatus.READY, deletedAt: null },
+      where: { id, status: FileStatus.ready, deletedAt: null },
     });
 
     if (!file) throw new NotFoundException('File not found');
@@ -206,7 +205,7 @@ export class FilesService {
 
   async getFileExif(id: string): Promise<Record<string, any> | undefined> {
     const file = await this.prismaService.file.findFirst({
-      where: { id, status: FileStatus.READY, deletedAt: null },
+      where: { id, status: FileStatus.ready, deletedAt: null },
     });
 
     if (!file) throw new NotFoundException('File not found');
@@ -221,11 +220,11 @@ export class FilesService {
     let file = await this.prismaService.file.findUnique({ where: { id } });
 
     if (!file || file.deletedAt) throw new NotFoundException('File not found');
-    if (file.status === FileStatus.DELETED) throw new GoneException('File has been deleted');
-    if (file.status !== FileStatus.READY) throw new ConflictException('File is not ready for download');
-    if (file.optimizationStatus === OptimizationStatus.FAILED) throw new ConflictException('Image optimization failed');
+    if (file.status === FileStatus.deleted) throw new GoneException('File has been deleted');
+    if (file.status !== FileStatus.ready) throw new ConflictException('File is not ready for download');
+    if (file.optimizationStatus === OptimizationStatus.failed) throw new ConflictException('Image optimization failed');
 
-    if (file.optimizationStatus === OptimizationStatus.PENDING || file.optimizationStatus === OptimizationStatus.PROCESSING) {
+    if (file.optimizationStatus === OptimizationStatus.pending || file.optimizationStatus === OptimizationStatus.processing) {
       file = await this.ensureOptimized(id);
     }
 
@@ -264,7 +263,7 @@ export class FilesService {
       throw new BadRequestException('At least one tag filter is required');
     }
 
-    const where: any = { status: FileStatus.READY, deletedAt: null };
+    const where: any = { status: FileStatus.ready, deletedAt: null };
     if (appId) where.appId = appId.trim();
     if (userId) where.userId = userId.trim();
     if (purpose) where.purpose = purpose.trim();
@@ -292,7 +291,7 @@ export class FilesService {
   async listFiles(params: ListFilesDto): Promise<ListFilesResponseDto> {
     const { limit = 50, offset = 0, sortBy = 'uploadedAt', order = 'desc', q, mimeType, appId, userId, purpose } = params;
 
-    const where: any = { status: FileStatus.READY, deletedAt: null };
+    const where: any = { status: FileStatus.ready, deletedAt: null };
     if (q?.trim()) where.filename = { contains: q.trim(), mode: 'insensitive' };
     if (mimeType?.trim()) where.mimeType = mimeType.trim();
     if (appId?.trim()) where.appId = appId.trim();
@@ -327,16 +326,16 @@ export class FilesService {
     const candidates = await this.prismaService.file.findMany({
       where: {
         OR: [
-          { status: FileStatus.FAILED },
-          { status: FileStatus.MISSING },
-          { status: FileStatus.UPLOADING, statusChangedAt: { lt: thresholds.stuckUploadingAt } },
-          { status: FileStatus.DELETING, statusChangedAt: { lt: thresholds.stuckDeletingAt } },
-          { optimizationStatus: OptimizationStatus.FAILED },
-          { optimizationStatus: OptimizationStatus.PENDING, optimizationStartedAt: { lt: thresholds.stuckOptimizationAt } },
-          { optimizationStatus: OptimizationStatus.PROCESSING, optimizationStartedAt: { lt: thresholds.stuckOptimizationAt } },
-          { deletedAt: { not: null }, status: { not: FileStatus.DELETED } },
-          { status: FileStatus.DELETED, deletedAt: null },
-          { status: FileStatus.READY, OR: [{ s3Key: '' }, { checksum: null }, { size: null }, { uploadedAt: null }] },
+          { status: FileStatus.failed },
+          { status: FileStatus.missing },
+          { status: FileStatus.uploading, statusChangedAt: { lt: thresholds.stuckUploadingAt } },
+          { status: FileStatus.deleting, statusChangedAt: { lt: thresholds.stuckDeletingAt } },
+          { optimizationStatus: OptimizationStatus.failed },
+          { optimizationStatus: OptimizationStatus.pending, optimizationStartedAt: { lt: thresholds.stuckOptimizationAt } },
+          { optimizationStatus: OptimizationStatus.processing, optimizationStartedAt: { lt: thresholds.stuckOptimizationAt } },
+          { deletedAt: { not: null }, status: { not: FileStatus.deleted } },
+          { status: FileStatus.deleted, deletedAt: null },
+          { status: FileStatus.ready, OR: [{ s3Key: '' }, { checksum: null }, { size: null }, { uploadedAt: null }] },
         ],
       },
       orderBy: { statusChangedAt: 'desc' },
@@ -383,7 +382,7 @@ export class FilesService {
         await this.storageService.deleteFile(key);
         await this.prismaService.file.update({
           where: { id: fileId },
-          data: { status: FileStatus.FAILED, statusChangedAt: new Date() },
+          data: { status: FileStatus.failed, statusChangedAt: new Date() },
         });
       } catch (err) {
         this.logger.error({ err, fileId }, 'Failed cleanup after abort');
@@ -431,7 +430,7 @@ export class FilesService {
           checksum,
           size: BigInt(size),
           s3Key: finalKey,
-          status: FileStatus.READY,
+          status: FileStatus.ready,
           uploadedAt: new Date(),
           statusChangedAt: new Date(),
         },
@@ -449,7 +448,7 @@ export class FilesService {
 
   private async findReadyByChecksum(params: { checksum: string; mimeType: string }) {
     return this.prismaService.file.findFirst({
-      where: { checksum: params.checksum, mimeType: params.mimeType, status: FileStatus.READY },
+      where: { checksum: params.checksum, mimeType: params.mimeType, status: FileStatus.ready },
     });
   }
 
@@ -495,8 +494,8 @@ export class FilesService {
 
   public async ensureOptimized(fileId: string): Promise<any> {
     const updated = await this.prismaService.file.updateMany({
-      where: { id: fileId, optimizationStatus: OptimizationStatus.PENDING },
-      data: { optimizationStatus: OptimizationStatus.PROCESSING, optimizationStartedAt: new Date() },
+      where: { id: fileId, optimizationStatus: OptimizationStatus.pending },
+      data: { optimizationStatus: OptimizationStatus.processing, optimizationStartedAt: new Date() },
     });
 
     if (updated.count > 0) {
@@ -507,8 +506,8 @@ export class FilesService {
     while (Date.now() - start < this.optimizationWaitTimeout) {
       const file = await this.prismaService.file.findUnique({ where: { id: fileId } });
       if (!file) throw new NotFoundException('File not found');
-      if (file.optimizationStatus === OptimizationStatus.READY) return file;
-      if (file.optimizationStatus === OptimizationStatus.FAILED) throw new ConflictException('Optimization failed');
+      if (file.optimizationStatus === OptimizationStatus.ready) return file;
+      if (file.optimizationStatus === OptimizationStatus.failed) throw new ConflictException('Optimization failed');
       await new Promise(r => setTimeout(r, 300));
     }
     throw new RequestTimeoutException('Optimization timeout');
@@ -517,8 +516,8 @@ export class FilesService {
   private triggerOptimizationIfPending(fileId: string): void {
     void (async () => {
       const updated = await this.prismaService.file.updateMany({
-        where: { id: fileId, optimizationStatus: OptimizationStatus.PENDING },
-        data: { optimizationStatus: OptimizationStatus.PROCESSING, optimizationStartedAt: new Date() },
+        where: { id: fileId, optimizationStatus: OptimizationStatus.pending },
+        data: { optimizationStatus: OptimizationStatus.processing, optimizationStartedAt: new Date() },
       });
       if (updated.count > 0) {
         await this.optimizeImage(fileId);
@@ -554,7 +553,7 @@ export class FilesService {
           where: { id: fileId },
           data: {
             s3Key: finalKey, mimeType: result.format, size: BigInt(result.size),
-            checksum, optimizationStatus: OptimizationStatus.READY, optimizationCompletedAt: new Date(),
+            checksum, optimizationStatus: OptimizationStatus.ready, optimizationCompletedAt: new Date(),
           },
         });
       } catch (updateError) {
@@ -575,7 +574,7 @@ export class FilesService {
       this.logger.error({ err, fileId }, 'Optimization error');
       await this.prismaService.file.update({
         where: { id: fileId },
-        data: { optimizationStatus: OptimizationStatus.FAILED, optimizationError: err instanceof Error ? err.message : 'Unknown', optimizationCompletedAt: new Date() },
+        data: { optimizationStatus: OptimizationStatus.failed, optimizationError: err instanceof Error ? err.message : 'Unknown', optimizationCompletedAt: new Date() },
       });
       if (originalS3Key) await this.storageService.deleteFile(originalS3Key).catch(() => {});
       throw err;

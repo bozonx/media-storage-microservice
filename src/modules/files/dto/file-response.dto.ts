@@ -1,6 +1,5 @@
 import { Exclude, Expose } from 'class-transformer';
-import { FileStatus } from '../file-status.js';
-import { OptimizationStatus } from '../optimization-status.js';
+import { FileStatus, OptimizationStatus } from '../../../generated/prisma/enums.js';
 
 @Exclude()
 export class FileResponseDto {
