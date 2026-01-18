@@ -284,6 +284,7 @@ export type ThumbnailWhereInput = {
   mimeType?: Prisma.StringFilter<"Thumbnail"> | string
   lastAccessedAt?: Prisma.DateTimeFilter<"Thumbnail"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"Thumbnail"> | Date | string
+  file?: Prisma.XOR<Prisma.FileScalarRelationFilter, Prisma.FileWhereInput>
 }
 
 export type ThumbnailOrderByWithRelationInput = {
@@ -299,6 +300,7 @@ export type ThumbnailOrderByWithRelationInput = {
   mimeType?: Prisma.SortOrder
   lastAccessedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  file?: Prisma.FileOrderByWithRelationInput
 }
 
 export type ThumbnailWhereUniqueInput = Prisma.AtLeast<{
@@ -318,6 +320,7 @@ export type ThumbnailWhereUniqueInput = Prisma.AtLeast<{
   mimeType?: Prisma.StringFilter<"Thumbnail"> | string
   lastAccessedAt?: Prisma.DateTimeFilter<"Thumbnail"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"Thumbnail"> | Date | string
+  file?: Prisma.XOR<Prisma.FileScalarRelationFilter, Prisma.FileWhereInput>
 }, "id" | "fileId_paramsHash">
 
 export type ThumbnailOrderByWithAggregationInput = {
@@ -360,7 +363,6 @@ export type ThumbnailScalarWhereWithAggregatesInput = {
 
 export type ThumbnailCreateInput = {
   id?: string
-  fileId: string
   width: number
   height: number
   quality: number
@@ -371,6 +373,7 @@ export type ThumbnailCreateInput = {
   mimeType: string
   lastAccessedAt?: Date | string
   createdAt?: Date | string
+  file: Prisma.FileCreateNestedOneWithoutThumbnailsInput
 }
 
 export type ThumbnailUncheckedCreateInput = {
@@ -390,7 +393,6 @@ export type ThumbnailUncheckedCreateInput = {
 
 export type ThumbnailUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  fileId?: Prisma.StringFieldUpdateOperationsInput | string
   width?: Prisma.IntFieldUpdateOperationsInput | number
   height?: Prisma.IntFieldUpdateOperationsInput | number
   quality?: Prisma.IntFieldUpdateOperationsInput | number
@@ -401,6 +403,7 @@ export type ThumbnailUpdateInput = {
   mimeType?: Prisma.StringFieldUpdateOperationsInput | string
   lastAccessedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  file?: Prisma.FileUpdateOneRequiredWithoutThumbnailsNestedInput
 }
 
 export type ThumbnailUncheckedUpdateInput = {
@@ -435,7 +438,6 @@ export type ThumbnailCreateManyInput = {
 
 export type ThumbnailUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  fileId?: Prisma.StringFieldUpdateOperationsInput | string
   width?: Prisma.IntFieldUpdateOperationsInput | number
   height?: Prisma.IntFieldUpdateOperationsInput | number
   quality?: Prisma.IntFieldUpdateOperationsInput | number
@@ -461,6 +463,16 @@ export type ThumbnailUncheckedUpdateManyInput = {
   mimeType?: Prisma.StringFieldUpdateOperationsInput | string
   lastAccessedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type ThumbnailListRelationFilter = {
+  every?: Prisma.ThumbnailWhereInput
+  some?: Prisma.ThumbnailWhereInput
+  none?: Prisma.ThumbnailWhereInput
+}
+
+export type ThumbnailOrderByRelationAggregateInput = {
+  _count?: Prisma.SortOrder
 }
 
 export type ThumbnailFileIdParamsHashCompoundUniqueInput = {
@@ -527,6 +539,48 @@ export type ThumbnailSumOrderByAggregateInput = {
   size?: Prisma.SortOrder
 }
 
+export type ThumbnailCreateNestedManyWithoutFileInput = {
+  create?: Prisma.XOR<Prisma.ThumbnailCreateWithoutFileInput, Prisma.ThumbnailUncheckedCreateWithoutFileInput> | Prisma.ThumbnailCreateWithoutFileInput[] | Prisma.ThumbnailUncheckedCreateWithoutFileInput[]
+  connectOrCreate?: Prisma.ThumbnailCreateOrConnectWithoutFileInput | Prisma.ThumbnailCreateOrConnectWithoutFileInput[]
+  createMany?: Prisma.ThumbnailCreateManyFileInputEnvelope
+  connect?: Prisma.ThumbnailWhereUniqueInput | Prisma.ThumbnailWhereUniqueInput[]
+}
+
+export type ThumbnailUncheckedCreateNestedManyWithoutFileInput = {
+  create?: Prisma.XOR<Prisma.ThumbnailCreateWithoutFileInput, Prisma.ThumbnailUncheckedCreateWithoutFileInput> | Prisma.ThumbnailCreateWithoutFileInput[] | Prisma.ThumbnailUncheckedCreateWithoutFileInput[]
+  connectOrCreate?: Prisma.ThumbnailCreateOrConnectWithoutFileInput | Prisma.ThumbnailCreateOrConnectWithoutFileInput[]
+  createMany?: Prisma.ThumbnailCreateManyFileInputEnvelope
+  connect?: Prisma.ThumbnailWhereUniqueInput | Prisma.ThumbnailWhereUniqueInput[]
+}
+
+export type ThumbnailUpdateManyWithoutFileNestedInput = {
+  create?: Prisma.XOR<Prisma.ThumbnailCreateWithoutFileInput, Prisma.ThumbnailUncheckedCreateWithoutFileInput> | Prisma.ThumbnailCreateWithoutFileInput[] | Prisma.ThumbnailUncheckedCreateWithoutFileInput[]
+  connectOrCreate?: Prisma.ThumbnailCreateOrConnectWithoutFileInput | Prisma.ThumbnailCreateOrConnectWithoutFileInput[]
+  upsert?: Prisma.ThumbnailUpsertWithWhereUniqueWithoutFileInput | Prisma.ThumbnailUpsertWithWhereUniqueWithoutFileInput[]
+  createMany?: Prisma.ThumbnailCreateManyFileInputEnvelope
+  set?: Prisma.ThumbnailWhereUniqueInput | Prisma.ThumbnailWhereUniqueInput[]
+  disconnect?: Prisma.ThumbnailWhereUniqueInput | Prisma.ThumbnailWhereUniqueInput[]
+  delete?: Prisma.ThumbnailWhereUniqueInput | Prisma.ThumbnailWhereUniqueInput[]
+  connect?: Prisma.ThumbnailWhereUniqueInput | Prisma.ThumbnailWhereUniqueInput[]
+  update?: Prisma.ThumbnailUpdateWithWhereUniqueWithoutFileInput | Prisma.ThumbnailUpdateWithWhereUniqueWithoutFileInput[]
+  updateMany?: Prisma.ThumbnailUpdateManyWithWhereWithoutFileInput | Prisma.ThumbnailUpdateManyWithWhereWithoutFileInput[]
+  deleteMany?: Prisma.ThumbnailScalarWhereInput | Prisma.ThumbnailScalarWhereInput[]
+}
+
+export type ThumbnailUncheckedUpdateManyWithoutFileNestedInput = {
+  create?: Prisma.XOR<Prisma.ThumbnailCreateWithoutFileInput, Prisma.ThumbnailUncheckedCreateWithoutFileInput> | Prisma.ThumbnailCreateWithoutFileInput[] | Prisma.ThumbnailUncheckedCreateWithoutFileInput[]
+  connectOrCreate?: Prisma.ThumbnailCreateOrConnectWithoutFileInput | Prisma.ThumbnailCreateOrConnectWithoutFileInput[]
+  upsert?: Prisma.ThumbnailUpsertWithWhereUniqueWithoutFileInput | Prisma.ThumbnailUpsertWithWhereUniqueWithoutFileInput[]
+  createMany?: Prisma.ThumbnailCreateManyFileInputEnvelope
+  set?: Prisma.ThumbnailWhereUniqueInput | Prisma.ThumbnailWhereUniqueInput[]
+  disconnect?: Prisma.ThumbnailWhereUniqueInput | Prisma.ThumbnailWhereUniqueInput[]
+  delete?: Prisma.ThumbnailWhereUniqueInput | Prisma.ThumbnailWhereUniqueInput[]
+  connect?: Prisma.ThumbnailWhereUniqueInput | Prisma.ThumbnailWhereUniqueInput[]
+  update?: Prisma.ThumbnailUpdateWithWhereUniqueWithoutFileInput | Prisma.ThumbnailUpdateWithWhereUniqueWithoutFileInput[]
+  updateMany?: Prisma.ThumbnailUpdateManyWithWhereWithoutFileInput | Prisma.ThumbnailUpdateManyWithWhereWithoutFileInput[]
+  deleteMany?: Prisma.ThumbnailScalarWhereInput | Prisma.ThumbnailScalarWhereInput[]
+}
+
 export type IntFieldUpdateOperationsInput = {
   set?: number
   increment?: number
@@ -541,6 +595,134 @@ export type BigIntFieldUpdateOperationsInput = {
   decrement?: bigint | number
   multiply?: bigint | number
   divide?: bigint | number
+}
+
+export type ThumbnailCreateWithoutFileInput = {
+  id?: string
+  width: number
+  height: number
+  quality: number
+  paramsHash: string
+  s3Key: string
+  s3Bucket: string
+  size: bigint | number
+  mimeType: string
+  lastAccessedAt?: Date | string
+  createdAt?: Date | string
+}
+
+export type ThumbnailUncheckedCreateWithoutFileInput = {
+  id?: string
+  width: number
+  height: number
+  quality: number
+  paramsHash: string
+  s3Key: string
+  s3Bucket: string
+  size: bigint | number
+  mimeType: string
+  lastAccessedAt?: Date | string
+  createdAt?: Date | string
+}
+
+export type ThumbnailCreateOrConnectWithoutFileInput = {
+  where: Prisma.ThumbnailWhereUniqueInput
+  create: Prisma.XOR<Prisma.ThumbnailCreateWithoutFileInput, Prisma.ThumbnailUncheckedCreateWithoutFileInput>
+}
+
+export type ThumbnailCreateManyFileInputEnvelope = {
+  data: Prisma.ThumbnailCreateManyFileInput | Prisma.ThumbnailCreateManyFileInput[]
+  skipDuplicates?: boolean
+}
+
+export type ThumbnailUpsertWithWhereUniqueWithoutFileInput = {
+  where: Prisma.ThumbnailWhereUniqueInput
+  update: Prisma.XOR<Prisma.ThumbnailUpdateWithoutFileInput, Prisma.ThumbnailUncheckedUpdateWithoutFileInput>
+  create: Prisma.XOR<Prisma.ThumbnailCreateWithoutFileInput, Prisma.ThumbnailUncheckedCreateWithoutFileInput>
+}
+
+export type ThumbnailUpdateWithWhereUniqueWithoutFileInput = {
+  where: Prisma.ThumbnailWhereUniqueInput
+  data: Prisma.XOR<Prisma.ThumbnailUpdateWithoutFileInput, Prisma.ThumbnailUncheckedUpdateWithoutFileInput>
+}
+
+export type ThumbnailUpdateManyWithWhereWithoutFileInput = {
+  where: Prisma.ThumbnailScalarWhereInput
+  data: Prisma.XOR<Prisma.ThumbnailUpdateManyMutationInput, Prisma.ThumbnailUncheckedUpdateManyWithoutFileInput>
+}
+
+export type ThumbnailScalarWhereInput = {
+  AND?: Prisma.ThumbnailScalarWhereInput | Prisma.ThumbnailScalarWhereInput[]
+  OR?: Prisma.ThumbnailScalarWhereInput[]
+  NOT?: Prisma.ThumbnailScalarWhereInput | Prisma.ThumbnailScalarWhereInput[]
+  id?: Prisma.UuidFilter<"Thumbnail"> | string
+  fileId?: Prisma.UuidFilter<"Thumbnail"> | string
+  width?: Prisma.IntFilter<"Thumbnail"> | number
+  height?: Prisma.IntFilter<"Thumbnail"> | number
+  quality?: Prisma.IntFilter<"Thumbnail"> | number
+  paramsHash?: Prisma.StringFilter<"Thumbnail"> | string
+  s3Key?: Prisma.StringFilter<"Thumbnail"> | string
+  s3Bucket?: Prisma.StringFilter<"Thumbnail"> | string
+  size?: Prisma.BigIntFilter<"Thumbnail"> | bigint | number
+  mimeType?: Prisma.StringFilter<"Thumbnail"> | string
+  lastAccessedAt?: Prisma.DateTimeFilter<"Thumbnail"> | Date | string
+  createdAt?: Prisma.DateTimeFilter<"Thumbnail"> | Date | string
+}
+
+export type ThumbnailCreateManyFileInput = {
+  id?: string
+  width: number
+  height: number
+  quality: number
+  paramsHash: string
+  s3Key: string
+  s3Bucket: string
+  size: bigint | number
+  mimeType: string
+  lastAccessedAt?: Date | string
+  createdAt?: Date | string
+}
+
+export type ThumbnailUpdateWithoutFileInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  width?: Prisma.IntFieldUpdateOperationsInput | number
+  height?: Prisma.IntFieldUpdateOperationsInput | number
+  quality?: Prisma.IntFieldUpdateOperationsInput | number
+  paramsHash?: Prisma.StringFieldUpdateOperationsInput | string
+  s3Key?: Prisma.StringFieldUpdateOperationsInput | string
+  s3Bucket?: Prisma.StringFieldUpdateOperationsInput | string
+  size?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  mimeType?: Prisma.StringFieldUpdateOperationsInput | string
+  lastAccessedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type ThumbnailUncheckedUpdateWithoutFileInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  width?: Prisma.IntFieldUpdateOperationsInput | number
+  height?: Prisma.IntFieldUpdateOperationsInput | number
+  quality?: Prisma.IntFieldUpdateOperationsInput | number
+  paramsHash?: Prisma.StringFieldUpdateOperationsInput | string
+  s3Key?: Prisma.StringFieldUpdateOperationsInput | string
+  s3Bucket?: Prisma.StringFieldUpdateOperationsInput | string
+  size?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  mimeType?: Prisma.StringFieldUpdateOperationsInput | string
+  lastAccessedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type ThumbnailUncheckedUpdateManyWithoutFileInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  width?: Prisma.IntFieldUpdateOperationsInput | number
+  height?: Prisma.IntFieldUpdateOperationsInput | number
+  quality?: Prisma.IntFieldUpdateOperationsInput | number
+  paramsHash?: Prisma.StringFieldUpdateOperationsInput | string
+  s3Key?: Prisma.StringFieldUpdateOperationsInput | string
+  s3Bucket?: Prisma.StringFieldUpdateOperationsInput | string
+  size?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  mimeType?: Prisma.StringFieldUpdateOperationsInput | string
+  lastAccessedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 
@@ -558,6 +740,7 @@ export type ThumbnailSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   mimeType?: boolean
   lastAccessedAt?: boolean
   createdAt?: boolean
+  file?: boolean | Prisma.FileDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["thumbnail"]>
 
 export type ThumbnailSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -573,6 +756,7 @@ export type ThumbnailSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ext
   mimeType?: boolean
   lastAccessedAt?: boolean
   createdAt?: boolean
+  file?: boolean | Prisma.FileDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["thumbnail"]>
 
 export type ThumbnailSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -588,6 +772,7 @@ export type ThumbnailSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ext
   mimeType?: boolean
   lastAccessedAt?: boolean
   createdAt?: boolean
+  file?: boolean | Prisma.FileDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["thumbnail"]>
 
 export type ThumbnailSelectScalar = {
@@ -606,10 +791,21 @@ export type ThumbnailSelectScalar = {
 }
 
 export type ThumbnailOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "fileId" | "width" | "height" | "quality" | "paramsHash" | "s3Key" | "s3Bucket" | "size" | "mimeType" | "lastAccessedAt" | "createdAt", ExtArgs["result"]["thumbnail"]>
+export type ThumbnailInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  file?: boolean | Prisma.FileDefaultArgs<ExtArgs>
+}
+export type ThumbnailIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  file?: boolean | Prisma.FileDefaultArgs<ExtArgs>
+}
+export type ThumbnailIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  file?: boolean | Prisma.FileDefaultArgs<ExtArgs>
+}
 
 export type $ThumbnailPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "Thumbnail"
-  objects: {}
+  objects: {
+    file: Prisma.$FilePayload<ExtArgs>
+  }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     fileId: string
@@ -1017,6 +1213,7 @@ readonly fields: ThumbnailFieldRefs;
  */
 export interface Prisma__ThumbnailClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
+  file<T extends Prisma.FileDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FileDefaultArgs<ExtArgs>>): Prisma.Prisma__FileClient<runtime.Types.Result.GetResult<Prisma.$FilePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1075,6 +1272,10 @@ export type ThumbnailFindUniqueArgs<ExtArgs extends runtime.Types.Extensions.Int
    */
   omit?: Prisma.ThumbnailOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThumbnailInclude<ExtArgs> | null
+  /**
    * Filter, which Thumbnail to fetch.
    */
   where: Prisma.ThumbnailWhereUniqueInput
@@ -1093,6 +1294,10 @@ export type ThumbnailFindUniqueOrThrowArgs<ExtArgs extends runtime.Types.Extensi
    */
   omit?: Prisma.ThumbnailOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThumbnailInclude<ExtArgs> | null
+  /**
    * Filter, which Thumbnail to fetch.
    */
   where: Prisma.ThumbnailWhereUniqueInput
@@ -1110,6 +1315,10 @@ export type ThumbnailFindFirstArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * Omit specific fields from the Thumbnail
    */
   omit?: Prisma.ThumbnailOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThumbnailInclude<ExtArgs> | null
   /**
    * Filter, which Thumbnail to fetch.
    */
@@ -1159,6 +1368,10 @@ export type ThumbnailFindFirstOrThrowArgs<ExtArgs extends runtime.Types.Extensio
    */
   omit?: Prisma.ThumbnailOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThumbnailInclude<ExtArgs> | null
+  /**
    * Filter, which Thumbnail to fetch.
    */
   where?: Prisma.ThumbnailWhereInput
@@ -1207,6 +1420,10 @@ export type ThumbnailFindManyArgs<ExtArgs extends runtime.Types.Extensions.Inter
    */
   omit?: Prisma.ThumbnailOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThumbnailInclude<ExtArgs> | null
+  /**
    * Filter, which Thumbnails to fetch.
    */
   where?: Prisma.ThumbnailWhereInput
@@ -1250,6 +1467,10 @@ export type ThumbnailCreateArgs<ExtArgs extends runtime.Types.Extensions.Interna
    */
   omit?: Prisma.ThumbnailOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThumbnailInclude<ExtArgs> | null
+  /**
    * The data needed to create a Thumbnail.
    */
   data: Prisma.XOR<Prisma.ThumbnailCreateInput, Prisma.ThumbnailUncheckedCreateInput>
@@ -1283,6 +1504,10 @@ export type ThumbnailCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Exten
    */
   data: Prisma.ThumbnailCreateManyInput | Prisma.ThumbnailCreateManyInput[]
   skipDuplicates?: boolean
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThumbnailIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1297,6 +1522,10 @@ export type ThumbnailUpdateArgs<ExtArgs extends runtime.Types.Extensions.Interna
    * Omit specific fields from the Thumbnail
    */
   omit?: Prisma.ThumbnailOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThumbnailInclude<ExtArgs> | null
   /**
    * The data needed to update a Thumbnail.
    */
@@ -1349,6 +1578,10 @@ export type ThumbnailUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Exten
    * Limit how many Thumbnails to update.
    */
   limit?: number
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThumbnailIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1363,6 +1596,10 @@ export type ThumbnailUpsertArgs<ExtArgs extends runtime.Types.Extensions.Interna
    * Omit specific fields from the Thumbnail
    */
   omit?: Prisma.ThumbnailOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThumbnailInclude<ExtArgs> | null
   /**
    * The filter to search for the Thumbnail to update in case it exists.
    */
@@ -1389,6 +1626,10 @@ export type ThumbnailDeleteArgs<ExtArgs extends runtime.Types.Extensions.Interna
    * Omit specific fields from the Thumbnail
    */
   omit?: Prisma.ThumbnailOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThumbnailInclude<ExtArgs> | null
   /**
    * Filter which Thumbnail to delete.
    */
@@ -1421,4 +1662,8 @@ export type ThumbnailDefaultArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Omit specific fields from the Thumbnail
    */
   omit?: Prisma.ThumbnailOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThumbnailInclude<ExtArgs> | null
 }

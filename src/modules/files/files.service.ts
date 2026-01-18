@@ -260,11 +260,12 @@ export class FilesService {
 
         this.triggerOptimizationIfPending(updated.id);
 
+        const exif = await this.extractAndSaveExif(updated);
         this.logger.info(
-          { fileId: file.id, needsOptimization: true },
+          { fileId: file.id, needsOptimization: true, hasExif: !!exif },
           'File uploaded, optimization pending',
         );
-        return this.toResponseDto(updated);
+        return this.toResponseDto({ ...updated, exif });
       }
 
       const finalKey = this.generateS3Key(checksum, mimeType);
@@ -309,7 +310,8 @@ export class FilesService {
         mimeType,
       });
 
-      return this.toResponseDto(updated);
+      const exif = await this.extractAndSaveExif(updated);
+      return this.toResponseDto({ ...updated, exif });
     } catch (error) {
       this.logger.error({ err: error, fileId: file.id }, 'File upload stream failed');
 
@@ -395,6 +397,14 @@ export class FilesService {
       throw new NotFoundException('File not found');
     }
 
+    if (file.exif && typeof file.exif === 'object' && Object.keys(file.exif).length > 0) {
+      return file.exif as Record<string, any>;
+    }
+
+    return this.extractAndSaveExif(file);
+  }
+
+  private async extractAndSaveExif(file: any): Promise<Record<string, any> | undefined> {
     const mimeType: string =
       typeof file.originalMimeType === 'string' && file.originalMimeType.length > 0
         ? file.originalMimeType
@@ -405,7 +415,21 @@ export class FilesService {
         ? file.originalS3Key
         : file.s3Key;
 
-    return this.exifService.tryExtractFromStorageKey({ key, mimeType });
+    try {
+      const exif = await this.exifService.tryExtractFromStorageKey({ key, mimeType });
+
+      if (exif) {
+        await (this.prismaService as any).file.update({
+          where: { id: file.id },
+          data: { exif },
+        });
+      }
+
+      return exif;
+    } catch (err) {
+      this.logger.debug({ err, fileId: file.id }, 'Failed to extract and save EXIF');
+      return undefined;
+    }
   }
 
   /**
@@ -839,6 +863,7 @@ export class FilesService {
     metadata?: Record<string, any> | null;
     optimizationStatus?: OptimizationStatus | null;
     optimizationError?: string | null;
+    exif?: Record<string, any> | null;
   }): FileResponseDto {
     const dto = plainToInstance(FileResponseDto, file, {
       excludeExtraneousValues: true,
@@ -855,6 +880,7 @@ export class FilesService {
 
     dto.status = file.status ?? undefined;
     dto.metadata = file.metadata ?? undefined;
+    dto.exif = file.exif ?? undefined;
 
     dto.originalMimeType = file.originalMimeType ?? undefined;
     dto.optimizationStatus = file.optimizationStatus ?? undefined;

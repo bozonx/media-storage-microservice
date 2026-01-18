@@ -112,6 +112,7 @@ export type FileCountAggregateOutputType = {
   optimizationStartedAt: number
   optimizationCompletedAt: number
   metadata: number
+  exif: number
   uploadedAt: number
   deletedAt: number
   statusChangedAt: number
@@ -207,6 +208,7 @@ export type FileCountAggregateInputType = {
   optimizationStartedAt?: true
   optimizationCompletedAt?: true
   metadata?: true
+  exif?: true
   uploadedAt?: true
   deletedAt?: true
   statusChangedAt?: true
@@ -323,6 +325,7 @@ export type FileGroupByOutputType = {
   optimizationStartedAt: Date | null
   optimizationCompletedAt: Date | null
   metadata: runtime.JsonValue | null
+  exif: runtime.JsonValue | null
   uploadedAt: Date | null
   deletedAt: Date | null
   statusChangedAt: Date
@@ -375,11 +378,13 @@ export type FileWhereInput = {
   optimizationStartedAt?: Prisma.DateTimeNullableFilter<"File"> | Date | string | null
   optimizationCompletedAt?: Prisma.DateTimeNullableFilter<"File"> | Date | string | null
   metadata?: Prisma.JsonNullableFilter<"File">
+  exif?: Prisma.JsonNullableFilter<"File">
   uploadedAt?: Prisma.DateTimeNullableFilter<"File"> | Date | string | null
   deletedAt?: Prisma.DateTimeNullableFilter<"File"> | Date | string | null
   statusChangedAt?: Prisma.DateTimeFilter<"File"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"File"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"File"> | Date | string
+  thumbnails?: Prisma.ThumbnailListRelationFilter
 }
 
 export type FileOrderByWithRelationInput = {
@@ -404,16 +409,17 @@ export type FileOrderByWithRelationInput = {
   optimizationStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   optimizationCompletedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   metadata?: Prisma.SortOrderInput | Prisma.SortOrder
+  exif?: Prisma.SortOrderInput | Prisma.SortOrder
   uploadedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   deletedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   statusChangedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  thumbnails?: Prisma.ThumbnailOrderByRelationAggregateInput
 }
 
 export type FileWhereUniqueInput = Prisma.AtLeast<{
   id?: string
-  checksum_mimeType_status?: Prisma.FileChecksumMimeTypeStatusCompoundUniqueInput
   AND?: Prisma.FileWhereInput | Prisma.FileWhereInput[]
   OR?: Prisma.FileWhereInput[]
   NOT?: Prisma.FileWhereInput | Prisma.FileWhereInput[]
@@ -437,12 +443,14 @@ export type FileWhereUniqueInput = Prisma.AtLeast<{
   optimizationStartedAt?: Prisma.DateTimeNullableFilter<"File"> | Date | string | null
   optimizationCompletedAt?: Prisma.DateTimeNullableFilter<"File"> | Date | string | null
   metadata?: Prisma.JsonNullableFilter<"File">
+  exif?: Prisma.JsonNullableFilter<"File">
   uploadedAt?: Prisma.DateTimeNullableFilter<"File"> | Date | string | null
   deletedAt?: Prisma.DateTimeNullableFilter<"File"> | Date | string | null
   statusChangedAt?: Prisma.DateTimeFilter<"File"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"File"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"File"> | Date | string
-}, "id" | "checksum_mimeType_status">
+  thumbnails?: Prisma.ThumbnailListRelationFilter
+}, "id">
 
 export type FileOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -466,6 +474,7 @@ export type FileOrderByWithAggregationInput = {
   optimizationStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   optimizationCompletedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   metadata?: Prisma.SortOrderInput | Prisma.SortOrder
+  exif?: Prisma.SortOrderInput | Prisma.SortOrder
   uploadedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   deletedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   statusChangedAt?: Prisma.SortOrder
@@ -503,6 +512,7 @@ export type FileScalarWhereWithAggregatesInput = {
   optimizationStartedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"File"> | Date | string | null
   optimizationCompletedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"File"> | Date | string | null
   metadata?: Prisma.JsonNullableWithAggregatesFilter<"File">
+  exif?: Prisma.JsonNullableWithAggregatesFilter<"File">
   uploadedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"File"> | Date | string | null
   deletedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"File"> | Date | string | null
   statusChangedAt?: Prisma.DateTimeWithAggregatesFilter<"File"> | Date | string
@@ -532,11 +542,13 @@ export type FileCreateInput = {
   optimizationStartedAt?: Date | string | null
   optimizationCompletedAt?: Date | string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  exif?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   uploadedAt?: Date | string | null
   deletedAt?: Date | string | null
   statusChangedAt?: Date | string
   createdAt?: Date | string
   updatedAt?: Date | string
+  thumbnails?: Prisma.ThumbnailCreateNestedManyWithoutFileInput
 }
 
 export type FileUncheckedCreateInput = {
@@ -561,11 +573,13 @@ export type FileUncheckedCreateInput = {
   optimizationStartedAt?: Date | string | null
   optimizationCompletedAt?: Date | string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  exif?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   uploadedAt?: Date | string | null
   deletedAt?: Date | string | null
   statusChangedAt?: Date | string
   createdAt?: Date | string
   updatedAt?: Date | string
+  thumbnails?: Prisma.ThumbnailUncheckedCreateNestedManyWithoutFileInput
 }
 
 export type FileUpdateInput = {
@@ -590,11 +604,13 @@ export type FileUpdateInput = {
   optimizationStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   optimizationCompletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  exif?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   uploadedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   statusChangedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  thumbnails?: Prisma.ThumbnailUpdateManyWithoutFileNestedInput
 }
 
 export type FileUncheckedUpdateInput = {
@@ -619,11 +635,13 @@ export type FileUncheckedUpdateInput = {
   optimizationStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   optimizationCompletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  exif?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   uploadedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   statusChangedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  thumbnails?: Prisma.ThumbnailUncheckedUpdateManyWithoutFileNestedInput
 }
 
 export type FileCreateManyInput = {
@@ -648,6 +666,7 @@ export type FileCreateManyInput = {
   optimizationStartedAt?: Date | string | null
   optimizationCompletedAt?: Date | string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  exif?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   uploadedAt?: Date | string | null
   deletedAt?: Date | string | null
   statusChangedAt?: Date | string
@@ -677,6 +696,7 @@ export type FileUpdateManyMutationInput = {
   optimizationStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   optimizationCompletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  exif?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   uploadedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   statusChangedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -706,17 +726,12 @@ export type FileUncheckedUpdateManyInput = {
   optimizationStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   optimizationCompletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  exif?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   uploadedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   statusChangedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-}
-
-export type FileChecksumMimeTypeStatusCompoundUniqueInput = {
-  checksum: string
-  mimeType: string
-  status: $Enums.FileStatus
 }
 
 export type FileCountOrderByAggregateInput = {
@@ -741,6 +756,7 @@ export type FileCountOrderByAggregateInput = {
   optimizationStartedAt?: Prisma.SortOrder
   optimizationCompletedAt?: Prisma.SortOrder
   metadata?: Prisma.SortOrder
+  exif?: Prisma.SortOrder
   uploadedAt?: Prisma.SortOrder
   deletedAt?: Prisma.SortOrder
   statusChangedAt?: Prisma.SortOrder
@@ -812,6 +828,11 @@ export type FileSumOrderByAggregateInput = {
   size?: Prisma.SortOrder
 }
 
+export type FileScalarRelationFilter = {
+  is?: Prisma.FileWhereInput
+  isNot?: Prisma.FileWhereInput
+}
+
 export type StringFieldUpdateOperationsInput = {
   set?: string
 }
@@ -844,6 +865,185 @@ export type DateTimeFieldUpdateOperationsInput = {
   set?: Date | string
 }
 
+export type FileCreateNestedOneWithoutThumbnailsInput = {
+  create?: Prisma.XOR<Prisma.FileCreateWithoutThumbnailsInput, Prisma.FileUncheckedCreateWithoutThumbnailsInput>
+  connectOrCreate?: Prisma.FileCreateOrConnectWithoutThumbnailsInput
+  connect?: Prisma.FileWhereUniqueInput
+}
+
+export type FileUpdateOneRequiredWithoutThumbnailsNestedInput = {
+  create?: Prisma.XOR<Prisma.FileCreateWithoutThumbnailsInput, Prisma.FileUncheckedCreateWithoutThumbnailsInput>
+  connectOrCreate?: Prisma.FileCreateOrConnectWithoutThumbnailsInput
+  upsert?: Prisma.FileUpsertWithoutThumbnailsInput
+  connect?: Prisma.FileWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.FileUpdateToOneWithWhereWithoutThumbnailsInput, Prisma.FileUpdateWithoutThumbnailsInput>, Prisma.FileUncheckedUpdateWithoutThumbnailsInput>
+}
+
+export type FileCreateWithoutThumbnailsInput = {
+  id?: string
+  filename: string
+  appId?: string | null
+  userId?: string | null
+  purpose?: string | null
+  originalS3Key?: string | null
+  originalMimeType?: string | null
+  originalSize?: bigint | number | null
+  originalChecksum?: string | null
+  s3Key: string
+  mimeType: string
+  size?: bigint | number | null
+  checksum?: string | null
+  s3Bucket: string
+  status?: $Enums.FileStatus
+  optimizationStatus?: $Enums.OptimizationStatus | null
+  optimizationParams?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  optimizationError?: string | null
+  optimizationStartedAt?: Date | string | null
+  optimizationCompletedAt?: Date | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  exif?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  uploadedAt?: Date | string | null
+  deletedAt?: Date | string | null
+  statusChangedAt?: Date | string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type FileUncheckedCreateWithoutThumbnailsInput = {
+  id?: string
+  filename: string
+  appId?: string | null
+  userId?: string | null
+  purpose?: string | null
+  originalS3Key?: string | null
+  originalMimeType?: string | null
+  originalSize?: bigint | number | null
+  originalChecksum?: string | null
+  s3Key: string
+  mimeType: string
+  size?: bigint | number | null
+  checksum?: string | null
+  s3Bucket: string
+  status?: $Enums.FileStatus
+  optimizationStatus?: $Enums.OptimizationStatus | null
+  optimizationParams?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  optimizationError?: string | null
+  optimizationStartedAt?: Date | string | null
+  optimizationCompletedAt?: Date | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  exif?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  uploadedAt?: Date | string | null
+  deletedAt?: Date | string | null
+  statusChangedAt?: Date | string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type FileCreateOrConnectWithoutThumbnailsInput = {
+  where: Prisma.FileWhereUniqueInput
+  create: Prisma.XOR<Prisma.FileCreateWithoutThumbnailsInput, Prisma.FileUncheckedCreateWithoutThumbnailsInput>
+}
+
+export type FileUpsertWithoutThumbnailsInput = {
+  update: Prisma.XOR<Prisma.FileUpdateWithoutThumbnailsInput, Prisma.FileUncheckedUpdateWithoutThumbnailsInput>
+  create: Prisma.XOR<Prisma.FileCreateWithoutThumbnailsInput, Prisma.FileUncheckedCreateWithoutThumbnailsInput>
+  where?: Prisma.FileWhereInput
+}
+
+export type FileUpdateToOneWithWhereWithoutThumbnailsInput = {
+  where?: Prisma.FileWhereInput
+  data: Prisma.XOR<Prisma.FileUpdateWithoutThumbnailsInput, Prisma.FileUncheckedUpdateWithoutThumbnailsInput>
+}
+
+export type FileUpdateWithoutThumbnailsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  filename?: Prisma.StringFieldUpdateOperationsInput | string
+  appId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  originalS3Key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  originalMimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  originalSize?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  originalChecksum?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  s3Key?: Prisma.StringFieldUpdateOperationsInput | string
+  mimeType?: Prisma.StringFieldUpdateOperationsInput | string
+  size?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  checksum?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  s3Bucket?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumFileStatusFieldUpdateOperationsInput | $Enums.FileStatus
+  optimizationStatus?: Prisma.NullableEnumOptimizationStatusFieldUpdateOperationsInput | $Enums.OptimizationStatus | null
+  optimizationParams?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  optimizationError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  optimizationStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  optimizationCompletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  exif?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  uploadedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  statusChangedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type FileUncheckedUpdateWithoutThumbnailsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  filename?: Prisma.StringFieldUpdateOperationsInput | string
+  appId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  originalS3Key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  originalMimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  originalSize?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  originalChecksum?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  s3Key?: Prisma.StringFieldUpdateOperationsInput | string
+  mimeType?: Prisma.StringFieldUpdateOperationsInput | string
+  size?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  checksum?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  s3Bucket?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumFileStatusFieldUpdateOperationsInput | $Enums.FileStatus
+  optimizationStatus?: Prisma.NullableEnumOptimizationStatusFieldUpdateOperationsInput | $Enums.OptimizationStatus | null
+  optimizationParams?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  optimizationError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  optimizationStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  optimizationCompletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  exif?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  uploadedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  statusChangedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+
+/**
+ * Count Type FileCountOutputType
+ */
+
+export type FileCountOutputType = {
+  thumbnails: number
+}
+
+export type FileCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  thumbnails?: boolean | FileCountOutputTypeCountThumbnailsArgs
+}
+
+/**
+ * FileCountOutputType without action
+ */
+export type FileCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FileCountOutputType
+   */
+  select?: Prisma.FileCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * FileCountOutputType without action
+ */
+export type FileCountOutputTypeCountThumbnailsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ThumbnailWhereInput
+}
 
 
 export type FileSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -868,11 +1068,14 @@ export type FileSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   optimizationStartedAt?: boolean
   optimizationCompletedAt?: boolean
   metadata?: boolean
+  exif?: boolean
   uploadedAt?: boolean
   deletedAt?: boolean
   statusChangedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  thumbnails?: boolean | Prisma.File$thumbnailsArgs<ExtArgs>
+  _count?: boolean | Prisma.FileCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["file"]>
 
 export type FileSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -897,6 +1100,7 @@ export type FileSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   optimizationStartedAt?: boolean
   optimizationCompletedAt?: boolean
   metadata?: boolean
+  exif?: boolean
   uploadedAt?: boolean
   deletedAt?: boolean
   statusChangedAt?: boolean
@@ -926,6 +1130,7 @@ export type FileSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   optimizationStartedAt?: boolean
   optimizationCompletedAt?: boolean
   metadata?: boolean
+  exif?: boolean
   uploadedAt?: boolean
   deletedAt?: boolean
   statusChangedAt?: boolean
@@ -955,6 +1160,7 @@ export type FileSelectScalar = {
   optimizationStartedAt?: boolean
   optimizationCompletedAt?: boolean
   metadata?: boolean
+  exif?: boolean
   uploadedAt?: boolean
   deletedAt?: boolean
   statusChangedAt?: boolean
@@ -962,11 +1168,19 @@ export type FileSelectScalar = {
   updatedAt?: boolean
 }
 
-export type FileOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "filename" | "appId" | "userId" | "purpose" | "originalS3Key" | "originalMimeType" | "originalSize" | "originalChecksum" | "s3Key" | "mimeType" | "size" | "checksum" | "s3Bucket" | "status" | "optimizationStatus" | "optimizationParams" | "optimizationError" | "optimizationStartedAt" | "optimizationCompletedAt" | "metadata" | "uploadedAt" | "deletedAt" | "statusChangedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["file"]>
+export type FileOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "filename" | "appId" | "userId" | "purpose" | "originalS3Key" | "originalMimeType" | "originalSize" | "originalChecksum" | "s3Key" | "mimeType" | "size" | "checksum" | "s3Bucket" | "status" | "optimizationStatus" | "optimizationParams" | "optimizationError" | "optimizationStartedAt" | "optimizationCompletedAt" | "metadata" | "exif" | "uploadedAt" | "deletedAt" | "statusChangedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["file"]>
+export type FileInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  thumbnails?: boolean | Prisma.File$thumbnailsArgs<ExtArgs>
+  _count?: boolean | Prisma.FileCountOutputTypeDefaultArgs<ExtArgs>
+}
+export type FileIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
+export type FileIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
 
 export type $FilePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "File"
-  objects: {}
+  objects: {
+    thumbnails: Prisma.$ThumbnailPayload<ExtArgs>[]
+  }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     filename: string
@@ -989,6 +1203,7 @@ export type $FilePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     optimizationStartedAt: Date | null
     optimizationCompletedAt: Date | null
     metadata: runtime.JsonValue | null
+    exif: runtime.JsonValue | null
     uploadedAt: Date | null
     deletedAt: Date | null
     statusChangedAt: Date
@@ -1388,6 +1603,7 @@ readonly fields: FileFieldRefs;
  */
 export interface Prisma__FileClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
+  thumbnails<T extends Prisma.File$thumbnailsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.File$thumbnailsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ThumbnailPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1438,6 +1654,7 @@ export interface FileFieldRefs {
   readonly optimizationStartedAt: Prisma.FieldRef<"File", 'DateTime'>
   readonly optimizationCompletedAt: Prisma.FieldRef<"File", 'DateTime'>
   readonly metadata: Prisma.FieldRef<"File", 'Json'>
+  readonly exif: Prisma.FieldRef<"File", 'Json'>
   readonly uploadedAt: Prisma.FieldRef<"File", 'DateTime'>
   readonly deletedAt: Prisma.FieldRef<"File", 'DateTime'>
   readonly statusChangedAt: Prisma.FieldRef<"File", 'DateTime'>
@@ -1460,6 +1677,10 @@ export type FileFindUniqueArgs<ExtArgs extends runtime.Types.Extensions.Internal
    */
   omit?: Prisma.FileOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FileInclude<ExtArgs> | null
+  /**
    * Filter, which File to fetch.
    */
   where: Prisma.FileWhereUniqueInput
@@ -1478,6 +1699,10 @@ export type FileFindUniqueOrThrowArgs<ExtArgs extends runtime.Types.Extensions.I
    */
   omit?: Prisma.FileOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FileInclude<ExtArgs> | null
+  /**
    * Filter, which File to fetch.
    */
   where: Prisma.FileWhereUniqueInput
@@ -1495,6 +1720,10 @@ export type FileFindFirstArgs<ExtArgs extends runtime.Types.Extensions.InternalA
    * Omit specific fields from the File
    */
   omit?: Prisma.FileOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FileInclude<ExtArgs> | null
   /**
    * Filter, which File to fetch.
    */
@@ -1544,6 +1773,10 @@ export type FileFindFirstOrThrowArgs<ExtArgs extends runtime.Types.Extensions.In
    */
   omit?: Prisma.FileOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FileInclude<ExtArgs> | null
+  /**
    * Filter, which File to fetch.
    */
   where?: Prisma.FileWhereInput
@@ -1592,6 +1825,10 @@ export type FileFindManyArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
    */
   omit?: Prisma.FileOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FileInclude<ExtArgs> | null
+  /**
    * Filter, which Files to fetch.
    */
   where?: Prisma.FileWhereInput
@@ -1634,6 +1871,10 @@ export type FileCreateArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs
    * Omit specific fields from the File
    */
   omit?: Prisma.FileOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FileInclude<ExtArgs> | null
   /**
    * The data needed to create a File.
    */
@@ -1682,6 +1923,10 @@ export type FileUpdateArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs
    * Omit specific fields from the File
    */
   omit?: Prisma.FileOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FileInclude<ExtArgs> | null
   /**
    * The data needed to update a File.
    */
@@ -1749,6 +1994,10 @@ export type FileUpsertArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs
    */
   omit?: Prisma.FileOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FileInclude<ExtArgs> | null
+  /**
    * The filter to search for the File to update in case it exists.
    */
   where: Prisma.FileWhereUniqueInput
@@ -1775,6 +2024,10 @@ export type FileDeleteArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs
    */
   omit?: Prisma.FileOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FileInclude<ExtArgs> | null
+  /**
    * Filter which File to delete.
    */
   where: Prisma.FileWhereUniqueInput
@@ -1795,6 +2048,30 @@ export type FileDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Internal
 }
 
 /**
+ * File.thumbnails
+ */
+export type File$thumbnailsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Thumbnail
+   */
+  select?: Prisma.ThumbnailSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Thumbnail
+   */
+  omit?: Prisma.ThumbnailOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThumbnailInclude<ExtArgs> | null
+  where?: Prisma.ThumbnailWhereInput
+  orderBy?: Prisma.ThumbnailOrderByWithRelationInput | Prisma.ThumbnailOrderByWithRelationInput[]
+  cursor?: Prisma.ThumbnailWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ThumbnailScalarFieldEnum | Prisma.ThumbnailScalarFieldEnum[]
+}
+
+/**
  * File without action
  */
 export type FileDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1806,4 +2083,8 @@ export type FileDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
    * Omit specific fields from the File
    */
   omit?: Prisma.FileOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FileInclude<ExtArgs> | null
 }

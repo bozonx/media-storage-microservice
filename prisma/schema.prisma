@@ -43,6 +43,7 @@ model File {
   optimizationCompletedAt DateTime?           @map("optimization_completed_at") @db.Timestamp(6)
   
   metadata                Json?
+  exif                    Json?
   uploadedAt              DateTime?           @map("uploaded_at") @db.Timestamp(6)
   deletedAt               DateTime?           @map("deleted_at") @db.Timestamp(6)
   // Timestamp of the last lifecycle status transition

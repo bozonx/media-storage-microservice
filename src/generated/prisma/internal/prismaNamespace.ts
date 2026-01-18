@@ -614,6 +614,7 @@ export const FileScalarFieldEnum = {
   optimizationStartedAt: 'optimizationStartedAt',
   optimizationCompletedAt: 'optimizationCompletedAt',
   metadata: 'metadata',
+  exif: 'exif',
   uploadedAt: 'uploadedAt',
   deletedAt: 'deletedAt',
   statusChangedAt: 'statusChangedAt',

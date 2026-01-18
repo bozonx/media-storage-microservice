@@ -34,7 +34,7 @@ export interface ImageProcessingProcessResponse {
 }
 
 export interface ImageProcessingExifRequest {
-  image: string;
+  image: string | Buffer;
   mimeType: string;
   priority?: number;
 }
@@ -68,12 +68,24 @@ export class ImageProcessingClient {
 
   async exif(request: ImageProcessingExifRequest): Promise<ImageProcessingExifResponse> {
     try {
+      const formData = new FormData();
+
+      if (Buffer.isBuffer(request.image)) {
+        const blob = new Blob([request.image], { type: request.mimeType });
+        formData.append('file', blob, 'image');
+      } else {
+        // base64
+        const buffer = Buffer.from(request.image, 'base64');
+        const blob = new Blob([buffer], { type: request.mimeType });
+        formData.append('file', blob, 'image');
+      }
+
+      if (request.priority !== undefined) {
+        formData.append('params', JSON.stringify({ priority: request.priority }));
+      }
+
       const res = await firstValueFrom<AxiosResponse<ImageProcessingExifResponse>>(
-        this.httpService.post<ImageProcessingExifResponse>('/exif', request, {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }),
+        this.httpService.post<ImageProcessingExifResponse>('/exif', formData),
       );
       return res.data;
     } catch (err) {
