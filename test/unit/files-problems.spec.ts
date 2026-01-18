@@ -6,8 +6,7 @@ import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
 import { StorageService } from '../../src/modules/storage/storage.service.js';
 import { ImageOptimizerService } from '../../src/modules/optimization/image-optimizer.service.js';
 import { ExifService } from '../../src/modules/files/exif.service.js';
-import { FileStatus } from '../../src/modules/files/file-status.js';
-import { OptimizationStatus } from '../../src/modules/files/optimization-status.js';
+import { FileStatus, OptimizationStatus } from '../../src/generated/prisma/enums.js';
 import { FilesMapper } from '../../src/modules/files/files.mapper.js';
 import { FileProblemDetector } from '../../src/modules/files/file-problem.detector.js';
 
@@ -92,7 +91,7 @@ describe('FilesService - Problems', () => {
         appId: null,
         userId: null,
         purpose: null,
-        status: FileStatus.FAILED,
+        status: FileStatus.failed,
         statusChangedAt: new Date(),
         uploadedAt: null,
         deletedAt: null,
@@ -121,14 +120,14 @@ describe('FilesService - Problems', () => {
         appId: null,
         userId: null,
         purpose: null,
-        status: FileStatus.READY,
+        status: FileStatus.ready,
         statusChangedAt: new Date(),
         uploadedAt: new Date(),
         deletedAt: null,
         s3Key: 'aa/bb/hash.jpg',
         size: BigInt(123),
         checksum: 'sha256:abc',
-        optimizationStatus: OptimizationStatus.FAILED,
+        optimizationStatus: OptimizationStatus.failed,
         optimizationError: 'Boom',
         optimizationStartedAt: new Date(Date.now() - 3600 * 1000),
       },

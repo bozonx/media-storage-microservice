@@ -5,8 +5,7 @@ import { FilesService } from '../../src/modules/files/files.service.js';
 import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
 import { StorageService } from '../../src/modules/storage/storage.service.js';
 import { ImageOptimizerService } from '../../src/modules/optimization/image-optimizer.service.js';
-import { FileStatus } from '../../src/modules/files/file-status.js';
-import { OptimizationStatus } from '../../src/modules/files/optimization-status.js';
+import { FileStatus, OptimizationStatus } from '../../src/generated/prisma/enums.js';
 import { ExifService } from '../../src/modules/files/exif.service.js';
 import { FilesMapper } from '../../src/modules/files/files.mapper.js';
 import { FileProblemDetector } from '../../src/modules/files/file-problem.detector.js';
@@ -112,7 +111,7 @@ describe('FilesService - Deduplication', () => {
         checksum,
         s3Key: 'ab/cd/abcd...txt',
         s3Bucket: 'test-bucket',
-        status: FileStatus.READY,
+        status: FileStatus.ready,
         uploadedAt: new Date(),
       };
 
@@ -124,7 +123,7 @@ describe('FilesService - Deduplication', () => {
         originalSize: null,
         checksum: null,
         uploadedAt: null,
-        status: FileStatus.UPLOADING,
+        status: FileStatus.uploading,
         s3Key: 'tmp/test-key',
       };
 
@@ -161,7 +160,7 @@ describe('FilesService - Deduplication', () => {
       const created = {
         id: fileId,
         s3Key: 'tmp/test-key',
-        status: FileStatus.UPLOADING,
+        status: FileStatus.uploading,
       };
 
       const existingFile = {
@@ -173,7 +172,7 @@ describe('FilesService - Deduplication', () => {
         checksum,
         s3Key: 'ab/cd/abcd1234.txt',
         s3Bucket: 'test-bucket',
-        status: FileStatus.READY,
+        status: FileStatus.ready,
         uploadedAt: new Date(),
       };
 
@@ -224,14 +223,14 @@ describe('FilesService - Deduplication', () => {
         checksum,
         s3Key: 'ab/cd/abcd1234.txt',
         s3Bucket: 'test-bucket',
-        status: FileStatus.READY,
+        status: FileStatus.ready,
         uploadedAt: new Date(),
       };
 
       prismaService.file.create.mockResolvedValue({
         id: fileId,
         s3Key: createdS3Key,
-        status: FileStatus.UPLOADING,
+        status: FileStatus.uploading,
       });
 
       storageService.uploadStream.mockResolvedValue(undefined);
@@ -261,7 +260,7 @@ describe('FilesService - Deduplication', () => {
       prismaService.file.create.mockResolvedValue({
         id: fileId,
         s3Key: createdS3Key,
-        status: FileStatus.UPLOADING,
+        status: FileStatus.uploading,
       });
 
       storageService.uploadStream.mockRejectedValue(new Error('S3 error'));
@@ -283,7 +282,7 @@ describe('FilesService - Deduplication', () => {
 
       expect(prismaService.file.update).toHaveBeenCalledWith({
         where: { id: fileId },
-        data: expect.objectContaining({ status: FileStatus.FAILED }),
+        data: expect.objectContaining({ status: FileStatus.failed }),
       });
       expect(storageService.deleteFile).toHaveBeenCalledWith(uploadedKey);
     });
@@ -304,7 +303,7 @@ describe('FilesService - Deduplication', () => {
         checksum,
         s3Key: 'ab/cd/abcd1234.txt',
         s3Bucket: 'test-bucket',
-        status: FileStatus.READY,
+        status: FileStatus.ready,
         uploadedAt: new Date(),
       };
 
@@ -338,8 +337,8 @@ describe('FilesService - Deduplication', () => {
         id: fileId,
         originalS3Key,
         originalMimeType: 'image/png',
-        status: FileStatus.READY,
-        optimizationStatus: OptimizationStatus.PROCESSING,
+        status: FileStatus.ready,
+        optimizationStatus: OptimizationStatus.processing,
       };
 
       const existingOptimized = {
@@ -351,7 +350,7 @@ describe('FilesService - Deduplication', () => {
         checksum,
         s3Key: 'ab/cd/optimized-hash.webp',
         s3Bucket: 'test-bucket',
-        status: FileStatus.READY,
+        status: FileStatus.ready,
         uploadedAt: new Date(),
       };
 
@@ -399,7 +398,7 @@ describe('FilesService - Deduplication', () => {
         checksum,
         s3Key: 'ab/cd/optimized-hash.webp',
         s3Bucket: 'test-bucket',
-        status: FileStatus.READY,
+        status: FileStatus.ready,
         uploadedAt: new Date(),
       };
 
@@ -442,8 +441,8 @@ describe('FilesService - Deduplication', () => {
         id: fileId,
         originalS3Key,
         originalMimeType: 'image/png',
-        status: FileStatus.READY,
-        optimizationStatus: OptimizationStatus.PROCESSING,
+        status: FileStatus.ready,
+        optimizationStatus: OptimizationStatus.processing,
       };
 
       prismaService.file.findUnique.mockResolvedValue(fileToOptimize);
@@ -455,7 +454,7 @@ describe('FilesService - Deduplication', () => {
 
       expect(prismaService.file.update).toHaveBeenCalledWith({
         where: { id: fileId },
-        data: expect.objectContaining({ optimizationStatus: OptimizationStatus.FAILED }),
+        data: expect.objectContaining({ optimizationStatus: OptimizationStatus.failed }),
       });
       expect(storageService.deleteFile).toHaveBeenCalledWith(originalS3Key);
     });

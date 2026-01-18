@@ -12,9 +12,8 @@ import { StorageService } from '../../src/modules/storage/storage.service.js';
 import { ImageOptimizerService } from '../../src/modules/optimization/image-optimizer.service.js';
 import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
 import { ConfigService } from '@nestjs/config';
-import { FileStatus } from '../../src/modules/files/file-status.js';
 import { getLoggerToken } from 'nestjs-pino';
-import { OptimizationStatus } from '../../src/modules/files/optimization-status.js';
+import { FileStatus, OptimizationStatus } from '../../src/generated/prisma/enums.js';
 import { ExifService } from '../../src/modules/files/exif.service.js';
 import { FilesMapper } from '../../src/modules/files/files.mapper.js';
 import { FileProblemDetector } from '../../src/modules/files/file-problem.detector.js';
@@ -180,8 +179,8 @@ describe('FilesService (unit)', () => {
       (prismaMock as any).file.updateMany.mockResolvedValue({ count: 0 });
       (prismaMock as any).file.findUnique.mockResolvedValue({
         id: 'id',
-        status: FileStatus.READY,
-        optimizationStatus: OptimizationStatus.PROCESSING,
+        status: FileStatus.ready,
+        optimizationStatus: OptimizationStatus.processing,
       });
 
       await expect(service2.ensureOptimized('file-id')).rejects.toThrow(RequestTimeoutException);
@@ -193,8 +192,8 @@ describe('FilesService (unit)', () => {
       (prismaMock as any).file.findUnique.mockResolvedValue({
         id: 'id',
         filename: 'a.jpg',
-        status: FileStatus.READY,
-        optimizationStatus: OptimizationStatus.FAILED,
+        status: FileStatus.ready,
+        optimizationStatus: OptimizationStatus.failed,
       });
 
       await expect(service.downloadFileStream('id')).rejects.toBeInstanceOf(ConflictException);
@@ -204,8 +203,8 @@ describe('FilesService (unit)', () => {
       (prismaMock as any).file.findUnique.mockResolvedValue({
         id: 'id',
         filename: 'a.jpg',
-        status: FileStatus.READY,
-        optimizationStatus: OptimizationStatus.PENDING,
+        status: FileStatus.ready,
+        optimizationStatus: OptimizationStatus.pending,
         originalS3Key: 'originals/x',
         originalMimeType: 'image/jpeg',
         s3Key: '',
@@ -215,8 +214,8 @@ describe('FilesService (unit)', () => {
       (service as any).ensureOptimized.mockResolvedValue({
         id: 'id',
         filename: 'a.jpg',
-        status: FileStatus.READY,
-        optimizationStatus: OptimizationStatus.READY,
+        status: FileStatus.ready,
+        optimizationStatus: OptimizationStatus.ready,
         s3Key: 'aa/bb/optimized.webp',
         mimeType: 'image/webp',
         size: 10n,
@@ -308,7 +307,7 @@ describe('FilesService (unit)', () => {
         originalSize: null,
         checksum: null,
         uploadedAt: null,
-        status: FileStatus.UPLOADING,
+        status: FileStatus.uploading,
         s3Key: 'tmp/whatever',
       };
 
@@ -320,7 +319,7 @@ describe('FilesService (unit)', () => {
         originalSize: null,
         checksum: 'sha256:abc',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
-        status: FileStatus.READY,
+        status: FileStatus.ready,
       };
 
       (prismaMock as any).file.create.mockResolvedValue(created);
@@ -354,7 +353,7 @@ describe('FilesService (unit)', () => {
         originalSize: null,
         checksum: null,
         uploadedAt: null,
-        status: FileStatus.UPLOADING,
+        status: FileStatus.uploading,
         s3Key: 'tmp/whatever',
       };
 
@@ -366,7 +365,7 @@ describe('FilesService (unit)', () => {
         originalSize: null,
         checksum: 'sha256:abc',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
-        status: FileStatus.READY,
+        status: FileStatus.ready,
         metadata: { a: 1 },
       };
 
@@ -389,7 +388,7 @@ describe('FilesService (unit)', () => {
         originalSize: undefined,
         checksum: 'sha256:abc',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
-        status: FileStatus.READY,
+        status: FileStatus.ready,
         metadata: { a: 1 },
         url: '/api/v1/files/file-id/download',
       });
@@ -410,7 +409,7 @@ describe('FilesService (unit)', () => {
         originalSize: null,
         checksum: null,
         uploadedAt: null,
-        status: FileStatus.UPLOADING,
+        status: FileStatus.uploading,
         s3Key: 'tmp/whatever',
       };
 
@@ -422,7 +421,7 @@ describe('FilesService (unit)', () => {
         originalSize: null,
         checksum: 'sha256:abc',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
-        status: FileStatus.READY,
+        status: FileStatus.ready,
       };
 
       (prismaMock as any).file.create.mockResolvedValue(created);
@@ -443,7 +442,7 @@ describe('FilesService (unit)', () => {
       expect((prismaMock as any).file.update).toHaveBeenCalledWith({
         where: { id: 'new-id' },
         data: expect.objectContaining({
-          status: FileStatus.READY,
+          status: FileStatus.ready,
           statusChangedAt: expect.any(Date),
           uploadedAt: expect.any(Date),
         }),
@@ -462,7 +461,7 @@ describe('FilesService (unit)', () => {
         originalSize: null,
         checksum: null,
         uploadedAt: null,
-        status: FileStatus.UPLOADING,
+        status: FileStatus.uploading,
         s3Key: 'tmp/whatever',
       };
 
@@ -482,7 +481,7 @@ describe('FilesService (unit)', () => {
       expect((prismaMock as any).file.update).toHaveBeenCalledWith({
         where: { id: 'new-id' },
         data: {
-          status: FileStatus.FAILED,
+          status: FileStatus.failed,
           statusChangedAt: expect.any(Date),
         },
       });
@@ -499,7 +498,7 @@ describe('FilesService (unit)', () => {
         originalSize: null,
         checksum: 'sha256:abc',
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
-        status: FileStatus.READY,
+        status: FileStatus.ready,
       };
 
       const created = {
@@ -510,7 +509,7 @@ describe('FilesService (unit)', () => {
         originalSize: null,
         checksum: null,
         uploadedAt: null,
-        status: FileStatus.UPLOADING,
+        status: FileStatus.uploading,
         s3Key: 'tmp/whatever',
       };
 
@@ -584,17 +583,17 @@ describe('FilesService (unit)', () => {
       const created = {
         id: 'created-id',
         filename: 'a.jpg',
-        status: FileStatus.UPLOADING,
+        status: FileStatus.uploading,
       };
       const updated = {
         id: 'created-id',
         filename: 'a.jpg',
-        status: FileStatus.READY,
+        status: FileStatus.ready,
         originalS3Key: 'originals/abc',
         originalMimeType: 'image/jpeg',
         originalSize: 3n,
         originalChecksum: 'sha256:abc',
-        optimizationStatus: OptimizationStatus.PENDING,
+        optimizationStatus: OptimizationStatus.pending,
         uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
       };
 
@@ -619,7 +618,7 @@ describe('FilesService (unit)', () => {
         data: {
           originalChecksum: expect.stringContaining('sha256:'),
           originalSize: BigInt(3),
-          status: FileStatus.READY,
+          status: FileStatus.ready,
           statusChangedAt: expect.any(Date),
           uploadedAt: expect.any(Date),
         },
@@ -639,7 +638,7 @@ describe('FilesService (unit)', () => {
       (prismaMock as any).file.findUnique.mockResolvedValue({
         id: 'id',
         s3Key: 'aa/bb',
-        status: FileStatus.READY,
+        status: FileStatus.ready,
         deletedAt: new Date('2020-01-01T00:00:00.000Z'),
       });
 
@@ -653,7 +652,7 @@ describe('FilesService (unit)', () => {
       (prismaMock as any).file.findUnique.mockResolvedValue({
         id: 'id',
         s3Key: 'aa/bb',
-        status: FileStatus.READY,
+        status: FileStatus.ready,
         deletedAt: null,
       });
 
@@ -687,7 +686,7 @@ describe('FilesService (unit)', () => {
           checksum: 'sha256:x',
           uploadedAt: new Date('2020-01-01T00:00:00.000Z'),
           statusChangedAt: new Date('2020-01-01T00:00:10.000Z'),
-          status: FileStatus.READY,
+          status: FileStatus.ready,
           metadata: { a: 1 },
           optimizationStatus: null,
           optimizationError: null,
@@ -709,7 +708,7 @@ describe('FilesService (unit)', () => {
       expect(res.items[0]?.appId).toBe('app-1');
       expect(res.items[0]?.userId).toBe('user-1');
       expect(res.items[0]?.purpose).toBe('avatar');
-      expect(res.items[0]?.status).toBe(FileStatus.READY);
+      expect(res.items[0]?.status).toBe(FileStatus.ready);
       expect(res.items[0]?.metadata).toEqual({ a: 1 });
       expect(res.items[0]?.statusChangedAt).toBeInstanceOf(Date);
       expect(res.items[0]?.originalMimeType).toBe('text/plain');
@@ -748,7 +747,7 @@ describe('FilesService (unit)', () => {
 
       expect((prismaMock as any).file.findMany).toHaveBeenCalledWith({
         where: {
-          status: FileStatus.READY,
+          status: FileStatus.ready,
           deletedAt: null,
           appId: 'app-1',
           userId: 'user-1',

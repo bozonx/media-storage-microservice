@@ -32,9 +32,13 @@ describe('Files from url (e2e)', () => {
     process.env.URL_UPLOAD_TIMEOUT_MS = '5000';
     process.env.URL_UPLOAD_MAX_BYTES_MB = '5';
 
-    server = createServer((_req, res) => {
+    server = createServer((req, res) => {
       res.statusCode = 200;
-      res.setHeader('Content-Type', 'text/plain');
+      if (req.url?.endsWith('.jpg')) {
+        res.setHeader('Content-Type', 'image/jpeg');
+      } else {
+        res.setHeader('Content-Type', 'text/plain');
+      }
       res.end('abc');
     });
 

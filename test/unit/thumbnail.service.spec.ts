@@ -12,8 +12,7 @@ import { StorageService } from '../../src/modules/storage/storage.service.js';
 import { FilesService } from '../../src/modules/files/files.service.js';
 import { ImageProcessingClient } from '../../src/modules/image-processing/image-processing.client.js';
 import { getLoggerToken } from 'nestjs-pino';
-import { FileStatus } from '../../src/modules/files/file-status.js';
-import { OptimizationStatus } from '../../src/modules/files/optimization-status.js';
+import { FileStatus, OptimizationStatus } from '../../src/generated/prisma/enums.js';
 
 describe('ThumbnailService (unit)', () => {
   let service: ThumbnailService;
@@ -116,7 +115,7 @@ describe('ThumbnailService (unit)', () => {
       id: fileId,
       mimeType: 'image/jpeg',
       s3Key: 'test/file.jpg',
-      status: FileStatus.READY,
+      status: FileStatus.ready,
     };
 
     it('should throw NotFoundException when file does not exist', async () => {
