@@ -76,8 +76,7 @@ describe('ImageOptimizerService (unit)', () => {
       const inputBuffer = Buffer.from('input');
       const outputBuffer = Buffer.from('output-webp');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: outputBuffer.toString('base64'),
-        size: outputBuffer.length,
+        buffer: outputBuffer,
         mimeType: 'image/webp',
       });
 
@@ -107,8 +106,7 @@ describe('ImageOptimizerService (unit)', () => {
       const inputBuffer = Buffer.from('input');
       const outputBuffer = Buffer.from('output-avif');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: outputBuffer.toString('base64'),
-        size: outputBuffer.length,
+        buffer: outputBuffer,
         mimeType: 'image/avif',
       });
 
@@ -128,10 +126,8 @@ describe('ImageOptimizerService (unit)', () => {
       const inputBuffer = Buffer.from('input');
       const outputBuffer = Buffer.from('output-webp');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: outputBuffer.toString('base64'),
-        size: outputBuffer.length,
+        buffer: outputBuffer,
         mimeType: 'image/webp',
-        dimensions: { width: 1920, height: 1152 },
       });
 
       const result = await service.compressImage(
@@ -149,8 +145,7 @@ describe('ImageOptimizerService (unit)', () => {
       const inputBuffer = Buffer.from('input');
       const outputBuffer = Buffer.from('output-webp');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: outputBuffer.toString('base64'),
-        size: outputBuffer.length,
+        buffer: outputBuffer,
         mimeType: 'image/webp',
       });
 
@@ -171,8 +166,7 @@ describe('ImageOptimizerService (unit)', () => {
       const inputBuffer = Buffer.from('input');
       const outputBuffer = Buffer.from('output-webp');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: outputBuffer.toString('base64'),
-        size: outputBuffer.length,
+        buffer: outputBuffer,
         mimeType: 'image/webp',
       });
 
@@ -199,8 +193,7 @@ describe('ImageOptimizerService (unit)', () => {
       const inputBuffer = Buffer.from('input');
       const outputBuffer = Buffer.from('output-webp');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: outputBuffer.toString('base64'),
-        size: outputBuffer.length,
+        buffer: outputBuffer,
         mimeType: 'image/webp',
       });
 
@@ -219,8 +212,7 @@ describe('ImageOptimizerService (unit)', () => {
       const inputBuffer = Buffer.from('input');
       const outputBuffer = Buffer.from('output-webp');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: outputBuffer.toString('base64'),
-        size: outputBuffer.length,
+        buffer: outputBuffer,
         mimeType: 'image/webp',
       });
 
@@ -246,8 +238,7 @@ describe('ImageOptimizerService (unit)', () => {
       const inputBuffer = Buffer.from('input');
       const outputBuffer = Buffer.from('output-webp');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: outputBuffer.toString('base64'),
-        size: outputBuffer.length,
+        buffer: outputBuffer,
         mimeType: 'image/webp',
       });
 
@@ -272,8 +263,7 @@ describe('ImageOptimizerService (unit)', () => {
       const inputBuffer = Buffer.from('input');
       const outputBuffer = Buffer.from('output-webp');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: outputBuffer.toString('base64'),
-        size: outputBuffer.length,
+        buffer: outputBuffer,
         mimeType: 'image/webp',
       });
 
@@ -287,8 +277,7 @@ describe('ImageOptimizerService (unit)', () => {
       const inputBuffer = Buffer.from('input');
       const outputBuffer = Buffer.from('output-webp');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: outputBuffer.toString('base64'),
-        size: outputBuffer.length,
+        buffer: outputBuffer,
         mimeType: 'image/webp',
       });
 
@@ -324,8 +313,7 @@ describe('ImageOptimizerService (unit)', () => {
       const inputBuffer = Buffer.from('input');
       const outputBuffer = Buffer.from('output-webp');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: outputBuffer.toString('base64'),
-        size: outputBuffer.length,
+        buffer: outputBuffer,
         mimeType: 'image/webp',
       });
 

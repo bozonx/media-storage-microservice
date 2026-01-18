@@ -178,8 +178,7 @@ describe('ThumbnailService (unit)', () => {
       const originalBuffer = Buffer.from('original');
       const processedBuffer = Buffer.from('processed-thumb');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: processedBuffer.toString('base64'),
-        size: processedBuffer.length,
+        buffer: processedBuffer,
         mimeType: 'image/webp',
       });
 
@@ -229,8 +228,7 @@ describe('ThumbnailService (unit)', () => {
       const originalBuffer = Buffer.from('original');
       const processedBuffer = Buffer.from('processed-thumb');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: processedBuffer.toString('base64'),
-        size: processedBuffer.length,
+        buffer: processedBuffer,
         mimeType: 'image/webp',
       });
 
@@ -269,8 +267,7 @@ describe('ThumbnailService (unit)', () => {
       const originalBuffer = Buffer.from('original');
       const processedBuffer = Buffer.from('processed-thumb');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: processedBuffer.toString('base64'),
-        size: processedBuffer.length,
+        buffer: processedBuffer,
         mimeType: 'image/webp',
       });
 
@@ -304,8 +301,7 @@ describe('ThumbnailService (unit)', () => {
       const originalBuffer = Buffer.from('original');
       const processedBuffer = Buffer.from('processed-thumb');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: processedBuffer.toString('base64'),
-        size: processedBuffer.length,
+        buffer: processedBuffer,
         mimeType: 'image/webp',
       });
 
@@ -345,10 +341,8 @@ describe('ThumbnailService (unit)', () => {
       const originalBuffer = Buffer.from('original');
       const processedBuffer = Buffer.from('processed-thumb');
       imageProcessingClientMock.process.mockResolvedValueOnce({
-        buffer: processedBuffer.toString('base64'),
-        size: processedBuffer.length,
+        buffer: processedBuffer,
         mimeType: 'image/webp',
-        dimensions: { width: 200, height: 100 },
       });
 
       prismaMock.file.findFirst.mockResolvedValue(mockFile as any);

@@ -12,30 +12,24 @@ import { FormData, request } from 'undici';
 import type { ImageProcessingConfig } from '../../config/image-processing.config.js';
 
 export interface ImageProcessingProcessRequest {
-  image: string;
+  buffer: Buffer;
   mimeType: string;
   priority?: number;
   transform?: Record<string, any>;
   output?: Record<string, any>;
+  watermark?: {
+    buffer: Buffer;
+    mimeType: string;
+  };
 }
 
 export interface ImageProcessingProcessResponse {
-  buffer: string;
-  size: number;
+  buffer: Buffer;
   mimeType: string;
-  dimensions?: {
-    width: number;
-    height: number;
-  };
-  stats?: {
-    beforeBytes: number;
-    afterBytes: number;
-    reductionPercent: number;
-  };
 }
 
 export interface ImageProcessingExifRequest {
-  image: string | Buffer;
+  buffer: Buffer;
   mimeType: string;
   priority?: number;
 }
@@ -61,12 +55,39 @@ export class ImageProcessingClient {
 
   async process(req: ImageProcessingProcessRequest): Promise<ImageProcessingProcessResponse> {
     try {
-      const { statusCode, body } = await request(`${this.baseUrl}/process`, {
+      const formData = new FormData();
+
+      // Add main image file
+      const imageBlob = new Blob([req.buffer as any], { type: req.mimeType });
+      formData.append('file', imageBlob, 'image');
+
+      // Add watermark if provided
+      if (req.watermark) {
+        const watermarkBlob = new Blob([req.watermark.buffer as any], {
+          type: req.watermark.mimeType,
+        });
+        formData.append('watermark', watermarkBlob, 'watermark');
+      }
+
+      // Add processing parameters
+      const params: Record<string, any> = {};
+      if (req.priority !== undefined) {
+        params.priority = req.priority;
+      }
+      if (req.transform) {
+        params.transform = req.transform;
+      }
+      if (req.output) {
+        params.output = req.output;
+      }
+
+      if (Object.keys(params).length > 0) {
+        formData.append('params', JSON.stringify(params));
+      }
+
+      const { statusCode, headers, body } = await request(`${this.baseUrl}/process`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(req),
+        body: formData,
         bodyTimeout: this.timeout,
         headersTimeout: this.timeout,
       });
@@ -75,7 +96,17 @@ export class ImageProcessingClient {
         throw await this.mapResponseError(statusCode, body, 'Image processing failed');
       }
 
-      return (await body.json()) as ImageProcessingProcessResponse;
+      // Response is binary stream
+      const arrayBuffer = await body.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Extract Content-Type from response headers
+      const contentType = (headers['content-type'] as string) || req.mimeType;
+
+      return {
+        buffer,
+        mimeType: contentType,
+      };
     } catch (err) {
       if (
         err instanceof BadRequestException ||
@@ -93,15 +124,11 @@ export class ImageProcessingClient {
     try {
       const formData = new FormData();
 
-      if (Buffer.isBuffer(req.image)) {
-        const blob = new Blob([req.image as any], { type: req.mimeType });
-        formData.append('file', blob, 'image');
-      } else {
-        const buffer = Buffer.from(req.image, 'base64');
-        const blob = new Blob([buffer as any], { type: req.mimeType });
-        formData.append('file', blob, 'image');
-      }
+      // Add image file
+      const blob = new Blob([req.buffer as any], { type: req.mimeType });
+      formData.append('file', blob, 'image');
 
+      // Add priority parameter if provided
       if (req.priority !== undefined) {
         formData.append('params', JSON.stringify({ priority: req.priority }));
       }

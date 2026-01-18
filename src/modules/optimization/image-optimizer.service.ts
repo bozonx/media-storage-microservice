@@ -107,7 +107,7 @@ export class ImageOptimizerService {
       }
 
       const result = await this.imageProcessingClient.process({
-        image: buffer.toString('base64'),
+        buffer,
         mimeType: originalMimeType,
         priority: 2,
         transform: {
@@ -121,7 +121,7 @@ export class ImageOptimizerService {
         output,
       });
 
-      const resultBuffer = Buffer.from(result.buffer, 'base64');
+      const resultBuffer = result.buffer;
 
       this.logger.info(
         {

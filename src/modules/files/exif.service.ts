@@ -43,7 +43,7 @@ export class ExifService {
 
     try {
       const res = await this.imageProcessingClient.exif({
-        image: params.buffer,
+        buffer: params.buffer,
         mimeType: params.mimeType,
         priority: 0,
       });
@@ -85,7 +85,7 @@ export class ExifService {
       const buffer = await this.readToBufferWithLimit(stream, this.maxBytes);
 
       const res = await this.imageProcessingClient.exif({
-        image: buffer,
+        buffer: buffer,
         mimeType: params.mimeType,
         priority: 0,
       });

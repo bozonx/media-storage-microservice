@@ -222,7 +222,7 @@ export class ThumbnailService {
       };
 
       const result = await this.imageProcessingClient.process({
-        image: params.buffer.toString('base64'),
+        buffer: params.buffer,
         mimeType: params.mimeType,
         priority: 1,
         transform: {
@@ -237,7 +237,7 @@ export class ThumbnailService {
         output,
       });
 
-      return Buffer.from(result.buffer, 'base64');
+      return result.buffer;
     } catch (error) {
       this.logger.error({ err: error }, 'Failed to generate thumbnail');
       if (error instanceof HttpException) {
