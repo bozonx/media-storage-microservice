@@ -1,4 +1,4 @@
-import { IsInt, Min, Max, IsOptional } from 'class-validator';
+import { IsInt, Min, Max, IsOptional, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ThumbnailParamsDto {
@@ -20,4 +20,8 @@ export class ThumbnailParamsDto {
   @Max(100)
   @IsOptional()
   quality?: number;
+
+  @IsIn(['cover', 'contain', 'fill', 'inside', 'outside'])
+  @IsOptional()
+  fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
 }

@@ -1,5 +1,9 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { jest } from '@jest/globals';
 import { ThumbnailService } from '../../src/modules/thumbnails/thumbnail.service.js';
@@ -210,6 +214,8 @@ describe('ThumbnailService (unit)', () => {
       const lastCall = imageProcessingClientMock.process.mock.calls.at(-1)?.[0];
       expect(lastCall.transform.resize.width).toBe(100);
       expect(lastCall.transform.resize.height).toBe(100);
+      expect(lastCall.transform.resize.fit).toBe('inside');
+      expect(lastCall.mimeType).toBe('image/jpeg');
       expect(lastCall.output.format).toBe('webp');
       expect(storageMock.uploadFile).toHaveBeenCalledWith(
         expect.stringContaining('thumbs/'),
@@ -258,10 +264,44 @@ describe('ThumbnailService (unit)', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             quality: 80,
-            paramsHash: expect.any(String),
           }),
         }),
       );
+    });
+
+    it('should use provided fit mode', async () => {
+      const originalBuffer = Buffer.from('original');
+      const processedBuffer = Buffer.from('processed-thumb');
+      imageProcessingClientMock.process.mockResolvedValueOnce({
+        buffer: processedBuffer.toString('base64'),
+        size: processedBuffer.length,
+        mimeType: 'image/webp',
+      });
+
+      (prismaMock.file.findFirst as any).mockResolvedValue(mockFile as any);
+      (prismaMock.thumbnail.findUnique as any).mockResolvedValue(null as any);
+      (storageMock.downloadStream as any).mockResolvedValue({
+        stream: (async function* () {
+          yield originalBuffer;
+        })(),
+      });
+      (storageMock.uploadFile as any).mockResolvedValue(undefined as any);
+      (prismaMock.thumbnail.create as any).mockResolvedValue({
+        id: 'new-thumb-id',
+        fileId,
+        width: 100,
+        height: 100,
+        quality: 80,
+        paramsHash: 'test-hash',
+        s3Key: 'thumbs/test-file-id/hash.webp',
+        size: BigInt(500),
+        mimeType: 'image/webp',
+      } as any);
+
+      await service.getThumbnail(fileId, { width: 100, height: 100, fit: 'cover' });
+
+      const lastCall = imageProcessingClientMock.process.mock.calls.at(-1)?.[0];
+      expect(lastCall.transform.resize.fit).toBe('cover');
     });
 
     it('should use custom quality when provided', async () => {
@@ -364,6 +404,26 @@ describe('ThumbnailService (unit)', () => {
           err: expect.any(Error),
         }),
         'Failed to generate thumbnail',
+      );
+    });
+
+    it('should propagate HttpException from image processing client', async () => {
+      const invalidBuffer = Buffer.from('invalid image data');
+
+      imageProcessingClientMock.process.mockRejectedValueOnce(
+        new ServiceUnavailableException('Image processing failed'),
+      );
+
+      (prismaMock.file.findFirst as any).mockResolvedValue(mockFile as any);
+      (prismaMock.thumbnail.findUnique as any).mockResolvedValue(null as any);
+      (storageMock.downloadStream as any).mockResolvedValue({
+        stream: (async function* () {
+          yield invalidBuffer;
+        })(),
+      });
+
+      await expect(service.getThumbnail(fileId, { width: 100, height: 100 })).rejects.toThrow(
+        ServiceUnavailableException,
       );
     });
   });

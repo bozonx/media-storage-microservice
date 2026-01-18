@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  HttpException,
   forwardRef,
   Inject,
 } from '@nestjs/common';
@@ -112,9 +113,10 @@ export class ThumbnailService {
 
     const width = Math.min(params.width, this.config.maxWidth);
     const height = Math.min(params.height, this.config.maxHeight);
+    const fit = params.fit ?? 'inside';
     const format = this.config.format;
     const quality = params.quality ?? this.config.quality;
-    const paramsHash = this.calculateParamsHash(width, height, quality, format);
+    const paramsHash = this.calculateParamsHash({ width, height, quality, format, fit });
 
     let thumbnail = await (this.prismaService as any).thumbnail.findUnique({
       where: {
@@ -149,7 +151,14 @@ export class ThumbnailService {
 
     const { stream } = await this.storageService.downloadStream(fileS3Key);
     const originalBuffer = await this.readToBufferWithLimit(stream, this.imageMaxBytes);
-    const thumbnailBuffer = await this.generateThumbnail(originalBuffer, width, height, quality);
+    const thumbnailBuffer = await this.generateThumbnail({
+      buffer: originalBuffer,
+      mimeType: fileMimeType,
+      width,
+      height,
+      quality,
+      fit,
+    });
 
     const thumbnailMimeType = format === 'webp' ? 'image/webp' : 'image/avif';
     const thumbnailS3Key = this.generateThumbnailS3Key(fileId, paramsHash, format);
@@ -190,31 +199,33 @@ export class ThumbnailService {
     };
   }
 
-  private async generateThumbnail(
-    buffer: Buffer,
-    width: number,
-    height: number,
-    quality: number,
-  ): Promise<Buffer> {
+  private async generateThumbnail(params: {
+    buffer: Buffer;
+    mimeType: string;
+    width: number;
+    height: number;
+    quality: number;
+    fit: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
+  }): Promise<Buffer> {
     try {
       const format = this.config.format;
 
       const output: Record<string, any> = {
         format,
-        quality,
+        quality: params.quality,
         effort: this.config.effort,
         stripMetadata: true,
       };
 
       const result = await this.imageProcessingClient.process({
-        image: buffer.toString('base64'),
-        mimeType: 'image/*',
+        image: params.buffer.toString('base64'),
+        mimeType: params.mimeType,
         priority: 1,
         transform: {
           resize: {
-            width,
-            height,
-            fit: 'inside',
+            width: params.width,
+            height: params.height,
+            fit: params.fit,
             withoutEnlargement: true,
           },
           autoOrient: true,
@@ -225,18 +236,24 @@ export class ThumbnailService {
       return Buffer.from(result.buffer, 'base64');
     } catch (error) {
       this.logger.error({ err: error }, 'Failed to generate thumbnail');
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new BadRequestException('Failed to generate thumbnail');
     }
   }
 
-  private calculateParamsHash(
-    width: number,
-    height: number,
-    quality: number,
-    format: string,
-  ): string {
+  private calculateParamsHash(params: {
+    width: number;
+    height: number;
+    quality: number;
+    format: string;
+    fit: string;
+  }): string {
     const hash = createHash('sha256');
-    hash.update(`${width}x${height}q${quality}f${format}`);
+    hash.update(
+      `${params.width}x${params.height}q${params.quality}f${params.format}fit${params.fit}`,
+    );
     return hash.digest('hex');
   }
 

@@ -1,4 +1,10 @@
-import { Injectable, BadRequestException, RequestTimeoutException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  GatewayTimeoutException,
+  ServiceUnavailableException,
+  BadGatewayException,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { firstValueFrom } from 'rxjs';
@@ -82,7 +88,16 @@ export class ImageProcessingClient {
     }
 
     if (err.code === 'ECONNABORTED') {
-      return new RequestTimeoutException(fallbackMessage);
+      return new GatewayTimeoutException(fallbackMessage);
+    }
+
+    if (
+      err.code === 'ECONNREFUSED' ||
+      err.code === 'ENOTFOUND' ||
+      err.code === 'EHOSTUNREACH' ||
+      err.code === 'ENETUNREACH'
+    ) {
+      return new ServiceUnavailableException(fallbackMessage);
     }
 
     const status = err.response?.status;
@@ -91,6 +106,17 @@ export class ImageProcessingClient {
 
     if (typeof status === 'number' && status >= 400 && status < 500) {
       return new BadRequestException(responseMessage ?? fallbackMessage);
+    }
+
+    if (typeof status === 'number' && status >= 500) {
+      this.logger.error(
+        {
+          err,
+          status,
+        },
+        'Image processing service responded with server error',
+      );
+      return new BadGatewayException(fallbackMessage);
     }
 
     this.logger.error(
