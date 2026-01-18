@@ -30,7 +30,7 @@ function buildThumbnailUrl(fileId, params) {
         height: String(params.height),
         ...(typeof params.quality === 'number' ? { quality: String(params.quality) } : {}),
     });
-    return `${basePathPrefix}/files/${encodeURIComponent(fileId)}/thumbnail?${search.toString()}`;
+    return `${basePathPrefix}/api/v1/files/${encodeURIComponent(fileId)}/thumbnail?${search.toString()}`;
 }
 
 browseBtn.addEventListener('click', () => {
@@ -55,7 +55,7 @@ dropZone.addEventListener('dragleave', () => {
 dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('drag-over');
-    
+
     const files = Array.from(e.dataTransfer.files);
     addFiles(files);
 });
@@ -74,20 +74,20 @@ clearBtn.addEventListener('click', () => {
 
 uploadBtn.addEventListener('click', async () => {
     if (selectedFiles.length === 0) return;
-    
+
     uploadBtn.disabled = true;
     document.querySelector('.btn-text').style.display = 'none';
     document.querySelector('.btn-loader').style.display = 'block';
     results.innerHTML = '';
-    
+
     for (const file of selectedFiles) {
         await uploadFile(file);
     }
-    
+
     uploadBtn.disabled = false;
     document.querySelector('.btn-text').style.display = 'block';
     document.querySelector('.btn-loader').style.display = 'none';
-    
+
     selectedFiles = [];
     renderFileList();
 });
@@ -112,9 +112,9 @@ function renderFileList() {
         uploadControls.style.display = 'none';
         return;
     }
-    
+
     uploadControls.style.display = 'flex';
-    
+
     fileList.innerHTML = selectedFiles.map((file, index) => `
         <div class="file-item">
             <div class="file-info">
@@ -132,18 +132,18 @@ function renderFileList() {
 async function uploadFile(file) {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     try {
         const response = await fetch(buildApiUrl('/api/v1/files'), {
             method: 'POST',
             body: formData
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.message || 'Upload failed');
         }
-        
+
         const data = await response.json();
         showResult(file.name, data, true);
     } catch (error) {
@@ -154,7 +154,7 @@ async function uploadFile(file) {
 function showResult(fileName, data, success) {
     const resultItem = document.createElement('div');
     resultItem.className = `result-item ${success ? 'success' : 'error'}`;
-    
+
     if (success) {
         const isImage = typeof data.mimeType === 'string' && data.mimeType.startsWith('image/');
         const thumbnailUrl = isImage ? buildThumbnailUrl(data.id, { width: 320, height: 320 }) : null;
@@ -166,16 +166,15 @@ function showResult(fileName, data, success) {
                     ID: ${data.id} | 
                     <a href="${data.url}" target="_blank">View file</a>
                 </div>
-                ${
-                    isImage
-                        ? `
+                ${isImage
+                ? `
                     <div class="result-preview">
                         <div class="result-preview-label">Thumbnail preview</div>
                         <img class="result-preview-image" src="${thumbnailUrl}" alt="Thumbnail preview" loading="lazy">
                     </div>
                 `
-                        : ''
-                }
+                : ''
+            }
             </div>
         `;
 
@@ -197,7 +196,7 @@ function showResult(fileName, data, success) {
             </div>
         `;
     }
-    
+
     results.appendChild(resultItem);
 }
 
@@ -208,11 +207,11 @@ function getFileExtension(filename) {
 
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
-    
+
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
