@@ -1,6 +1,7 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+
 import { CompressParamsDto } from '../files/dto/compress-params.dto.js';
 import { ImageProcessingClient } from '../image-processing/image-processing.client.js';
 

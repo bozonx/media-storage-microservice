@@ -1,5 +1,6 @@
-import { IsOptional, IsString, IsUrl, ValidateNested, IsObject } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsObject, IsOptional, IsString, IsUrl, ValidateNested } from 'class-validator';
+
 import { CompressParamsDto } from './compress-params.dto.js';
 
 export class UploadFileFromUrlDto {

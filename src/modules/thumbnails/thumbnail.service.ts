@@ -1,20 +1,21 @@
 import {
+  BadRequestException,
+  forwardRef,
+  HttpException,
+  Inject,
   Injectable,
   NotFoundException,
-  BadRequestException,
-  HttpException,
-  forwardRef,
-  Inject,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { createHash } from 'crypto';
-import { PrismaService } from '../prisma/prisma.service.js';
-import { StorageService } from '../storage/storage.service.js';
-import { ThumbnailParamsDto } from '../files/dto/thumbnail-params.dto.js';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+
 import { FileStatus, OptimizationStatus } from '../../generated/prisma/enums.js';
+import { ThumbnailParamsDto } from '../files/dto/thumbnail-params.dto.js';
 import { FilesService } from '../files/files.service.js';
 import { ImageProcessingClient } from '../image-processing/image-processing.client.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { StorageService } from '../storage/storage.service.js';
 
 interface ThumbnailConfig {
   format: 'webp' | 'avif';

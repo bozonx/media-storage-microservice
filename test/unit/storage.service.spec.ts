@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
-import { Readable } from 'stream';
 import type { ConfigService } from '@nestjs/config';
+import { Readable } from 'stream';
 
 const doneMock = jest.fn(async () => undefined);
 const uploadCtorMock = jest.fn(() => ({ done: doneMock }));

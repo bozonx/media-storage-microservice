@@ -1,28 +1,29 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ScheduleModule } from '@nestjs/schedule';
 import { APP_FILTER } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
-import { PrismaModule } from './modules/prisma/prisma.module.js';
-import { HealthModule } from './modules/health/health.module.js';
-import { FilesModule } from './modules/files/files.module.js';
-import { StorageModule } from './modules/storage/storage.module.js';
-import { OptimizationModule } from './modules/optimization/optimization.module.js';
-import { ThumbnailModule } from './modules/thumbnails/thumbnail.module.js';
-import { CleanupModule } from './modules/cleanup/cleanup.module.js';
-import { ImageProcessingModule } from './modules/image-processing/image-processing.module.js';
-import { ShutdownModule } from './common/shutdown/shutdown.module.js';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
-import appConfig from './config/app.config.js';
-import databaseConfig from './config/database.config.js';
-import storageConfig from './config/storage.config.js';
-import compressionConfig from './config/compression.config.js';
-import thumbnailConfig from './config/thumbnail.config.js';
-import cleanupConfig from './config/cleanup.config.js';
-import imageProcessingConfig from './config/image-processing.config.js';
-import urlUploadConfig from './config/url-upload.config.js';
-import type { AppConfig } from './config/app.config.js';
+
 import pkg from '../package.json' with { type: 'json' };
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
+import { ShutdownModule } from './common/shutdown/shutdown.module.js';
+import type { AppConfig } from './config/app.config.js';
+import appConfig from './config/app.config.js';
+import cleanupConfig from './config/cleanup.config.js';
+import compressionConfig from './config/compression.config.js';
+import databaseConfig from './config/database.config.js';
+import imageProcessingConfig from './config/image-processing.config.js';
+import storageConfig from './config/storage.config.js';
+import thumbnailConfig from './config/thumbnail.config.js';
+import urlUploadConfig from './config/url-upload.config.js';
+import { CleanupModule } from './modules/cleanup/cleanup.module.js';
+import { FilesModule } from './modules/files/files.module.js';
+import { HealthModule } from './modules/health/health.module.js';
+import { ImageProcessingModule } from './modules/image-processing/image-processing.module.js';
+import { OptimizationModule } from './modules/optimization/optimization.module.js';
+import { PrismaModule } from './modules/prisma/prisma.module.js';
+import { StorageModule } from './modules/storage/storage.module.js';
+import { ThumbnailModule } from './modules/thumbnails/thumbnail.module.js';
 
 @Module({
   imports: [

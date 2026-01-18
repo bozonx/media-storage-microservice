@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
+
+import { StorageModule } from '../storage/storage.module.js';
 import { HealthController } from './health.controller.js';
 import { HealthService } from './health.service.js';
-import { StorageModule } from '../storage/storage.module.js';
 
 @Module({
   imports: [StorageModule],

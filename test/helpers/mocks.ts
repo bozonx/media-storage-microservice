@@ -5,8 +5,8 @@
  * All mocks follow the DRY principle and provide type-safe implementations.
  */
 
-import type { PinoLogger } from 'nestjs-pino';
 import type { ConfigService } from '@nestjs/config';
+import type { PinoLogger } from 'nestjs-pino';
 
 /**
  * Creates a mock PinoLogger instance with all required methods

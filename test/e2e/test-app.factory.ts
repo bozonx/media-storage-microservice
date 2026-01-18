@@ -1,6 +1,7 @@
-import { Test } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { Test } from '@nestjs/testing';
+
 import { AppModule } from '../../src/app.module.js';
 import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
 import { StorageService } from '../../src/modules/storage/storage.service.js';

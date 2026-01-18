@@ -1,14 +1,15 @@
-import { Test, type TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import { jest } from '@jest/globals';
+import { ConfigService } from '@nestjs/config';
+import { Test, type TestingModule } from '@nestjs/testing';
+
+import { FileStatus, OptimizationStatus } from '../../src/generated/prisma/enums.js';
+import { ExifService } from '../../src/modules/files/exif.service.js';
+import { FileProblemDetector } from '../../src/modules/files/file-problem.detector.js';
+import { FilesMapper } from '../../src/modules/files/files.mapper.js';
 import { FilesService } from '../../src/modules/files/files.service.js';
+import { ImageOptimizerService } from '../../src/modules/optimization/image-optimizer.service.js';
 import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
 import { StorageService } from '../../src/modules/storage/storage.service.js';
-import { ImageOptimizerService } from '../../src/modules/optimization/image-optimizer.service.js';
-import { ExifService } from '../../src/modules/files/exif.service.js';
-import { FileStatus, OptimizationStatus } from '../../src/generated/prisma/enums.js';
-import { FilesMapper } from '../../src/modules/files/files.mapper.js';
-import { FileProblemDetector } from '../../src/modules/files/file-problem.detector.js';
 
 describe('FilesService - Problems', () => {
   let service: FilesService;

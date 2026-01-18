@@ -1,22 +1,22 @@
-import { Test, type TestingModule } from '@nestjs/testing';
+import { jest } from '@jest/globals';
 import {
   BadRequestException,
   ConflictException,
-  GoneException,
   NotFoundException,
   RequestTimeoutException,
 } from '@nestjs/common';
-import { jest } from '@jest/globals';
-import { FilesService } from '../../src/modules/files/files.service.js';
-import { StorageService } from '../../src/modules/storage/storage.service.js';
-import { ImageOptimizerService } from '../../src/modules/optimization/image-optimizer.service.js';
-import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
 import { ConfigService } from '@nestjs/config';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { getLoggerToken } from 'nestjs-pino';
+
 import { FileStatus, OptimizationStatus } from '../../src/generated/prisma/enums.js';
 import { ExifService } from '../../src/modules/files/exif.service.js';
-import { FilesMapper } from '../../src/modules/files/files.mapper.js';
 import { FileProblemDetector } from '../../src/modules/files/file-problem.detector.js';
+import { FilesMapper } from '../../src/modules/files/files.mapper.js';
+import { FilesService } from '../../src/modules/files/files.service.js';
+import { ImageOptimizerService } from '../../src/modules/optimization/image-optimizer.service.js';
+import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
+import { StorageService } from '../../src/modules/storage/storage.service.js';
 
 async function drainStream(stream: AsyncIterable<unknown>): Promise<void> {
   for await (const _chunk of stream) {

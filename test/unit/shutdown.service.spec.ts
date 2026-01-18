@@ -1,4 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing';
+
 import { ShutdownService } from '../../src/common/shutdown/shutdown.service.js';
 
 describe('ShutdownService (unit)', () => {

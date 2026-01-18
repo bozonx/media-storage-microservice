@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { CleanupService } from './cleanup.service.js';
+
 import { StorageModule } from '../storage/storage.module.js';
+import { CleanupService } from './cleanup.service.js';
 
 @Module({
   imports: [StorageModule],

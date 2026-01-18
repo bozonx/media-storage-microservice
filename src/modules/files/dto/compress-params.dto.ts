@@ -1,5 +1,5 @@
-import { IsInt, Min, Max, IsOptional, IsIn, IsBoolean } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 
 export class CompressParamsDto {
   @Type(() => Number)

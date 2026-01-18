@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
-import { StorageService } from '../storage/storage.service.js';
+
 import { ImageProcessingClient } from '../image-processing/image-processing.client.js';
+import { StorageService } from '../storage/storage.service.js';
 
 const BYTES_PER_MEGABYTE = 1024 * 1024;
 const DEFAULT_MAX_BYTES = 25 * BYTES_PER_MEGABYTE;

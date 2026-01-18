@@ -1,13 +1,14 @@
 import {
-  Injectable,
+  BadGatewayException,
   BadRequestException,
   GatewayTimeoutException,
+  Injectable,
   ServiceUnavailableException,
-  BadGatewayException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { request, FormData } from 'undici';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { FormData, request } from 'undici';
+
 import type { ImageProcessingConfig } from '../../config/image-processing.config.js';
 
 export interface ImageProcessingProcessRequest {

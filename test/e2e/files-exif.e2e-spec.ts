@@ -1,11 +1,12 @@
-import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { Test } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { FastifyAdapter } from '@nestjs/platform-fastify';
+import { Test } from '@nestjs/testing';
+
 import { AppModule } from '../../src/app.module.js';
+import { FilesService } from '../../src/modules/files/files.service.js';
 import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
 import { StorageService } from '../../src/modules/storage/storage.service.js';
-import { FilesService } from '../../src/modules/files/files.service.js';
 
 describe('Files EXIF (e2e)', () => {
   let app: NestFastifyApplication;

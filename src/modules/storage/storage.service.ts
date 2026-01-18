@@ -1,4 +1,16 @@
 import {
+  CopyObjectCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
+import {
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -8,19 +20,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
-import { Upload } from '@aws-sdk/lib-storage';
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-  DeleteObjectsCommand,
-  ListObjectsV2Command,
-  HeadBucketCommand,
-  HeadObjectCommand,
-  CopyObjectCommand,
-} from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
+
 import { StorageConfig } from '../../config/storage.config.js';
 
 export interface StorageDeleteManyError {
@@ -126,7 +127,7 @@ export class StorageService implements OnModuleDestroy {
     mimeType: string;
     contentLength?: number;
     metadata?: Record<string, string>;
-    onAbort?: () => void;
+    onAbort?: () => void | Promise<void>;
   }): Promise<void> {
     const uploader = new Upload({
       client: this.s3Client,
@@ -144,12 +145,12 @@ export class StorageService implements OnModuleDestroy {
       if (params.onAbort) {
         params.body.once('error', () => {
           uploader.abort().catch(() => {});
-          params.onAbort?.();
+          void params.onAbort?.();
         });
         params.body.once('close', () => {
           if (!params.body.readableEnded) {
             uploader.abort().catch(() => {});
-            params.onAbort?.();
+            void params.onAbort?.();
           }
         });
       }
@@ -187,7 +188,7 @@ export class StorageService implements OnModuleDestroy {
         contentLength:
           typeof response.ContentLength === 'number' ? response.ContentLength : undefined,
         contentRange: response.ContentRange,
-        etag: response.ETag ? response.ETag.replace(/\"/g, '') : undefined,
+        etag: response.ETag ? response.ETag.replace(/"/g, '') : undefined,
         isPartial: response.ContentRange !== undefined,
       };
     } catch (error) {
@@ -221,7 +222,7 @@ export class StorageService implements OnModuleDestroy {
       return {
         contentLength:
           typeof response.ContentLength === 'number' ? response.ContentLength : undefined,
-        etag: response.ETag ? response.ETag.replace(/\"/g, '') : undefined,
+        etag: response.ETag ? response.ETag.replace(/"/g, '') : undefined,
         contentType: response.ContentType,
       };
     } catch (error) {

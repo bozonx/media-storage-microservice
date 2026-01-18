@@ -1,4 +1,5 @@
 import { Exclude, Expose } from 'class-transformer';
+
 import { FileStatus, OptimizationStatus } from '../../../generated/prisma/enums.js';
 
 @Exclude()

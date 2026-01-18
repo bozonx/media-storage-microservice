@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
-import { IsBoolean, IsNotEmpty, IsString, validateSync } from 'class-validator';
 import { plainToClass } from 'class-transformer';
+import { IsBoolean, IsNotEmpty, IsString, validateSync } from 'class-validator';
 
 export interface StorageConfig {
   endpoint: string;

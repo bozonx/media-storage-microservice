@@ -1,29 +1,30 @@
 import {
-  Controller,
-  Post,
-  Get,
-  Delete,
-  Param,
-  Query,
-  Body,
-  Res,
-  Req,
-  HttpStatus,
-  HttpCode,
   BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
-import type { FastifyReply, FastifyRequest } from 'fastify';
-import { basename } from 'path';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
-import { FilesService } from './files.service.js';
-import { UrlDownloadService } from './url-download.service.js';
-import { ListFilesDto } from './dto/list-files.dto.js';
-import { ListProblemFilesDto } from './dto/list-problem-files.dto.js';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import { basename } from 'path';
+
 import { BulkDeleteFilesDto } from './dto/bulk-delete-files.dto.js';
 import { CompressParamsDto } from './dto/compress-params.dto.js';
+import { ListFilesDto } from './dto/list-files.dto.js';
+import { ListProblemFilesDto } from './dto/list-problem-files.dto.js';
 import { UploadFileFromUrlDto } from './dto/upload-file-from-url.dto.js';
+import { FilesService } from './files.service.js';
+import { UrlDownloadService } from './url-download.service.js';
 
 function sanitizeFilename(filename: string): string {
   const normalized = (filename ?? '').normalize('NFKC');
@@ -31,7 +32,7 @@ function sanitizeFilename(filename: string): string {
   const withoutCrLf = asBasename.replace(/[\r\n]/g, ' ');
   const withoutControls = withoutCrLf.replace(/[\u0000-\u001F\u007F]/g, '');
   const collapsedWhitespace = withoutControls.replace(/\s+/g, ' ');
-  const withoutSeparators = collapsedWhitespace.replace(/[\/]/g, '_');
+  const withoutSeparators = collapsedWhitespace.replace(/[/]/g, '_');
   const trimmed = withoutSeparators.trim();
   const limited = trimmed.length > 255 ? trimmed.slice(0, 255) : trimmed;
   return limited.length > 0 ? limited : 'file';
@@ -303,7 +304,7 @@ export class FilesController {
     if (
       result.etag &&
       typeof ifNoneMatch === 'string' &&
-      ifNoneMatch.replace(/\"/g, '') === result.etag
+      ifNoneMatch.replace(/"/g, '') === result.etag
     ) {
       return reply.status(HttpStatus.NOT_MODIFIED).header('ETag', `"${result.etag}"`).send();
     }

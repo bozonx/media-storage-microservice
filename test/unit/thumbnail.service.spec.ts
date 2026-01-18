@@ -1,23 +1,22 @@
-import { Test, type TestingModule } from '@nestjs/testing';
+import { jest } from '@jest/globals';
 import {
   BadRequestException,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { jest } from '@jest/globals';
-import { ThumbnailService } from '../../src/modules/thumbnails/thumbnail.service.js';
-import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
-import { StorageService } from '../../src/modules/storage/storage.service.js';
+import { Test, type TestingModule } from '@nestjs/testing';
+import { getLoggerToken } from 'nestjs-pino';
+
+import { FileStatus } from '../../src/generated/prisma/enums.js';
 import { FilesService } from '../../src/modules/files/files.service.js';
 import { ImageProcessingClient } from '../../src/modules/image-processing/image-processing.client.js';
-import { getLoggerToken } from 'nestjs-pino';
-import { FileStatus, OptimizationStatus } from '../../src/generated/prisma/enums.js';
+import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
+import { StorageService } from '../../src/modules/storage/storage.service.js';
+import { ThumbnailService } from '../../src/modules/thumbnails/thumbnail.service.js';
 
 describe('ThumbnailService (unit)', () => {
   let service: ThumbnailService;
-  let prismaService: PrismaService;
-  let storageService: StorageService;
 
   const mockLogger = {
     info: jest.fn(),
@@ -101,8 +100,6 @@ describe('ThumbnailService (unit)', () => {
     }).compile();
 
     service = module.get<ThumbnailService>(ThumbnailService);
-    prismaService = module.get<PrismaService>(PrismaService);
-    storageService = module.get<StorageService>(StorageService);
   });
 
   afterEach(() => {
@@ -374,7 +371,7 @@ describe('ThumbnailService (unit)', () => {
         mimeType: 'image/webp',
       } as any);
 
-      const result = await service.getThumbnail(fileId, { width: 200, height: 200 });
+      await service.getThumbnail(fileId, { width: 200, height: 200 });
 
       const lastCall = imageProcessingClientMock.process.mock.calls.at(-1)?.[0];
       expect(lastCall.transform.resize.width).toBe(200);

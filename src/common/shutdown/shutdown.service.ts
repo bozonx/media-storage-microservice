@@ -1,4 +1,4 @@
-import { Injectable, type BeforeApplicationShutdown } from '@nestjs/common';
+import { type BeforeApplicationShutdown, Injectable } from '@nestjs/common';
 
 @Injectable()
 export class ShutdownService implements BeforeApplicationShutdown {

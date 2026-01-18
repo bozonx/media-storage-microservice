@@ -1,28 +1,29 @@
 import {
-  Injectable,
-  NotFoundException,
   BadRequestException,
   ConflictException,
-  RequestTimeoutException,
   GoneException,
+  Injectable,
+  NotFoundException,
+  RequestTimeoutException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { createHash, randomUUID } from 'crypto';
-import { Transform, type Readable } from 'stream';
-import { StorageService } from '../storage/storage.service.js';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { type Readable, Transform } from 'stream';
+
+import { FileStatus, OptimizationStatus } from '../../generated/prisma/enums.js';
 import { ImageOptimizerService } from '../optimization/image-optimizer.service.js';
-import { CompressParamsDto } from './dto/compress-params.dto.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { StorageService } from '../storage/storage.service.js';
 import { BulkDeleteFilesDto } from './dto/bulk-delete-files.dto.js';
-import { ListFilesDto } from './dto/list-files.dto.js';
+import { CompressParamsDto } from './dto/compress-params.dto.js';
 import { FileResponseDto } from './dto/file-response.dto.js';
+import { ListFilesDto } from './dto/list-files.dto.js';
 import { ListFilesResponseDto } from './dto/list-files-response.dto.js';
 import { ProblemFileDto } from './dto/problem-file.dto.js';
-import { PrismaService } from '../prisma/prisma.service.js';
-import { FileStatus, OptimizationStatus } from '../../generated/prisma/enums.js';
 import { ExifService } from './exif.service.js';
-import { FilesMapper } from './files.mapper.js';
 import { FileProblemDetector } from './file-problem.detector.js';
+import { FilesMapper } from './files.mapper.js';
 
 function isPrismaKnownRequestError(error: unknown): error is {
   name: string;

@@ -1,4 +1,5 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+
 import { createTestApp } from './test-app.factory.js';
 
 describe('Health (e2e)', () => {

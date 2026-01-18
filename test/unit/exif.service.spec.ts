@@ -1,9 +1,10 @@
-import { Test, type TestingModule } from '@nestjs/testing';
 import { jest } from '@jest/globals';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { getLoggerToken } from 'nestjs-pino';
+
 import { ExifService } from '../../src/modules/files/exif.service.js';
-import { StorageService } from '../../src/modules/storage/storage.service.js';
 import { ImageProcessingClient } from '../../src/modules/image-processing/image-processing.client.js';
+import { StorageService } from '../../src/modules/storage/storage.service.js';
 
 describe('ExifService (unit)', () => {
   let service: InstanceType<typeof ExifService>;

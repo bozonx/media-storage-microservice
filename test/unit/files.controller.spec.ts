@@ -1,6 +1,7 @@
-import { Test, type TestingModule } from '@nestjs/testing';
-import { BadRequestException, HttpStatus, UnsupportedMediaTypeException } from '@nestjs/common';
 import { jest } from '@jest/globals';
+import { BadRequestException, HttpStatus, UnsupportedMediaTypeException } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
+
 import { FilesController } from '../../src/modules/files/files.controller.js';
 import { FilesService } from '../../src/modules/files/files.service.js';
 import { UrlDownloadService } from '../../src/modules/files/url-download.service.js';

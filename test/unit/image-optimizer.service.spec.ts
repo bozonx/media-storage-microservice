@@ -1,10 +1,11 @@
-import { Test, type TestingModule } from '@nestjs/testing';
+import { jest } from '@jest/globals';
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { jest } from '@jest/globals';
-import { ImageOptimizerService } from '../../src/modules/optimization/image-optimizer.service.js';
-import { ImageProcessingClient } from '../../src/modules/image-processing/image-processing.client.js';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { getLoggerToken } from 'nestjs-pino';
+
+import { ImageProcessingClient } from '../../src/modules/image-processing/image-processing.client.js';
+import { ImageOptimizerService } from '../../src/modules/optimization/image-optimizer.service.js';
 
 describe('ImageOptimizerService (unit)', () => {
   let service: ImageOptimizerService;

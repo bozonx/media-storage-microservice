@@ -1,15 +1,17 @@
 import 'reflect-metadata';
-import { NestFactory } from '@nestjs/core';
-import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
-import { ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Logger } from 'nestjs-pino';
-import { LoggerErrorInterceptor } from 'nestjs-pino';
+
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
+import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { Logger } from 'nestjs-pino';
+import { LoggerErrorInterceptor } from 'nestjs-pino';
 import { join } from 'path';
-import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+
 import { AppModule } from './app.module.js';
 import { ShutdownService } from './common/shutdown/shutdown.service.js';
 import type { AppConfig } from './config/app.config.js';

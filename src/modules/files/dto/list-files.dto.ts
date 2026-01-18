@@ -1,5 +1,5 @@
-import { IsInt, IsOptional, IsString, Min, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class ListFilesDto {
   @IsOptional()

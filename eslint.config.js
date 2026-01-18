@@ -4,6 +4,8 @@ import tsparser from '@typescript-eslint/parser';
 import prettier from 'eslint-plugin-prettier';
 import prettierConfig from 'eslint-config-prettier';
 import jest from 'eslint-plugin-jest';
+import simpleImportSort from 'eslint-plugin-simple-import-sort';
+import unusedImports from 'eslint-plugin-unused-imports';
 
 export default [
     // Ignore patterns
@@ -26,7 +28,7 @@ export default [
                 ecmaVersion: 2022,
             },
             globals: {
-                // Node.js globals
+                // Node.js globals (extended)
                 process: 'readonly',
                 __dirname: 'readonly',
                 __filename: 'readonly',
@@ -36,6 +38,12 @@ export default [
                 require: 'readonly',
                 exports: 'readonly',
                 global: 'readonly',
+                setTimeout: 'readonly',
+                clearTimeout: 'readonly',
+                setInterval: 'readonly',
+                clearInterval: 'readonly',
+                fetch: 'readonly',
+                NodeJS: 'readonly',
                 // ES2022 globals
                 Promise: 'readonly',
                 Symbol: 'readonly',
@@ -45,10 +53,17 @@ export default [
                 Set: 'readonly',
                 Proxy: 'readonly',
                 Reflect: 'readonly',
+                AbortController: 'readonly',
+                FormData: 'readonly',
+                Blob: 'readonly',
+                File: 'readonly',
+                ReadableStream: 'readonly',
             },
         },
         plugins: {
             '@typescript-eslint': tseslint,
+            'simple-import-sort': simpleImportSort,
+            'unused-imports': unusedImports,
             prettier,
             jest,
         },
@@ -56,24 +71,40 @@ export default [
             // Prettier integration
             'prettier/prettier': 'error',
 
+            // Simple import sort
+            'simple-import-sort/imports': 'error',
+            'simple-import-sort/exports': 'error',
+
+            // Unused imports auto-fix
+            'no-unused-vars': 'off', // Turn off base rule
+            '@typescript-eslint/no-unused-vars': 'off', // Turn off TS rule in favor of unused-imports
+            'unused-imports/no-unused-imports': 'error',
+            'unused-imports/no-unused-vars': [
+                'warn',
+                {
+                    vars: 'all',
+                    varsIgnorePattern: '^_',
+                    args: 'after-used',
+                    argsIgnorePattern: '^_',
+                },
+            ],
+
             // TypeScript specific rules
             '@typescript-eslint/explicit-function-return-type': 'off',
             '@typescript-eslint/explicit-module-boundary-types': 'off',
             '@typescript-eslint/no-explicit-any': 'warn',
-            '@typescript-eslint/no-unused-vars': [
-                'error',
+            '@typescript-eslint/prefer-nullish-coalescing': [
+                'warn',
                 {
-                    argsIgnorePattern: '^_',
-                    varsIgnorePattern: '^_',
-                    caughtErrorsIgnorePattern: '^_',
+                    ignoreConditionalTests: true,
+                    ignoreMixedLogicalExpressions: true,
                 },
             ],
-            '@typescript-eslint/prefer-nullish-coalescing': 'error',
             '@typescript-eslint/prefer-optional-chain': 'error',
             '@typescript-eslint/no-floating-promises': 'error',
             '@typescript-eslint/await-thenable': 'error',
             '@typescript-eslint/no-misused-promises': 'error',
-            '@typescript-eslint/require-await': 'error',
+            '@typescript-eslint/require-await': 'warn', // Downgraded to warn because of false positives
             '@typescript-eslint/no-unnecessary-type-assertion': 'error',
             '@typescript-eslint/prefer-as-const': 'error',
             '@typescript-eslint/no-non-null-assertion': 'warn',
@@ -84,17 +115,17 @@ export default [
             '@typescript-eslint/consistent-type-exports': 'error',
             '@typescript-eslint/no-import-type-side-effects': 'error',
 
-            // NestJS specific rules
+            // NestJS specific rules - loosened for better DX
             '@typescript-eslint/explicit-member-accessibility': [
-                'error',
+                'warn',
                 {
                     accessibility: 'explicit',
                     overrides: {
                         accessors: 'explicit',
-                        constructors: 'no-public',
+                        constructors: 'off',
                         methods: 'explicit',
-                        properties: 'explicit',
-                        parameterProperties: 'explicit',
+                        properties: 'off',
+                        parameterProperties: 'off',
                     },
                 },
             ],
@@ -114,6 +145,8 @@ export default [
             'no-debugger': 'error',
             'prefer-const': 'error',
             'no-var': 'error',
+            'no-undef': 'error',
+            'no-control-regex': 'off', // Allow control regex (common in some validation logic)
         },
     },
 
@@ -142,6 +175,7 @@ export default [
             '@typescript-eslint/no-unsafe-return': 'off',
             '@typescript-eslint/no-explicit-any': 'off',
             '@typescript-eslint/explicit-member-accessibility': 'off',
+            '@typescript-eslint/require-await': 'off', // Completely off for tests
             'no-console': 'off',
         },
     },

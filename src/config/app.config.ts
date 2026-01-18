@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
-import { IsInt, IsString, IsIn, Min, Max, validateSync } from 'class-validator';
 import { plainToClass } from 'class-transformer';
+import { IsIn, IsInt, IsString, Max, Min, validateSync } from 'class-validator';
 
 export class AppConfig {
   @IsInt()

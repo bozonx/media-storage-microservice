@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+
 import { ImageProcessingClient } from './image-processing.client.js';
 
 @Module({

@@ -1,8 +1,9 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { lookup } from 'dns/promises';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Readable, Transform } from 'stream';
-import { lookup } from 'dns/promises';
+
 import type { UrlUploadConfig } from '../../config/url-upload.config.js';
 
 const BLOCKED_HOSTNAME_SUFFIXES = new Set([
@@ -268,7 +269,9 @@ export class UrlDownloadService {
     const onTimeout = () => {
       try {
         controller.abort();
-      } catch {}
+      } catch {
+        // Ignore abort errors
+      }
       if (activeRawStream) {
         activeRawStream.destroy(new BadRequestException('Download timeout'));
       }

@@ -1,14 +1,14 @@
 import {
   type ArgumentsHost,
   Catch,
-  type ExceptionFilter,
   ConflictException,
+  type ExceptionFilter,
   HttpException,
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
 function isPrismaKnownRequestError(exception: unknown): exception is {
   name: string;
