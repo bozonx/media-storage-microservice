@@ -9,7 +9,7 @@
 Дополнительно для изображений:
 - Оптимизация (WebP/AVIF)
 - Динамические миниатюры
-- Дедупликация по checksum
+- Дедупликация по чексумме (sha256)
 
 ## Требования
 
@@ -47,7 +47,7 @@ UI (простая страница для проверки):
 
 ## Конфигурация
 
-Полный список переменных окружения см. в `.env.production.example` (источник истины).
+Полный список переменных окружения см. в `.env.production.example` (основной источник конфигурации).
 
 Минимально необходимое:
 - `DATABASE_URL`
@@ -57,7 +57,7 @@ UI (простая страница для проверки):
 - `S3_SECRET_ACCESS_KEY`
 - `S3_BUCKET`
 
-Часто используемое:
+Основные настройки:
 - `LISTEN_HOST` (для Docker обычно `0.0.0.0`)
 - `LISTEN_PORT` (по умолчанию `8080`)
 - `BASE_PATH` (префикс для API и UI, например `media`)
@@ -69,13 +69,13 @@ UI (простая страница для проверки):
 Основные эндпоинты:
 - `POST /files` — загрузка файла (multipart)
 - `POST /files/from-url` — загрузка по URL
-- `GET /files/:id` — метаданные
-- `GET /files/:id/download` — скачать файл
-- `GET /files/:id/thumbnail` — миниатюра (для изображений)
+- `GET /files/:id` — получение метаданных
+- `GET /files/:id/download` — скачивание файла
+- `GET /files/:id/thumbnail` — генерация миниатюры (только для изображений)
 - `DELETE /files/:id` — удаление (soft delete)
-- `GET /health` — проверка состояния
+- `GET /health` — проверка состояния сервиса
 
-Минимальные примеры:
+Примеры использования:
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/files \
@@ -86,7 +86,7 @@ curl -X POST http://localhost:8080/api/v1/files \
 curl -O http://localhost:8080/api/v1/files/<file-id>/download
 ```
 
-## Development
+## Разработка (Development)
 
 Требования:
 - Node.js 22+
@@ -99,7 +99,7 @@ pnpm setup:dev
 pnpm start:dev
 ```
 
-Альтернатива (вручную):
+Альтернативный запуск (вручную):
 
 ```bash
 pnpm install
@@ -109,7 +109,7 @@ bash scripts/init-garage.sh
 pnpm start:dev
 ```
 
-Тесты:
+Тестирование:
 
 ```bash
 pnpm test:unit

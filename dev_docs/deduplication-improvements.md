@@ -41,7 +41,7 @@ This document describes improvements made to the file deduplication system to en
 - Delete current file record and reuse existing on deduplication
 - Proper cleanup of `originalS3Key` on both success and failure paths
 
-**Code**: `@/mnt/disk2/workspace/media-storage-microservice/src/modules/files/files.service.ts:690-827`
+**Code**: `src/modules/files/files.service.ts` (метод `optimizeImage`)
 
 **Benefits**:
 - Idempotent optimization process
@@ -56,7 +56,7 @@ This document describes improvements made to the file deduplication system to en
 - Better error logging for cleanup operations
 - Handle cleanup failures gracefully (log but don't fail the operation)
 
-**Code**: `@/mnt/disk2/workspace/media-storage-microservice/src/modules/files/files.service.ts:150-259`
+**Code**: `src/modules/files/files.service.ts` (метод `uploadFileStream`)
 
 **Benefits**:
 - Reduced orphaned objects
@@ -66,12 +66,11 @@ This document describes improvements made to the file deduplication system to en
 ### 3. Cleanup Service Enhancement
 
 **Changes**:
-- Added `cleanupOrphanedTemporaryFiles()` method
-- Finds files in `UPLOADING` status older than 24 hours
-- Finds `FAILED` files with `tmp/` or `originals/` keys
+- Added `cleanupTemporaryObjects()` method
+- Finds files in `UPLOADING` status older than configured TTL
 - Deletes both DB records and storage objects
 
-**Code**: `@/mnt/disk2/workspace/media-storage-microservice/src/modules/cleanup/cleanup.service.ts:104-146`
+**Code**: `src/modules/cleanup/cleanup.service.ts` (метод `cleanupTemporaryObjects`)
 
 **Benefits**:
 - Automatic recovery from partial failures
@@ -118,7 +117,7 @@ Unit tests added for critical scenarios:
 - Deduplication in optimization pipeline
 - Race conditions during optimization
 
-**Test file**: `@/mnt/disk2/workspace/media-storage-microservice/test/unit/files-deduplication.spec.ts`
+**Test file**: `test/unit/files-deduplication.spec.ts`
 
 ## Configuration
 
@@ -128,9 +127,7 @@ Orphaned temporary files cleanup is controlled by:
 - `CLEANUP_ENABLED`: Enable/disable cleanup service (default: true)
 - `CLEANUP_CRON`: Schedule for cleanup job (default: "0 2 * * *")
 - `CLEANUP_BATCH_SIZE`: Max files to process per run (default: 100)
-- `CLEANUP_BAD_STATUS_TTL_DAYS`: TTL for bad status files (default: 7)
-
-Orphaned temporary files have hardcoded TTL of 24 hours.
+- `CLEANUP_STUCK_UPLOAD_TIMEOUT_MS`: TTL for stuck uploads
 
 ## Migration Required
 

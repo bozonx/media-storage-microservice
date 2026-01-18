@@ -76,10 +76,12 @@ export class ImageProcessingClient {
 
       return (await body.json()) as ImageProcessingProcessResponse;
     } catch (err) {
-      if (err instanceof BadRequestException || 
-          err instanceof GatewayTimeoutException || 
-          err instanceof ServiceUnavailableException || 
-          err instanceof BadGatewayException) {
+      if (
+        err instanceof BadRequestException ||
+        err instanceof GatewayTimeoutException ||
+        err instanceof ServiceUnavailableException ||
+        err instanceof BadGatewayException
+      ) {
         throw err;
       }
       throw this.mapConnectionError(err, 'Image processing failed');
@@ -116,17 +118,23 @@ export class ImageProcessingClient {
 
       return (await body.json()) as ImageProcessingExifResponse;
     } catch (err) {
-      if (err instanceof BadRequestException || 
-          err instanceof GatewayTimeoutException || 
-          err instanceof ServiceUnavailableException || 
-          err instanceof BadGatewayException) {
+      if (
+        err instanceof BadRequestException ||
+        err instanceof GatewayTimeoutException ||
+        err instanceof ServiceUnavailableException ||
+        err instanceof BadGatewayException
+      ) {
         throw err;
       }
       throw this.mapConnectionError(err, 'EXIF extraction failed');
     }
   }
 
-  private async mapResponseError(status: number, body: any, fallbackMessage: string): Promise<Error> {
+  private async mapResponseError(
+    status: number,
+    body: any,
+    fallbackMessage: string,
+  ): Promise<Error> {
     let responseMessage: string | undefined;
     try {
       const data = await body.json();
@@ -140,7 +148,10 @@ export class ImageProcessingClient {
     }
 
     if (status >= 500) {
-      this.logger.error({ status, responseMessage }, 'Image processing service responded with server error');
+      this.logger.error(
+        { status, responseMessage },
+        'Image processing service responded with server error',
+      );
       return new BadGatewayException(fallbackMessage);
     }
 
@@ -150,7 +161,11 @@ export class ImageProcessingClient {
   private mapConnectionError(err: any, fallbackMessage: string): Error {
     const code = err?.code;
 
-    if (code === 'UND_ERR_HEADERS_TIMEOUT' || code === 'UND_ERR_BODY_TIMEOUT' || code === 'ECONNABORTED') {
+    if (
+      code === 'UND_ERR_HEADERS_TIMEOUT' ||
+      code === 'UND_ERR_BODY_TIMEOUT' ||
+      code === 'ECONNABORTED'
+    ) {
       return new GatewayTimeoutException(fallbackMessage);
     }
 
