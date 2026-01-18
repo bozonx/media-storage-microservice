@@ -2,16 +2,10 @@
 
 ## Unreleased
 
-- **Heavy Tasks Queue**: add priority-based queue system for memory/CPU-intensive operations.
-  - Implement `HeavyTasksQueueService` using `p-queue` with three priority levels.
-  - Priority 0 (highest): EXIF extraction (request-bound, user waits).
-  - Priority 1 (medium): Thumbnail generation (request-bound, user waits).
-  - Priority 2 (lowest): Lazy image compression (background task).
-  - Add `HEAVY_TASKS_MAX_CONCURRENCY` env var to control concurrent heavy tasks (default 4).
-  - Add `HEAVY_TASKS_QUEUE_TIMEOUT_MS` env var for task timeout (default 30000ms).
-  - Replace `IMAGE_OPTIMIZATION_WAIT_TIMEOUT_MS` with `HEAVY_TASKS_QUEUE_TIMEOUT_MS` for waiting on lazy optimization completion.
-  - Prevents server overload by limiting concurrent sharp/exifr operations.
-  - Ensures request-bound tasks (EXIF, thumbnails) don't wait for background compression.
+- **Images**: delegate image optimization, thumbnail generation, and EXIF extraction to external Image Processing microservice.
+  - Public API remains unchanged (clients do not need to update).
+  - Replace local `sharp`/`exifr` processing and in-process heavy tasks queue with HTTP calls.
+  - Add env vars: `IMAGE_PROCESSING_BASE_URL`, `IMAGE_PROCESSING_REQUEST_TIMEOUT_MS`.
 - Logging: unify application logs on Pino (nestjs-pino) with structured error fields.
 - Env: unify image compression quality/effort settings into `IMAGE_COMPRESSION_QUALITY` and `IMAGE_COMPRESSION_EFFORT`.
 - Compression (breaking): replace `IMAGE_COMPRESSION_MAX_WIDTH`/`IMAGE_COMPRESSION_MAX_HEIGHT` with `IMAGE_COMPRESSION_MAX_DIMENSION` and replace request optimize params `maxWidth`/`maxHeight` with `maxDimension`.

@@ -75,8 +75,8 @@ describe('FilesService (unit)', () => {
       if (key === 'compression.forceEnabled') {
         return false;
       }
-      if (key === 'heavyTasksQueue.timeoutMs') {
-        return 30000;
+      if (key === 'imageProcessing.requestTimeoutMs') {
+        return 60000;
       }
       return undefined;
     }),
@@ -139,7 +139,7 @@ describe('FilesService (unit)', () => {
           if (key === 'compression.forceEnabled') {
             return false;
           }
-          if (key === 'heavyTasksQueue.timeoutMs') {
+          if (key === 'imageProcessing.requestTimeoutMs') {
             return 1;
           }
           return undefined;
@@ -147,7 +147,7 @@ describe('FilesService (unit)', () => {
       };
 
       await moduleRef.close();
-      moduleRef = await Test.createTestingModule({
+      const moduleRef2 = await Test.createTestingModule({
         providers: [
           FilesService,
           {
@@ -169,7 +169,7 @@ describe('FilesService (unit)', () => {
         ],
       }).compile();
 
-      service = moduleRef.get<FilesService>(FilesService);
+      const service2 = moduleRef2.get<FilesService>(FilesService);
 
       (prismaMock as any).file.updateMany.mockResolvedValue({ count: 0 });
       (prismaMock as any).file.findUnique.mockResolvedValue({
@@ -178,7 +178,7 @@ describe('FilesService (unit)', () => {
         optimizationStatus: OptimizationStatus.PROCESSING,
       });
 
-      await expect(service.ensureOptimized('id')).rejects.toBeInstanceOf(RequestTimeoutException);
+      await expect(service2.ensureOptimized('file-id')).rejects.toThrow(RequestTimeoutException);
     });
   });
 
@@ -261,8 +261,8 @@ describe('FilesService (unit)', () => {
           if (key === 'compression.forceEnabled') {
             return false;
           }
-          if (key === 'heavyTasksQueue.timeoutMs') {
-            return 30000;
+          if (key === 'imageProcessing.requestTimeoutMs') {
+            return 60000;
           }
           return undefined;
         }),
@@ -541,8 +541,8 @@ describe('FilesService (unit)', () => {
         if (key === 'compression.forceEnabled') {
           return true;
         }
-        if (key === 'heavyTasksQueue.timeoutMs') {
-          return 30000;
+        if (key === 'imageProcessing.requestTimeoutMs') {
+          return 60000;
         }
         return undefined;
       });

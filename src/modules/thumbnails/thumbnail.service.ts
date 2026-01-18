@@ -8,17 +8,13 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { createHash } from 'crypto';
-import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { ThumbnailParamsDto } from '../files/dto/thumbnail-params.dto.js';
 import { FileStatus } from '../files/file-status.js';
 import { OptimizationStatus } from '../files/optimization-status.js';
 import { FilesService } from '../files/files.service.js';
-import {
-  HeavyTasksQueueService,
-  TaskPriority,
-} from '../heavy-tasks-queue/heavy-tasks-queue.service.js';
+import { ImageProcessingClient } from '../image-processing/image-processing.client.js';
 
 interface ThumbnailConfig {
   format: 'webp' | 'avif';
@@ -53,7 +49,7 @@ export class ThumbnailService {
     private readonly storageService: StorageService,
     @Inject(forwardRef(() => FilesService))
     private readonly filesService: FilesService,
-    private readonly heavyTasksQueue: HeavyTasksQueueService,
+    private readonly imageProcessingClient: ImageProcessingClient,
   ) {
     this.config = this.configService.get<ThumbnailConfig>('thumbnail')!;
     this.bucket = this.configService.get<string>('storage.bucket')!;
@@ -200,32 +196,37 @@ export class ThumbnailService {
     height: number,
     quality: number,
   ): Promise<Buffer> {
-    return this.heavyTasksQueue.execute(async () => {
-      try {
-        const format = this.config.format;
-        let pipeline = sharp(buffer).autoOrient().resize(width, height, {
-          fit: sharp.fit.inside,
-          withoutEnlargement: true,
-        });
+    try {
+      const format = this.config.format;
 
-        if (format === 'webp') {
-          pipeline = pipeline.webp({
-            quality,
-            effort: this.config.effort,
-          });
-        } else {
-          pipeline = pipeline.avif({
-            quality,
-            effort: this.config.effort,
-          });
-        }
+      const output: Record<string, any> = {
+        format,
+        quality,
+        effort: this.config.effort,
+        stripMetadata: true,
+      };
 
-        return await pipeline.toBuffer();
-      } catch (error) {
-        this.logger.error({ err: error }, 'Failed to generate thumbnail');
-        throw new BadRequestException('Failed to generate thumbnail');
-      }
-    }, TaskPriority.THUMBNAIL_GENERATION);
+      const result = await this.imageProcessingClient.process({
+        image: buffer.toString('base64'),
+        mimeType: 'image/*',
+        priority: 1,
+        transform: {
+          resize: {
+            width,
+            height,
+            fit: 'inside',
+            withoutEnlargement: true,
+          },
+          autoOrient: true,
+        },
+        output,
+      });
+
+      return Buffer.from(result.buffer, 'base64');
+    } catch (error) {
+      this.logger.error({ err: error }, 'Failed to generate thumbnail');
+      throw new BadRequestException('Failed to generate thumbnail');
+    }
   }
 
   private calculateParamsHash(

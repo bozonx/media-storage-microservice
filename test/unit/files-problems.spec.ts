@@ -26,7 +26,7 @@ describe('FilesService - Problems', () => {
         'storage.bucket': 'test-bucket',
         'app.basePath': '',
         BASE_PATH: '',
-        'heavyTasksQueue.timeoutMs': 30000,
+        'imageProcessing.requestTimeoutMs': 60000,
         'compression.forceEnabled': false,
         'cleanup.stuckUploadTimeoutMs': 30 * 60 * 1000,
         'cleanup.stuckDeleteTimeoutMs': 30 * 60 * 1000,

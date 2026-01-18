@@ -104,7 +104,7 @@ export class FilesService {
       this.configService.get<string>('BASE_PATH') ||
       '';
     this.optimizationWaitTimeout =
-      this.configService.get<number>('heavyTasksQueue.timeoutMs') ?? 30000;
+      this.configService.get<number>('imageProcessing.requestTimeoutMs') ?? 60000;
     this.forceCompression = this.configService.get<boolean>('compression.forceEnabled') ?? false;
 
     this.stuckUploadTimeoutMs =

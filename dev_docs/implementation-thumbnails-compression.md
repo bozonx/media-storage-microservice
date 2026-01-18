@@ -2,7 +2,7 @@
 
 ## Overview
 
-Реализация динамической генерации thumbnail с параметрами из query string и улучшенного пережатия оригинальных изображений при загрузке с использованием библиотеки Sharp.
+Реализация динамической генерации thumbnail с параметрами из query string и улучшенного пережатия оригинальных изображений при загрузке через внешний Image Processing microservice.
 
 ## Goals
 
@@ -14,7 +14,7 @@
 
 ## Technical Stack
 
-- **Image Processing**: Sharp (с поддержкой AVIF)
+- **Image Processing**: External Image Processing microservice (NestJS + Sharp)
 - **Format**: WebP (thumbnail), WebP/AVIF (compressed originals)
 - **Storage**: Единое S3 хранилище для оригиналов и thumbnails
 - **Caching**: S3 storage + DB metadata
@@ -198,20 +198,32 @@ async getThumbnail(
 }
 ```
 
-#### Step 5: Sharp Integration
+#### Step 5: Image Processing Microservice Integration
 **File**: `src/modules/thumbnails/thumbnail-generator.service.ts`
 
 ```typescript
 async generateThumbnail(buffer: Buffer, params: ThumbnailParams): Promise<Buffer> {
-  return sharp(buffer)
-    .resize(params.width, params.height, {
-      fit: params.fit as keyof sharp.FitEnum,
-      withoutEnlargement: true,
-    })
-    .rotate() // Auto-rotate based on EXIF orientation
-    .withMetadata(false) // Strip all metadata (EXIF, ICC profile, etc.)
-    .webp({ quality: params.quality })
-    .toBuffer();
+  const response = await imageProcessingClient.process({
+    image: buffer.toString('base64'),
+    mimeType: 'image/*',
+    priority: 1,
+    transform: {
+      resize: {
+        width: params.width,
+        height: params.height,
+        fit: params.fit ?? 'inside',
+        withoutEnlargement: true,
+      },
+      autoOrient: true,
+    },
+    output: {
+      format: 'webp',
+      quality: params.quality,
+      stripMetadata: true,
+    },
+  });
+
+  return Buffer.from(response.buffer, 'base64');
 }
 ```
 

@@ -1,19 +1,9 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { jest } from '@jest/globals';
 import { getLoggerToken } from 'nestjs-pino';
-
-const parseMock: any = jest.fn();
-
-jest.unstable_mockModule('exifr', () => ({
-  default: {
-    parse: parseMock,
-  },
-}));
-
-const { ExifService } = await import('../../src/modules/files/exif.service.js');
-const { StorageService } = await import('../../src/modules/storage/storage.service.js');
-const { HeavyTasksQueueService } =
-  await import('../../src/modules/heavy-tasks-queue/heavy-tasks-queue.service.js');
+import { ExifService } from '../../src/modules/files/exif.service.js';
+import { StorageService } from '../../src/modules/storage/storage.service.js';
+import { ImageProcessingClient } from '../../src/modules/image-processing/image-processing.client.js';
 
 describe('ExifService (unit)', () => {
   let service: InstanceType<typeof ExifService>;
@@ -31,8 +21,8 @@ describe('ExifService (unit)', () => {
     fatal: jest.fn(),
   };
 
-  const heavyTasksQueueMock: any = {
-    execute: jest.fn(async (task: any) => task()),
+  const imageProcessingClientMock: any = {
+    exif: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -45,7 +35,7 @@ describe('ExifService (unit)', () => {
         ExifService,
         { provide: getLoggerToken('ExifService'), useValue: loggerMock },
         { provide: StorageService, useValue: storageMock },
-        { provide: HeavyTasksQueueService, useValue: heavyTasksQueueMock },
+        { provide: ImageProcessingClient, useValue: imageProcessingClientMock },
       ],
     }).compile();
 
@@ -59,11 +49,11 @@ describe('ExifService (unit)', () => {
     });
 
     expect(res).toBeUndefined();
-    expect(parseMock).not.toHaveBeenCalled();
+    expect(imageProcessingClientMock.exif).not.toHaveBeenCalled();
   });
 
-  it('returns undefined when exifr returns undefined', async () => {
-    parseMock.mockImplementationOnce(async () => undefined);
+  it('returns undefined when image processing service returns null exif', async () => {
+    imageProcessingClientMock.exif.mockResolvedValueOnce({ exif: null });
 
     const res = await service.tryExtractFromBuffer({
       buffer: Buffer.from('abc'),
@@ -71,7 +61,7 @@ describe('ExifService (unit)', () => {
     });
 
     expect(res).toBeUndefined();
-    expect(parseMock).toHaveBeenCalledTimes(1);
+    expect(imageProcessingClientMock.exif).toHaveBeenCalledTimes(1);
   });
 
   it('disables extraction when IMAGE_MAX_BYTES_MB=0', async () => {
@@ -82,7 +72,7 @@ describe('ExifService (unit)', () => {
         ExifService,
         { provide: getLoggerToken('ExifService'), useValue: loggerMock },
         { provide: StorageService, useValue: storageMock },
-        { provide: HeavyTasksQueueService, useValue: heavyTasksQueueMock },
+        { provide: ImageProcessingClient, useValue: imageProcessingClientMock },
       ],
     }).compile();
 
@@ -94,11 +84,11 @@ describe('ExifService (unit)', () => {
     });
 
     expect(res).toBeUndefined();
-    expect(parseMock).not.toHaveBeenCalled();
+    expect(imageProcessingClientMock.exif).not.toHaveBeenCalled();
   });
 
-  it('returns object when exifr returns data', async () => {
-    parseMock.mockImplementationOnce(async () => ({ Make: 'Canon' }));
+  it('returns object when service returns data', async () => {
+    imageProcessingClientMock.exif.mockResolvedValueOnce({ exif: { Make: 'Canon' } });
 
     const res = await service.tryExtractFromBuffer({
       buffer: Buffer.from('abc'),

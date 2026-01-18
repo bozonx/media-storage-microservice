@@ -3,9 +3,8 @@ import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { jest } from '@jest/globals';
 import { ImageOptimizerService } from '../../src/modules/optimization/image-optimizer.service.js';
-import { HeavyTasksQueueService } from '../../src/modules/heavy-tasks-queue/heavy-tasks-queue.service.js';
+import { ImageProcessingClient } from '../../src/modules/image-processing/image-processing.client.js';
 import { getLoggerToken } from 'nestjs-pino';
-import sharp from 'sharp';
 
 describe('ImageOptimizerService (unit)', () => {
   let service: ImageOptimizerService;
@@ -18,8 +17,8 @@ describe('ImageOptimizerService (unit)', () => {
     debug: jest.fn(),
   };
 
-  const heavyTasksQueueMock: any = {
-    execute: jest.fn(async (task: any) => task()),
+  const imageProcessingClientMock: any = {
+    process: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -57,8 +56,8 @@ describe('ImageOptimizerService (unit)', () => {
           useValue: mockLogger,
         },
         {
-          provide: HeavyTasksQueueService,
-          useValue: heavyTasksQueueMock,
+          provide: ImageProcessingClient,
+          useValue: imageProcessingClientMock,
         },
       ],
     }).compile();
@@ -73,16 +72,13 @@ describe('ImageOptimizerService (unit)', () => {
 
   describe('compressImage', () => {
     it('should compress image to WebP format', async () => {
-      const inputBuffer = await sharp({
-        create: {
-          width: 100,
-          height: 100,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
+      const inputBuffer = Buffer.from('input');
+      const outputBuffer = Buffer.from('output-webp');
+      imageProcessingClientMock.process.mockResolvedValueOnce({
+        buffer: outputBuffer.toString('base64'),
+        size: outputBuffer.length,
+        mimeType: 'image/webp',
+      });
 
       const result = await service.compressImage(
         inputBuffer,
@@ -94,6 +90,7 @@ describe('ImageOptimizerService (unit)', () => {
       expect(result.format).toBe('image/webp');
       expect(result.buffer).toBeInstanceOf(Buffer);
       expect(result.size).toBeGreaterThan(0);
+      expect(imageProcessingClientMock.process).toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
           beforeBytes: inputBuffer.length,
@@ -106,16 +103,13 @@ describe('ImageOptimizerService (unit)', () => {
     });
 
     it('should compress image to AVIF format', async () => {
-      const inputBuffer = await sharp({
-        create: {
-          width: 100,
-          height: 100,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
+      const inputBuffer = Buffer.from('input');
+      const outputBuffer = Buffer.from('output-avif');
+      imageProcessingClientMock.process.mockResolvedValueOnce({
+        buffer: outputBuffer.toString('base64'),
+        size: outputBuffer.length,
+        mimeType: 'image/avif',
+      });
 
       const result = await service.compressImage(
         inputBuffer,
@@ -130,16 +124,14 @@ describe('ImageOptimizerService (unit)', () => {
     });
 
     it('should resize image respecting max dimensions', async () => {
-      const inputBuffer = await sharp({
-        create: {
-          width: 5000,
-          height: 3000,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
+      const inputBuffer = Buffer.from('input');
+      const outputBuffer = Buffer.from('output-webp');
+      imageProcessingClientMock.process.mockResolvedValueOnce({
+        buffer: outputBuffer.toString('base64'),
+        size: outputBuffer.length,
+        mimeType: 'image/webp',
+        dimensions: { width: 1920, height: 1152 },
+      });
 
       const result = await service.compressImage(
         inputBuffer,
@@ -148,22 +140,18 @@ describe('ImageOptimizerService (unit)', () => {
         false,
       );
 
-      const metadata = await sharp(result.buffer).metadata();
-      expect(metadata.width).toBeLessThanOrEqual(1920);
-      expect(metadata.height).toBeLessThanOrEqual(1920);
+      const lastCall = imageProcessingClientMock.process.mock.calls.at(-1)?.[0];
+      expect(lastCall.transform.resize.maxDimension).toBe(1920);
     });
 
     it('should use default quality from config when not provided', async () => {
-      const inputBuffer = await sharp({
-        create: {
-          width: 100,
-          height: 100,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
+      const inputBuffer = Buffer.from('input');
+      const outputBuffer = Buffer.from('output-webp');
+      imageProcessingClientMock.process.mockResolvedValueOnce({
+        buffer: outputBuffer.toString('base64'),
+        size: outputBuffer.length,
+        mimeType: 'image/webp',
+      });
 
       const result = await service.compressImage(inputBuffer, 'image/png', {}, false);
 
@@ -179,16 +167,13 @@ describe('ImageOptimizerService (unit)', () => {
     });
 
     it('should use force compression settings when forceCompress is true', async () => {
-      const inputBuffer = await sharp({
-        create: {
-          width: 100,
-          height: 100,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
+      const inputBuffer = Buffer.from('input');
+      const outputBuffer = Buffer.from('output-webp');
+      imageProcessingClientMock.process.mockResolvedValueOnce({
+        buffer: outputBuffer.toString('base64'),
+        size: outputBuffer.length,
+        mimeType: 'image/webp',
+      });
 
       const result = await service.compressImage(
         inputBuffer,
@@ -210,16 +195,13 @@ describe('ImageOptimizerService (unit)', () => {
     });
 
     it('should respect max dimension limit from config', async () => {
-      const inputBuffer = await sharp({
-        create: {
-          width: 5000,
-          height: 3000,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
+      const inputBuffer = Buffer.from('input');
+      const outputBuffer = Buffer.from('output-webp');
+      imageProcessingClientMock.process.mockResolvedValueOnce({
+        buffer: outputBuffer.toString('base64'),
+        size: outputBuffer.length,
+        mimeType: 'image/webp',
+      });
 
       const result = await service.compressImage(
         inputBuffer,
@@ -228,21 +210,18 @@ describe('ImageOptimizerService (unit)', () => {
         false,
       );
 
-      const metadata = await sharp(result.buffer).metadata();
-      expect(metadata.width).toBeLessThanOrEqual(3840);
+      const lastCall = imageProcessingClientMock.process.mock.calls.at(-1)?.[0];
+      expect(lastCall.transform.resize.maxDimension).toBe(3840);
     });
 
     it('should preserve metadata when stripMetadata is false', async () => {
-      const inputBuffer = await sharp({
-        create: {
-          width: 100,
-          height: 100,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
+      const inputBuffer = Buffer.from('input');
+      const outputBuffer = Buffer.from('output-webp');
+      imageProcessingClientMock.process.mockResolvedValueOnce({
+        buffer: outputBuffer.toString('base64'),
+        size: outputBuffer.length,
+        mimeType: 'image/webp',
+      });
 
       const result = await service.compressImage(
         inputBuffer,
@@ -263,16 +242,13 @@ describe('ImageOptimizerService (unit)', () => {
     });
 
     it('should preserve metadata by default', async () => {
-      const inputBuffer = await sharp({
-        create: {
-          width: 100,
-          height: 100,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
+      const inputBuffer = Buffer.from('input');
+      const outputBuffer = Buffer.from('output-webp');
+      imageProcessingClientMock.process.mockResolvedValueOnce({
+        buffer: outputBuffer.toString('base64'),
+        size: outputBuffer.length,
+        mimeType: 'image/webp',
+      });
 
       const result = await service.compressImage(
         inputBuffer,
@@ -292,35 +268,28 @@ describe('ImageOptimizerService (unit)', () => {
     });
 
     it('should call autoOrient by default', async () => {
-      const autoOrientSpy = jest.spyOn(sharp.prototype, 'autoOrient');
-      const inputBuffer = await sharp({
-        create: {
-          width: 100,
-          height: 100,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
+      const inputBuffer = Buffer.from('input');
+      const outputBuffer = Buffer.from('output-webp');
+      imageProcessingClientMock.process.mockResolvedValueOnce({
+        buffer: outputBuffer.toString('base64'),
+        size: outputBuffer.length,
+        mimeType: 'image/webp',
+      });
 
       await service.compressImage(inputBuffer, 'image/png', {}, false);
 
-      expect(autoOrientSpy).toHaveBeenCalled();
+      const lastCall = imageProcessingClientMock.process.mock.calls.at(-1)?.[0];
+      expect(lastCall.transform.autoOrient).toBe(true);
     });
 
     it('should allow disabling autoOrient', async () => {
-      const autoOrientSpy = jest.spyOn(sharp.prototype, 'autoOrient');
-      const inputBuffer = await sharp({
-        create: {
-          width: 100,
-          height: 100,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
+      const inputBuffer = Buffer.from('input');
+      const outputBuffer = Buffer.from('output-webp');
+      imageProcessingClientMock.process.mockResolvedValueOnce({
+        buffer: outputBuffer.toString('base64'),
+        size: outputBuffer.length,
+        mimeType: 'image/webp',
+      });
 
       const result = await service.compressImage(
         inputBuffer,
@@ -330,7 +299,8 @@ describe('ImageOptimizerService (unit)', () => {
       );
 
       expect(result.format).toBe('image/webp');
-      expect(autoOrientSpy).not.toHaveBeenCalled();
+      const lastCall = imageProcessingClientMock.process.mock.calls.at(-1)?.[0];
+      expect(lastCall.transform.autoOrient).toBe(false);
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
           autoOrient: false,
@@ -350,16 +320,13 @@ describe('ImageOptimizerService (unit)', () => {
     });
 
     it('should support lossless compression', async () => {
-      const inputBuffer = await sharp({
-        create: {
-          width: 100,
-          height: 100,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
+      const inputBuffer = Buffer.from('input');
+      const outputBuffer = Buffer.from('output-webp');
+      imageProcessingClientMock.process.mockResolvedValueOnce({
+        buffer: outputBuffer.toString('base64'),
+        size: outputBuffer.length,
+        mimeType: 'image/webp',
+      });
 
       const result = await service.compressImage(
         inputBuffer,
@@ -379,6 +346,8 @@ describe('ImageOptimizerService (unit)', () => {
 
     it('should handle compression errors gracefully', async () => {
       const invalidBuffer = Buffer.from('invalid image data');
+
+      imageProcessingClientMock.process.mockRejectedValueOnce(new Error('boom'));
 
       await expect(
         service.compressImage(invalidBuffer, 'image/png', { format: 'webp' }, false),

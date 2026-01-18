@@ -10,7 +10,7 @@ import { StorageModule } from './modules/storage/storage.module.js';
 import { OptimizationModule } from './modules/optimization/optimization.module.js';
 import { ThumbnailModule } from './modules/thumbnails/thumbnail.module.js';
 import { CleanupModule } from './modules/cleanup/cleanup.module.js';
-import { HeavyTasksQueueModule } from './modules/heavy-tasks-queue/heavy-tasks-queue.module.js';
+import { ImageProcessingModule } from './modules/image-processing/image-processing.module.js';
 import { ShutdownModule } from './common/shutdown/shutdown.module.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import appConfig from './config/app.config.js';
@@ -19,7 +19,7 @@ import storageConfig from './config/storage.config.js';
 import compressionConfig from './config/compression.config.js';
 import thumbnailConfig from './config/thumbnail.config.js';
 import cleanupConfig from './config/cleanup.config.js';
-import heavyTasksQueueConfig from './config/heavy-tasks-queue.config.js';
+import imageProcessingConfig from './config/image-processing.config.js';
 import urlUploadConfig from './config/url-upload.config.js';
 import type { AppConfig } from './config/app.config.js';
 import pkg from '../package.json' with { type: 'json' };
@@ -35,7 +35,7 @@ import pkg from '../package.json' with { type: 'json' };
         compressionConfig,
         thumbnailConfig,
         cleanupConfig,
-        heavyTasksQueueConfig,
+        imageProcessingConfig,
         urlUploadConfig,
       ],
       envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}`, '.env'],
@@ -43,7 +43,7 @@ import pkg from '../package.json' with { type: 'json' };
     }),
     ShutdownModule,
     PrismaModule,
-    HeavyTasksQueueModule,
+    ImageProcessingModule,
     ScheduleModule.forRoot(),
     LoggerModule.forRootAsync({
       inject: [ConfigService],

@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ImageOptimizerService } from './image-optimizer.service.js';
-import { HeavyTasksQueueModule } from '../heavy-tasks-queue/heavy-tasks-queue.module.js';
+import { ImageProcessingModule } from '../image-processing/image-processing.module.js';
 
 @Module({
-  imports: [HeavyTasksQueueModule],
+  imports: [ImageProcessingModule],
   providers: [ImageOptimizerService],
   exports: [ImageOptimizerService],
 })

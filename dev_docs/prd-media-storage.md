@@ -356,7 +356,7 @@ Indexes:
 - **Database**: PostgreSQL 17 (via TypeORM или Prisma)
 - **Object Storage**: Garage S3-compatible API
 - **S3 Client**: AWS SDK v3 (@aws-sdk/client-s3)
-- **Image Processing**: Sharp (для оптимизации и миниатюр)
+- **Image Processing**: External Image Processing microservice (NestJS + Sharp)
 - **Video Processing**: FFmpeg (для видео миниатюр, v2)
 - **Validation**: class-validator, class-transformer
 - **Logging**: Pino (via nestjs-pino)
@@ -388,7 +388,7 @@ src/
 │   │       └── storage-config.interface.ts
 │   ├── optimization/
 │   │   ├── optimization.module.ts
-│   │   ├── image-optimizer.service.ts   // Sharp для изображений
+│   │   ├── image-optimizer.service.ts   // Delegates to external image processing service
 │   │   └── interfaces/
 │   │       └── optimization-options.interface.ts
 │   ├── thumbnails/ (v2)
@@ -443,11 +443,9 @@ BLOCK_EXECUTABLE_UPLOADS=true
 BLOCK_ARCHIVE_UPLOADS=true
 ALLOWED_MIME_TYPES=*  # or comma-separated list
 
-# Image Optimization (Phase 1)
-IMAGE_OPTIMIZATION_ENABLED=true
-IMAGE_OPTIMIZATION_DEFAULT_QUALITY=85
-IMAGE_OPTIMIZATION_MAX_WIDTH=3840
-IMAGE_OPTIMIZATION_MAX_HEIGHT=2160
+# Image Processing Microservice
+IMAGE_PROCESSING_BASE_URL=http://localhost:8080/api/v1
+IMAGE_PROCESSING_REQUEST_TIMEOUT_MS=60000
 
 # Thumbnails (v2)
 THUMBNAIL_MAX_AGE_DAYS=365
