@@ -19,13 +19,43 @@ A robust microservice for uploading, storing, and serving media files with built
 
 ## Quick Start
 
-### Docker Compose (Recommended)
+### Development Environment
+
+The easiest way to start developing is to use the setup script:
+
+```bash
+# 1. Install dependencies
+pnpm install
+
+# 2. Run the automated setup script
+# This script will:
+# - Create .env.development
+# - Start PostgreSQL and Garage (S3) in Docker
+# - Initialize Garage buckets and generate keys
+# - Output the keys to use in your .env
+pnpm run setup:dev
+
+# 3. Start the application
+pnpm start:dev
+```
+
+If you prefer a manual setup:
+1. Create `.env.development` from `.env.development.example`.
+2. Start dependencies: `docker compose -f docker-compose.yml up -d postgres garage`.
+3. Initialize Garage: `bash scripts/init-garage.sh`. **Note the Access Key and Secret Key output!**
+4. Update `.env.development` with the generated keys.
+5. Run the app: `pnpm start:dev`.
+
+### Production Deployment
+
+#### Using Docker Compose (Recommended)
 
 1. Create a production environment file:
    ```bash
    cp .env.production.example .env.production
    ```
 2. Edit `.env.production` and provide your credentials (PostgreSQL and S3).
+   - If you are using the bundled Garage service, you perform the setup first (see below).
 3. Start the services:
    ```bash
    docker compose -f docker/docker-compose.yml up -d
@@ -35,10 +65,71 @@ A robust microservice for uploading, storing, and serving media files with built
    curl http://localhost:8080/api/v1/health
    ```
 
-Default API Base URL: `http://localhost:8080/api/v1`
-Utility UI: `http://localhost:8080/ui`
+**Default API Base URL**: `http://localhost:8080/api/v1`
+**Utility UI**: `http://localhost:8080/ui`
 
 ---
+
+## Storage Configuration (Garage/S3)
+
+This service uses **Garage**, a lightweight S3-compatible object storage, but works with any S3 provider (AWS, MinIO, etc.).
+
+### Generating Keys for Garage
+
+If you are using the bundled Garage container (e.g., via `docker-compose.yml`), you need to generate access keys.
+
+**Automatic Generation (Development):**
+Running `pnpm run setup:dev` or `bash scripts/init-garage.sh` automatically ensures a bucket exists, creates a key (`media-storage-app`), and prints the credentials.
+
+**Manual Generation (Production/Custom):**
+If running in production with the bundled Garage:
+1. Start the Garage container:
+   ```bash
+   docker compose -f docker/docker-compose.yml up -d garage
+   ```
+   ```
+   **Note**: In some production setups, you might use an external managed S3 (like AWS S3 or MinIO) instead of the bundled Garage. In that case, skip step 2 and just configure `.env.production`.
+
+2. **Initialize Garage (If using bundled Garage):**
+   Run the initialization script from your **Host Machine** (not inside the container).
+   
+   *Requirement: You must have the `scripts/` folder from the repository on your host.*
+
+   ```bash
+   bash scripts/init-garage.sh
+   ```
+   (This script automatically detects the running `media-storage-garage` container and sets up buckets/keys).
+
+3. **Configure Keys:**
+   **Copy the `Access Key ID` and `Secret Access Key`** from the script output.
+   Add them to your `.env.production` file:
+   ```env
+   S3_ACCESS_KEY_ID=GKxxx...
+   S3_SECRET_ACCESS_KEY=xxxx...
+   ```
+4. **Apply Changes:**
+   Restart the microservice to apply changes:
+   ```bash
+   docker compose -f docker/docker-compose.yml restart microservice
+   ```
+
+### Connecting Manually (AWS CLI / Tools)
+
+You can connect to the local Garage instance using any S3-compatible tool (AWS CLI, Cyberduck, S3 Browser).
+
+- **Endpoint**: `http://localhost:3900`
+- **Region**: `garage` (or any string)
+- **Bucket**: `media-files`
+- **Path Style**: Forced (`true`)
+
+**Example AWS CLI Profile:**
+```ini
+[profile garage]
+region = garage
+endpoint_url = http://localhost:3900
+aws_access_key_id = <your_key_id>
+aws_secret_access_key = <your_secret_key>
+```
 
 ## Configuration
 
@@ -170,18 +261,6 @@ Search and filter files.
 - Node.js 22+
 - pnpm 10+
 - Docker (for database and storage)
-
-### Local Setup
-```bash
-pnpm install
-cp .env.development.example .env.development
-# Start DB and Garage (S3)
-docker compose up -d
-# Initialize storage buckets
-bash scripts/init-garage.sh
-# Run NestJS
-pnpm start:dev
-```
 
 ### Testing
 - `pnpm test:unit` - Run unit tests.

@@ -1,9 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
-GARAGE_CONTAINER_NAME=${GARAGE_CONTAINER_NAME:-garaged}
 BUCKET_NAME=${S3_BUCKET:-media-files}
 KEY_NAME=${GARAGE_KEY_NAME:-media-storage-app}
+
+# Auto-detect container name if not specified
+if [ -z "${GARAGE_CONTAINER_NAME:-}" ]; then
+  if docker ps --format '{{.Names}}' | grep -q "^media-storage-garage$"; then
+    GARAGE_CONTAINER_NAME="media-storage-garage"
+  elif docker ps --format '{{.Names}}' | grep -q "^garaged$"; then
+    GARAGE_CONTAINER_NAME="garaged"
+  else
+    GARAGE_CONTAINER_NAME="garaged" # Default fallback
+  fi
+  echo "Auto-detected Garage container: $GARAGE_CONTAINER_NAME"
+fi
 
 exec_garage() {
   docker exec -i "$GARAGE_CONTAINER_NAME" /garage "$@"
