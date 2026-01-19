@@ -5,6 +5,7 @@ import { Test } from '@nestjs/testing';
 import { AppModule } from '../../src/app.module.js';
 import { PrismaService } from '../../src/modules/prisma/prisma.service.js';
 import { StorageService } from '../../src/modules/storage/storage.service.js';
+import { ImageProcessingClient } from '../../src/modules/image-processing/image-processing.client.js';
 
 export async function createTestApp(): Promise<NestFastifyApplication> {
   process.env.S3_ACCESS_KEY_ID ??= 'test';
@@ -20,6 +21,19 @@ export async function createTestApp(): Promise<NestFastifyApplication> {
     .overrideProvider(StorageService)
     .useValue({
       checkConnection: async () => true,
+    })
+    .overrideProvider(ImageProcessingClient)
+    .useValue({
+      health: async () => ({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        queue: { size: 0, pending: 0 },
+      }),
+      process: async () => ({
+        buffer: Buffer.from('fake'),
+        mimeType: 'image/webp',
+      }),
+      exif: async () => ({ exif: {} }),
     })
     .compile();
 

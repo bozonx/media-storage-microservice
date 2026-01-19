@@ -33,6 +33,13 @@ describe('Health (e2e)', () => {
           s3: 'connected',
           database: 'connected',
         },
+        imageProcessing: {
+          status: 'connected',
+          queue: {
+            size: 0,
+            pending: 0,
+          },
+        },
       });
     });
   });

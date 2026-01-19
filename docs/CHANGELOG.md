@@ -6,6 +6,7 @@
   - Public API remains unchanged (clients do not need to update).
   - Replace local `sharp`/`exifr` processing and in-process heavy tasks queue with HTTP calls.
   - Add env vars: `IMAGE_PROCESSING_BASE_URL`, `IMAGE_PROCESSING_REQUEST_TIMEOUT_SECONDS` (in seconds).
+- **Fix**: resolve missing dependencies in `HealthModule` and update E2E tests to match new health response structure.
 - Logging: unify application logs on Pino (nestjs-pino) with structured error fields.
 - Env: unify image compression quality/effort settings into `IMAGE_COMPRESSION_QUALITY` and `IMAGE_COMPRESSION_EFFORT`.
 - Compression (breaking): replace `IMAGE_COMPRESSION_MAX_WIDTH`/`IMAGE_COMPRESSION_MAX_HEIGHT` with `IMAGE_COMPRESSION_MAX_DIMENSION` and replace request optimize params `maxWidth`/`maxHeight` with `maxDimension`.
