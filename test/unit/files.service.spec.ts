@@ -857,7 +857,15 @@ describe('FilesService (unit)', () => {
 
       expect(storageMock.downloadStream).toHaveBeenCalledWith('aa/bb/orig.jpg');
       expect(imageOptimizerMock.compressImage).toHaveBeenCalled();
-      expect((prismaMock as any).file.create).toHaveBeenCalled();
+      expect((prismaMock as any).file.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          checksum: 'sha256:9da308c2e4bc33afa72df5c088b5fc5673c477f3ef21d6bdaa358393834f9804',
+          size: BigInt(500),
+          originalS3Key: 'aa/bb/orig.jpg',
+          originalChecksum: 'sha256:orig',
+          originalSize: 1000n,
+        }),
+      }));
       expect(result.id).toBe('new-id');
       expect(result.mimeType).toBe('image/webp');
     });

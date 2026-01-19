@@ -313,11 +313,13 @@ export class FilesService {
           userId: file.userId,
           purpose: file.purpose,
           originalMimeType: mimeType,
-          originalS3Key: file.originalS3Key, // carry over original if it existed
+          originalS3Key: file.originalS3Key || file.s3Key, // carry over original source
           originalChecksum: file.originalChecksum || file.checksum,
           originalSize: file.originalSize || file.size,
           mimeType: result.format,
           s3Key: finalKey,
+          checksum,
+          size: BigInt(result.size),
           s3Bucket: this.bucket,
           status: FileStatus.ready,
           optimizationStatus: OptimizationStatus.ready,
@@ -745,7 +747,6 @@ export class FilesService {
           optimizationCompletedAt: new Date(),
         },
       });
-      if (originalS3Key) await this.storageService.deleteFile(originalS3Key).catch(() => {});
       throw err;
     }
   }
