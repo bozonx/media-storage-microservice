@@ -46,4 +46,8 @@ export class CompressParamsDto {
   @Max(9)
   @IsOptional()
   effort?: number;
+
+  @IsIn(['4:2:0', '4:4:4'])
+  @IsOptional()
+  chromaSubsampling?: '4:2:0' | '4:4:4';
 }

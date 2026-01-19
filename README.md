@@ -213,6 +213,7 @@ When uploading images, you can control the optimization process:
 | `autoOrient` | boolean | - | Automatically rotate image based on EXIF Orientation tag. |
 | `removeAlpha` | boolean | - | Remove transparency channel (useful for conversion to JPEG). |
 | `effort` | number | 0-9 | CPU effort for compression (higher is slower but better). |
+| `chromaSubsampling` | string | `4:2:0`, `4:4:4` | AVIF chroma subsampling. |
 
 ---
 

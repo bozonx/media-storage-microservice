@@ -106,7 +106,10 @@ export class ImageOptimizerService {
         output.quality = quality;
         output.effort = effort;
 
-        const chromaSubsampling = this.compressionConfig.avif.chromaSubsampling;
+        const chromaSubsampling = forceCompress
+          ? this.compressionConfig.avif.chromaSubsampling
+          : (params.chromaSubsampling ?? this.compressionConfig.avif.chromaSubsampling);
+
         if (chromaSubsampling) {
           output.chromaSubsampling = chromaSubsampling;
         }

@@ -122,6 +122,24 @@ describe('ImageOptimizerService (unit)', () => {
       expect(result.buffer).toBeInstanceOf(Buffer);
       expect(result.size).toBeGreaterThan(0);
     });
+    it('should respect chromaSubsampling for AVIF', async () => {
+      const inputBuffer = Buffer.from('input');
+      const outputBuffer = Buffer.from('output-avif');
+      imageProcessingClientMock.process.mockResolvedValueOnce({
+        buffer: outputBuffer,
+        mimeType: 'image/avif',
+      });
+
+      await service.compressImage(
+        inputBuffer,
+        'image/png',
+        { format: 'avif', chromaSubsampling: '4:4:4' },
+        false,
+      );
+
+      const lastCall = imageProcessingClientMock.process.mock.calls.at(-1)?.[0];
+      expect(lastCall.output.chromaSubsampling).toBe('4:4:4');
+    });
 
     it('should resize image respecting max dimensions', async () => {
       const inputBuffer = Buffer.from('input');
