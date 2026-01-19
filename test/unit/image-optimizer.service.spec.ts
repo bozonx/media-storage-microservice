@@ -37,6 +37,7 @@ describe('ImageOptimizerService (unit)', () => {
                   maxDimension: 3840,
                   stripMetadata: false,
                   lossless: false,
+                  autoOrient: true,
                   webp: {
                     quality: 80,
                     effort: 6,

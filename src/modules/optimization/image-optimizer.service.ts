@@ -17,6 +17,7 @@ interface CompressionConfig {
   maxDimension: number;
   stripMetadata: boolean;
   lossless: boolean;
+  autoOrient: boolean;
   webp: {
     quality: number;
     effort: number;
@@ -73,7 +74,9 @@ export class ImageOptimizerService {
       const lossless = forceCompress
         ? this.compressionConfig.lossless
         : (params.lossless ?? this.compressionConfig.lossless);
-      const autoOrient = params.autoOrient ?? true;
+      const autoOrient = forceCompress
+        ? this.compressionConfig.autoOrient
+        : (params.autoOrient ?? this.compressionConfig.autoOrient);
       const removeAlpha = params.removeAlpha;
 
       let quality: number;

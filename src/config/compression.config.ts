@@ -5,6 +5,7 @@ export default () => ({
     maxDimension: parseInt(process.env.IMAGE_COMPRESSION_MAX_DIMENSION || '3840', 10),
     stripMetadata: process.env.IMAGE_COMPRESSION_STRIP_METADATA === 'true',
     lossless: process.env.IMAGE_COMPRESSION_LOSSLESS === 'true',
+    autoOrient: process.env.IMAGE_COMPRESSION_AUTO_ORIENT !== 'false', // Default to true
     webp: {
       quality: parseInt(process.env.IMAGE_COMPRESSION_QUALITY || '80', 10),
       effort: parseInt(process.env.IMAGE_COMPRESSION_EFFORT || '6', 10),
