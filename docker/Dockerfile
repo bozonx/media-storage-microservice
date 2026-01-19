@@ -23,6 +23,7 @@ RUN corepack enable
 # Copy files required for dependency install + Prisma client generation
 COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
+COPY prisma.config.ts ./
 
 RUN pnpm install --prod --frozen-lockfile --prefer-offline --ignore-scripts || pnpm install --prod --prefer-offline --ignore-scripts
 
