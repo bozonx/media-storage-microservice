@@ -17,10 +17,19 @@ import { ShutdownService } from './common/shutdown/shutdown.service.js';
 import type { AppConfig } from './config/app.config.js';
 
 function resolveMaxFileSize(): number {
-  const fallbackMb = 100;
-  const parsedMb = parseInt(process.env.MAX_FILE_SIZE_MB ?? `${fallbackMb}`, 10);
-  const maxFileSizeMb = Number.isNaN(parsedMb) || parsedMb <= 0 ? fallbackMb : parsedMb;
-  return maxFileSizeMb * 1024 * 1024;
+  const imageMaxMb = parseInt(process.env.IMAGE_MAX_BYTES_MB ?? '25', 10);
+  const videoMaxMb = parseInt(process.env.VIDEO_MAX_BYTES_MB ?? '100', 10);
+  const audioMaxMb = parseInt(process.env.AUDIO_MAX_BYTES_MB ?? '50', 10);
+  const docMaxMb = parseInt(process.env.DOCUMENT_MAX_BYTES_MB ?? '50', 10);
+
+  const maxMb = Math.max(
+    Number.isNaN(imageMaxMb) ? 25 : imageMaxMb,
+    Number.isNaN(videoMaxMb) ? 100 : videoMaxMb,
+    Number.isNaN(audioMaxMb) ? 50 : audioMaxMb,
+    Number.isNaN(docMaxMb) ? 50 : docMaxMb,
+  );
+
+  return maxMb * 1024 * 1024;
 }
 
 async function bootstrap() {

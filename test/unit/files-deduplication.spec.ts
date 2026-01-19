@@ -33,6 +33,13 @@ describe('FilesService - Deduplication', () => {
         BASE_PATH: '',
         'imageProcessing.requestTimeoutMs': 60000,
         'compression.forceEnabled': false,
+        upload: {
+          imageMaxBytesMb: 25,
+          videoMaxBytesMb: 100,
+          audioMaxBytesMb: 50,
+          documentMaxBytesMb: 50,
+          maxFileSizeMb: 100,
+        },
       };
       return config[key];
     }),
@@ -386,8 +393,8 @@ describe('FilesService - Deduplication', () => {
         id: fileId,
         originalS3Key,
         originalMimeType: 'image/png',
-        status: FileStatus.READY,
-        optimizationStatus: OptimizationStatus.PROCESSING,
+        status: FileStatus.ready,
+        optimizationStatus: OptimizationStatus.processing,
       };
 
       const existingOptimized = {

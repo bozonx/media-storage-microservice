@@ -5,6 +5,7 @@ import { getLoggerToken } from 'nestjs-pino';
 import { ExifService } from '../../src/modules/files/exif.service.js';
 import { ImageProcessingClient } from '../../src/modules/image-processing/image-processing.client.js';
 import { StorageService } from '../../src/modules/storage/storage.service.js';
+import { ConfigService } from '@nestjs/config';
 
 describe('ExifService (unit)', () => {
   let service: InstanceType<typeof ExifService>;
@@ -26,10 +27,23 @@ describe('ExifService (unit)', () => {
     exif: jest.fn(),
   };
 
+  const configServiceMock: any = {
+    get: jest.fn((key: string) => {
+      if (key === 'upload') {
+        return {
+          imageMaxBytesMb: 25,
+          videoMaxBytesMb: 100,
+          audioMaxBytesMb: 50,
+          documentMaxBytesMb: 50,
+          maxFileSizeMb: 100,
+        };
+      }
+      return undefined;
+    }),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
-
-    delete process.env.IMAGE_MAX_BYTES_MB;
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -37,6 +51,7 @@ describe('ExifService (unit)', () => {
         { provide: getLoggerToken('ExifService'), useValue: loggerMock },
         { provide: StorageService, useValue: storageMock },
         { provide: ImageProcessingClient, useValue: imageProcessingClientMock },
+        { provide: ConfigService, useValue: configServiceMock },
       ],
     }).compile();
 
@@ -65,8 +80,21 @@ describe('ExifService (unit)', () => {
     expect(imageProcessingClientMock.exif).toHaveBeenCalledTimes(1);
   });
 
-  it('disables extraction when IMAGE_MAX_BYTES_MB=0', async () => {
-    process.env.IMAGE_MAX_BYTES_MB = '0';
+  it('disables extraction when imageMaxBytesMb=0', async () => {
+    const configServiceMockZero: any = {
+      get: jest.fn((key: string) => {
+        if (key === 'upload') {
+          return {
+            imageMaxBytesMb: 0,
+            videoMaxBytesMb: 100,
+            audioMaxBytesMb: 50,
+            documentMaxBytesMb: 50,
+            maxFileSizeMb: 100,
+          };
+        }
+        return undefined;
+      }),
+    };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -74,6 +102,7 @@ describe('ExifService (unit)', () => {
         { provide: getLoggerToken('ExifService'), useValue: loggerMock },
         { provide: StorageService, useValue: storageMock },
         { provide: ImageProcessingClient, useValue: imageProcessingClientMock },
+        { provide: ConfigService, useValue: configServiceMockZero },
       ],
     }).compile();
 

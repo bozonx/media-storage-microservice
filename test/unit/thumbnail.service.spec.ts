@@ -84,6 +84,15 @@ describe('ThumbnailService (unit)', () => {
               if (key === 'storage.bucket') {
                 return 'test-bucket';
               }
+              if (key === 'upload') {
+                return {
+                  imageMaxBytesMb: 25,
+                  videoMaxBytesMb: 100,
+                  audioMaxBytesMb: 50,
+                  documentMaxBytesMb: 50,
+                  maxFileSizeMb: 100,
+                };
+              }
               return null;
             }),
           },

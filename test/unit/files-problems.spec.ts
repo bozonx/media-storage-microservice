@@ -33,6 +33,13 @@ describe('FilesService - Problems', () => {
         'cleanup.stuckUploadTimeoutMs': 30 * 60 * 1000,
         'cleanup.stuckDeleteTimeoutMs': 30 * 60 * 1000,
         'cleanup.stuckOptimizationTimeoutMs': 30 * 60 * 1000,
+        upload: {
+          imageMaxBytesMb: 25,
+          videoMaxBytesMb: 100,
+          audioMaxBytesMb: 50,
+          documentMaxBytesMb: 50,
+          maxFileSizeMb: 100,
+        },
       };
       return config[key];
     }),

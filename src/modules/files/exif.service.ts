@@ -3,6 +3,8 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
 import { ImageProcessingClient } from '../image-processing/image-processing.client.js';
 import { StorageService } from '../storage/storage.service.js';
+import { ConfigService } from '@nestjs/config';
+import type { UploadConfig } from '../../config/upload.config.js';
 
 const BYTES_PER_MEGABYTE = 1024 * 1024;
 const DEFAULT_MAX_BYTES = 25 * BYTES_PER_MEGABYTE;
@@ -16,9 +18,10 @@ export class ExifService {
     private readonly logger: PinoLogger,
     private readonly storageService: StorageService,
     private readonly imageProcessingClient: ImageProcessingClient,
+    private readonly configService: ConfigService,
   ) {
-    const parsedMb = this.parseMegabytes(process.env.IMAGE_MAX_BYTES_MB);
-    this.maxBytes = parsedMb ?? DEFAULT_MAX_BYTES;
+    const uploadConfig = this.configService.get<UploadConfig>('upload')!;
+    this.maxBytes = uploadConfig.imageMaxBytesMb * BYTES_PER_MEGABYTE;
   }
 
   async tryExtractFromBuffer(params: {
@@ -122,18 +125,5 @@ export class ExifService {
     }
 
     return Buffer.concat(chunks);
-  }
-
-  private parseMegabytes(value: string | undefined): number | undefined {
-    if (value === undefined) {
-      return undefined;
-    }
-
-    const parsed = Number.parseFloat(value);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      return undefined;
-    }
-
-    return Math.floor(parsed * BYTES_PER_MEGABYTE);
   }
 }

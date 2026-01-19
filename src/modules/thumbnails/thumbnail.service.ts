@@ -16,6 +16,7 @@ import { FilesService } from '../files/files.service.js';
 import { ImageProcessingClient } from '../image-processing/image-processing.client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { StorageService } from '../storage/storage.service.js';
+import type { UploadConfig } from '../../config/upload.config.js';
 
 interface ThumbnailConfig {
   format: 'webp' | 'avif';
@@ -55,11 +56,8 @@ export class ThumbnailService {
     this.config = this.configService.get<ThumbnailConfig>('thumbnail')!;
     this.bucket = this.configService.get<string>('storage.bucket')!;
 
-    const parsedMb = Number.parseFloat(process.env.IMAGE_MAX_BYTES_MB ?? '');
-    this.imageMaxBytes =
-      Number.isFinite(parsedMb) && parsedMb > 0
-        ? Math.floor(parsedMb * 1024 * 1024)
-        : 25 * 1024 * 1024;
+    const uploadConfig = this.configService.get<UploadConfig>('upload')!;
+    this.imageMaxBytes = uploadConfig.imageMaxBytesMb * 1024 * 1024;
   }
 
   private async readToBufferWithLimit(

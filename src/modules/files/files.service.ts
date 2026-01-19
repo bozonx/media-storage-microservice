@@ -24,6 +24,7 @@ import { ProblemFileDto } from './dto/problem-file.dto.js';
 import { ExifService } from './exif.service.js';
 import { FileProblemDetector } from './file-problem.detector.js';
 import { FilesMapper } from './files.mapper.js';
+import type { UploadConfig } from '../../config/upload.config.js';
 
 function isPrismaKnownRequestError(error: unknown): error is {
   name: string;
@@ -95,11 +96,8 @@ export class FilesService {
     this.stuckOptimizationTimeoutMs =
       this.configService.get<number>('cleanup.stuckOptimizationTimeoutMs') ?? 30 * 60 * 1000;
 
-    const parsedImageMaxBytesMb = Number.parseFloat(process.env.IMAGE_MAX_BYTES_MB ?? '');
-    this.imageMaxBytes =
-      Number.isFinite(parsedImageMaxBytesMb) && parsedImageMaxBytesMb > 0
-        ? Math.floor(parsedImageMaxBytesMb * 1024 * 1024)
-        : 25 * 1024 * 1024;
+    const uploadConfig = this.configService.get<UploadConfig>('upload')!;
+    this.imageMaxBytes = uploadConfig.imageMaxBytesMb * 1024 * 1024;
   }
 
   // --- Public Upload API ---
@@ -418,8 +416,9 @@ export class FilesService {
       transform: (chunk, _encoding, callback) => {
         const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
         size += buf.length;
-        if (mimeType.startsWith('image/') && size > this.imageMaxBytes) {
-          return callback(new BadRequestException('Image is too large'));
+        if (size > this.getFileSizeLimit(mimeType)) {
+          const limitMb = Math.floor(this.getFileSizeLimit(mimeType) / (1024 * 1024));
+          return callback(new BadRequestException(`File is too large (limit: ${limitMb}MB)`));
         }
         if (!hashFinalized) hash.update(buf);
         callback(null, buf);
@@ -535,6 +534,14 @@ export class FilesService {
 
   private isImage(mimeType: string): boolean {
     return mimeType.startsWith('image/');
+  }
+
+  private getFileSizeLimit(mimeType: string): number {
+    const uploadConfig = this.configService.get<UploadConfig>('upload')!;
+    if (this.isImage(mimeType)) return uploadConfig.imageMaxBytesMb * 1024 * 1024;
+    if (mimeType.startsWith('video/')) return uploadConfig.videoMaxBytesMb * 1024 * 1024;
+    if (mimeType.startsWith('audio/')) return uploadConfig.audioMaxBytesMb * 1024 * 1024;
+    return uploadConfig.documentMaxBytesMb * 1024 * 1024;
   }
 
   private async readToBufferWithLimit(stream: Readable, maxBytes: number): Promise<Buffer> {

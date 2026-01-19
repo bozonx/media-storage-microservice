@@ -79,6 +79,15 @@ describe('FilesService (unit)', () => {
       if (key === 'imageProcessing.requestTimeoutMs') {
         return 60000;
       }
+      if (key === 'upload') {
+        return {
+          imageMaxBytesMb: 25,
+          videoMaxBytesMb: 25, // Using 25 for consistency with old behavior if needed
+          audioMaxBytesMb: 25,
+          documentMaxBytesMb: 25,
+          maxFileSizeMb: 25,
+        };
+      }
       return undefined;
     }),
   };
@@ -88,8 +97,6 @@ describe('FilesService (unit)', () => {
 
     exifServiceMock.tryExtractFromBuffer.mockResolvedValue(undefined);
     exifServiceMock.tryExtractFromStorageKey.mockResolvedValue(undefined);
-
-    process.env.IMAGE_MAX_BYTES_MB = '25';
 
     storageMock.uploadFile.mockResolvedValue(undefined);
     (storageMock.uploadStream as unknown as jest.Mock).mockImplementation(async (params: any) => {
@@ -144,6 +151,15 @@ describe('FilesService (unit)', () => {
           }
           if (key === 'imageProcessing.requestTimeoutMs') {
             return 1;
+          }
+          if (key === 'upload') {
+            return {
+              imageMaxBytesMb: 25,
+              videoMaxBytesMb: 100,
+              audioMaxBytesMb: 50,
+              documentMaxBytesMb: 50,
+              maxFileSizeMb: 100,
+            };
           }
           return undefined;
         }),
@@ -243,7 +259,6 @@ describe('FilesService (unit)', () => {
 
   afterEach(async () => {
     await moduleRef.close();
-    delete process.env.IMAGE_MAX_BYTES_MB;
   });
 
   it('should be defined', () => {
@@ -268,6 +283,15 @@ describe('FilesService (unit)', () => {
           }
           if (key === 'imageProcessing.requestTimeoutMs') {
             return 60000;
+          }
+          if (key === 'upload') {
+            return {
+              imageMaxBytesMb: 25,
+              videoMaxBytesMb: 100,
+              audioMaxBytesMb: 50,
+              documentMaxBytesMb: 50,
+              maxFileSizeMb: 100,
+            };
           }
           return undefined;
         }),
@@ -550,6 +574,15 @@ describe('FilesService (unit)', () => {
         }
         if (key === 'imageProcessing.requestTimeoutMs') {
           return 60000;
+        }
+        if (key === 'upload') {
+          return {
+            imageMaxBytesMb: 25,
+            videoMaxBytesMb: 100,
+            audioMaxBytesMb: 50,
+            documentMaxBytesMb: 50,
+            maxFileSizeMb: 100,
+          };
         }
         return undefined;
       });

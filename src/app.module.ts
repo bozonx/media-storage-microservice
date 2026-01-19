@@ -15,6 +15,7 @@ import databaseConfig from './config/database.config.js';
 import imageProcessingConfig from './config/image-processing.config.js';
 import storageConfig from './config/storage.config.js';
 import thumbnailConfig from './config/thumbnail.config.js';
+import uploadConfig from './config/upload.config.js';
 import urlUploadConfig from './config/url-upload.config.js';
 import { CleanupModule } from './modules/cleanup/cleanup.module.js';
 import { FilesModule } from './modules/files/files.module.js';
@@ -37,6 +38,7 @@ import { ThumbnailModule } from './modules/thumbnails/thumbnail.module.js';
         thumbnailConfig,
         cleanupConfig,
         imageProcessingConfig,
+        uploadConfig,
         urlUploadConfig,
       ],
       envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}`, '.env'],
