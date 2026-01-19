@@ -5,7 +5,7 @@
 - **Images**: delegate image optimization, thumbnail generation, and EXIF extraction to external Image Processing microservice.
   - Public API remains unchanged (clients do not need to update).
   - Replace local `sharp`/`exifr` processing and in-process heavy tasks queue with HTTP calls.
-  - Add env vars: `IMAGE_PROCESSING_BASE_URL`, `IMAGE_PROCESSING_REQUEST_TIMEOUT_MS`.
+  - Add env vars: `IMAGE_PROCESSING_BASE_URL`, `IMAGE_PROCESSING_REQUEST_TIMEOUT` (in seconds).
 - Logging: unify application logs on Pino (nestjs-pino) with structured error fields.
 - Env: unify image compression quality/effort settings into `IMAGE_COMPRESSION_QUALITY` and `IMAGE_COMPRESSION_EFFORT`.
 - Compression (breaking): replace `IMAGE_COMPRESSION_MAX_WIDTH`/`IMAGE_COMPRESSION_MAX_HEIGHT` with `IMAGE_COMPRESSION_MAX_DIMENSION` and replace request optimize params `maxWidth`/`maxHeight` with `maxDimension`.
@@ -18,7 +18,7 @@
 - Files: add EXIF extraction (no persistence).
   - Add `GET /api/v1/files/:id/exif` endpoint to extract EXIF for stored images.
   - Remove EXIF extraction from upload response (client should call `/exif` explicitly when needed).
-- Shutdown: add `SHUTDOWN_TIMEOUT_MS` env var to limit graceful shutdown wait time for in-flight heavy tasks.
+- Shutdown: add `SHUTDOWN_TIMEOUT` env var to limit graceful shutdown wait time for in-flight heavy tasks (in seconds).
 - Errors: harden global exception responses and map Prisma errors to HTTP.
 - Cleanup: comprehensive cleanup service with TTL-based policies for bad status files and old thumbnails.
   - Add `statusChangedAt` field to track when file status changes.
