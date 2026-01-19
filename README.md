@@ -12,8 +12,9 @@ A robust microservice for uploading, storing, and serving media files with built
   - EXIF data extraction and storage.
   - Metadata stripping and auto-orientation.
 - **Deduplication**: Content-addressable storage using SHA-256 checksums to save space.
-- **Security**: Blocking of executable and archive file uploads by default.
+- **Security**: Blocking of executable and archive file uploads by default. Granular file size limits by type.
 - **Resilience**: Streaming uploads/downloads for low memory footprint and partial content support (Range requests).
+- **Automated Cleanup**: Systematic removal of orphaned files, old thumbnails, and temporary objects.
 
 ---
 
@@ -150,17 +151,56 @@ aws_secret_access_key = <your_secret_key>
 
 The service is configured via environment variables. See `.env.production.example` for the full list.
 
+### 1. Basic Settings
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LISTEN_PORT` | Port for the service | `8080` |
+| `LISTEN_HOST` | Host for the service | `0.0.0.0` |
+| `BASE_PATH`| URL prefix for API/UI (e.g. `/media`) | (empty) |
+| `LOG_LEVEL` | Logging level (pino) | `warn` |
+| `TZ` | Application timezone | `UTC` |
+
+### 2. Database & Storage
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | Required |
 | `S3_ENDPOINT` | S3 API endpoint | Required |
 | `S3_REGION` | S3 region | `us-east-1` |
 | `S3_BUCKET` | S3 bucket name | Required |
-| `LISTEN_PORT` | Port for the service | `8080` |
-| `LISTEN_HOST` | Host for the service | `0.0.0.0` |
-| `BASE_PATH`| URL prefix for API/UI | (empty) |
-| `BLOCK_EXECUTABLE_UPLOADS` | Reject executables | `true` |
-| `BLOCK_ARCHIVE_UPLOADS` | Reject archives | `true` |
+| `S3_FORCE_PATH_STYLE` | Use path-style S3 URLs | `true` |
+
+### 3. External Image Processing
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `IMAGE_PROCESSING_BASE_URL` | URL of the image-processing-microservice | Required |
+| `IMAGE_PROCESSING_REQUEST_TIMEOUT_SECONDS` | Timeout for processing requests | `60` |
+
+### 4. File Upload Limits
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `IMAGE_MAX_BYTES_MB` | Max size for images | `25` |
+| `VIDEO_MAX_BYTES_MB` | Max size for videos | `100` |
+| `AUDIO_MAX_BYTES_MB` | Max size for audio | `50` |
+| `DOCUMENT_MAX_BYTES_MB` | Max size for documents | `50` |
+| `BLOCK_EXECUTABLE_UPLOADS` | Reject executable files | `true` |
+| `BLOCK_ARCHIVE_UPLOADS` | Reject archive files | `true` |
+
+### 5. Cleanup Job
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CLEANUP_ENABLED` | Enable automated cleanup | `true` |
+| `CLEANUP_CRON` | Cron schedule for cleanup | `0 */6 * * *` |
+| `CLEANUP_BAD_STATUS_TTL_DAYS` | TTL for failed/missing files | `1` |
+| `CLEANUP_TMP_TTL_DAYS` | TTL for temporary S3 objects | `2` |
+| `CLEANUP_ORIGINALS_TTL_DAYS` | TTL for original images | `14` |
+| `THUMBNAIL_MAX_AGE_DAYS` | TTL for unused thumbnails | `90` |
+
+### 6. Upload From URL
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `URL_UPLOAD_BLOCK_UNSAFE_CONNECTIONS` | Block local/unsafe URLs | `true` |
+| `URL_UPLOAD_TIMEOUT_MS` | External download timeout | `15000` |
+| `URL_UPLOAD_MAX_BYTES_MB` | Max size (0 = max of above) | `0` |
 
 ---
 
@@ -203,17 +243,16 @@ Upload a file by providing a remote URL.
 
 When uploading images, you can control the optimization process:
 
-| Parameter | Type | Range | Description |
-|-----------|------|-------|-------------|
-| `format` | string | `webp`, `avif` | Target output format. |
-| `quality` | number | 1-100 | Compression quality (default ~80). |
-| `maxDimension` | number | 1-8192 | Resize the image if its width or height exceeds this value. |
-| `lossless` | boolean | - | Use lossless compression (WebP only). |
-| `stripMetadata` | boolean | - | Remove EXIF and other metadata from the binary. |
-| `autoOrient` | boolean | - | Automatically rotate image based on EXIF Orientation tag. |
-| `removeAlpha` | boolean | - | Remove transparency channel (useful for conversion to JPEG). |
-| `effort` | number | 0-9 | CPU effort for compression (higher is slower but better). |
-| `chromaSubsampling` | string | `4:2:0`, `4:4:4` | AVIF chroma subsampling. |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `format` | string | `webp` | Target output format (`webp`, `avif`). |
+| `quality` | number | 80 | Compression quality (1-100). |
+| `maxDimension` | number | 3840 | Resize if width or height exceeds this value. |
+| `lossless` | boolean | false | Use lossless compression (WebP only). |
+| `stripMetadata` | boolean | false | Remove EXIF and other metadata. |
+| `autoOrient` | boolean | true | Rotate image based on EXIF Orientation. |
+| `chromaSubsampling` | string | `4:2:0` | AVIF chroma subsampling (`4:2:0`, `4:4:4`). |
+| `effort` | number | 6 | CPU effort (0-9, higher is slower but better). |
 
 ---
 
@@ -230,6 +269,14 @@ Retrieve extracted EXIF data from the image.
 
 #### DELETE `/files/:id`
 Mark a file as deleted (Soft Delete).
+
+#### POST `/files/bulk-delete`
+Mark multiple files as deleted based on tags. **Requires at least one filter.**
+
+**Body (JSON):**
+- `appId` (Optional): Filter by Application ID.
+- `userId` (Optional): Filter by User ID.
+- `purpose` (Optional): Filter by Purpose.
 
 ---
 
