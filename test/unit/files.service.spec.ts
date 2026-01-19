@@ -798,4 +798,105 @@ describe('FilesService (unit)', () => {
       expect(res).toEqual({ matched: 2, deleted: 2 });
     });
   });
+
+  describe('reprocessFile', () => {
+    it('throws NotFoundException if file does not exist', async () => {
+      (prismaMock as any).file.findUnique.mockResolvedValue(null);
+      await expect(service.reprocessFile('id', {})).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ConflictException if file is not READY', async () => {
+      (prismaMock as any).file.findUnique.mockResolvedValue({ id: 'id', status: FileStatus.uploading });
+      await expect(service.reprocessFile('id', {})).rejects.toThrow(ConflictException);
+    });
+
+    it('throws BadRequestException if file is not an image', async () => {
+      (prismaMock as any).file.findUnique.mockResolvedValue({
+        id: 'id',
+        status: FileStatus.ready,
+        mimeType: 'application/pdf',
+      });
+      await expect(service.reprocessFile('id', {})).rejects.toThrow(BadRequestException);
+    });
+
+    it('reprocesses file and returns new file response', async () => {
+      const originalFile = {
+        id: 'id',
+        status: FileStatus.ready,
+        mimeType: 'image/jpeg',
+        filename: 'test.jpg',
+        s3Key: 'aa/bb/orig.jpg',
+        size: 1000n,
+        checksum: 'sha256:orig',
+      };
+      (prismaMock as any).file.findUnique.mockResolvedValue(originalFile);
+
+      const stream = (await import('stream')).Readable.from([Buffer.from('data')]);
+      storageMock.downloadStream.mockResolvedValue({ stream });
+
+      imageOptimizerMock.compressImage.mockResolvedValue({
+        buffer: Buffer.from('compressed'),
+        size: 500,
+        format: 'image/webp',
+      });
+
+      (prismaMock as any).file.findFirst.mockResolvedValue(null); // No existing file with same checksum
+
+      const newFile = {
+        ...originalFile,
+        id: 'new-id',
+        mimeType: 'image/webp',
+        size: 500n,
+        checksum: 'sha256:new',
+        s3Key: 'cc/dd/new.webp',
+      };
+      (prismaMock as any).file.create.mockResolvedValue(newFile);
+      exifServiceMock.tryExtractFromStorageKey.mockResolvedValue({ some: 'exif' });
+
+      const result = await service.reprocessFile('id', { format: 'webp' });
+
+      expect(storageMock.downloadStream).toHaveBeenCalledWith('aa/bb/orig.jpg');
+      expect(imageOptimizerMock.compressImage).toHaveBeenCalled();
+      expect((prismaMock as any).file.create).toHaveBeenCalled();
+      expect(result.id).toBe('new-id');
+      expect(result.mimeType).toBe('image/webp');
+    });
+
+    it('returns existing file if checksum matches (deduplication)', async () => {
+      const originalFile = {
+        id: 'id',
+        status: FileStatus.ready,
+        mimeType: 'image/jpeg',
+        filename: 'test.jpg',
+        s3Key: 'aa/bb/orig.jpg',
+      };
+      (prismaMock as any).file.findUnique.mockResolvedValue(originalFile);
+
+      storageMock.downloadStream.mockResolvedValue({
+        stream: (await import('stream')).Readable.from([Buffer.from('data')]),
+      });
+
+      imageOptimizerMock.compressImage.mockResolvedValue({
+        buffer: Buffer.from('compressed'),
+        size: 500,
+        format: 'image/webp',
+      });
+
+      const existingFile = {
+        id: 'existing-id',
+        status: FileStatus.ready,
+        mimeType: 'image/webp',
+        checksum: 'sha256:4d616335123d4529f55e5d3269b247f0bf0885c398337894a86f917578be4d5f', // hash of 'compressed'
+        size: 500n,
+        uploadedAt: new Date(),
+        statusChangedAt: new Date(),
+      };
+      (prismaMock as any).file.findFirst.mockResolvedValue(existingFile);
+
+      const result = await service.reprocessFile('id', { format: 'webp' });
+
+      expect(result.id).toBe('existing-id');
+      expect((prismaMock as any).file.create).not.toHaveBeenCalled();
+    });
+  });
 });

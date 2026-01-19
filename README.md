@@ -279,6 +279,17 @@ Mark multiple files as deleted based on tags. **Requires at least one filter.**
 - `userId` (Optional): Filter by User ID.
 - `purpose` (Optional): Filter by Purpose.
 
+#### POST `/files/:id/reprocess`
+Reprocess an existing image with new optimization settings.
+
+**Body (JSON):**
+Accepts `Optimization Parameters` (see section 2).
+
+**Behavior:**
+- Uses the original source image for maximum quality if it's still available in storage (see `CLEANUP_ORIGINALS_TTL_DAYS`).
+- Automatically deduplicates: returns an existing file if the same result has already been generated.
+- Creates a new file record linked to the same original metadata where possible.
+
 ---
 
 ### 4. Dynamic Thumbnails

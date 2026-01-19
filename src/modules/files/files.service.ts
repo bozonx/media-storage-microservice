@@ -3,6 +3,7 @@ import {
   ConflictException,
   GoneException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   RequestTimeoutException,
 } from '@nestjs/common';
@@ -263,6 +264,80 @@ export class FilesService {
       isPartial: result.isPartial,
       contentRange: result.contentRange,
     };
+  }
+
+  async reprocessFile(id: string, params: CompressParamsDto): Promise<FileResponseDto> {
+    const file = await this.prismaService.file.findUnique({ where: { id, deletedAt: null } });
+    if (!file) throw new NotFoundException('File not found');
+    if (file.status !== FileStatus.ready) {
+      throw new ConflictException('File is not ready for reprocessing');
+    }
+
+    const mimeType = file.originalMimeType || file.mimeType;
+    if (!this.isImage(mimeType)) {
+      throw new BadRequestException('Only images can be reprocessed');
+    }
+
+    // Try to use original if it exists, otherwise use current
+    const sourceKey = file.originalS3Key || file.s3Key;
+    if (!sourceKey) {
+      throw new ConflictException('No source key found for reprocessing');
+    }
+
+    try {
+      const { stream } = await this.storageService.downloadStream(sourceKey);
+      const buffer = await this.readToBufferWithLimit(stream, this.imageMaxBytes);
+
+      const result = await this.imageOptimizer.compressImage(
+        buffer,
+        mimeType,
+        params,
+        false, // forceCompress=false because we want to use provided params
+      );
+
+      const checksum = this.calculateChecksum(result.buffer);
+      const existing = await this.findReadyByChecksum({ checksum, mimeType: result.format });
+
+      if (existing) {
+        return this.mapper.toResponseDto(existing);
+      }
+
+      const finalKey = this.generateS3Key(checksum, result.format);
+      await this.storageService.uploadFile(finalKey, result.buffer, result.format);
+
+      // Create a new file record (deduplication handled above)
+      const newFile = await this.prismaService.file.create({
+        data: {
+          filename: file.filename, // keep same filename
+          appId: file.appId,
+          userId: file.userId,
+          purpose: file.purpose,
+          originalMimeType: mimeType,
+          originalS3Key: file.originalS3Key, // carry over original if it existed
+          originalChecksum: file.originalChecksum || file.checksum,
+          originalSize: file.originalSize || file.size,
+          mimeType: result.format,
+          s3Key: finalKey,
+          s3Bucket: this.bucket,
+          status: FileStatus.ready,
+          optimizationStatus: OptimizationStatus.ready,
+          optimizationParams: params as any,
+          optimizationCompletedAt: new Date(),
+          uploadedAt: new Date(),
+          statusChangedAt: new Date(),
+          metadata: (file.metadata ?? null) as any,
+        },
+      });
+
+      const exif = await this.extractAndSaveExif(newFile);
+      return this.mapper.toResponseDto({ ...newFile, exif });
+    } catch (err) {
+      this.logger.error({ err, fileId: id }, 'Reprocessing failed');
+      if (err instanceof BadRequestException || err instanceof ConflictException) {
+        throw err;
+      }
+      throw new InternalServerErrorException('Reprocessing failed');
+    }
   }
 
   // --- Delete API ---
