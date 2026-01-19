@@ -44,7 +44,7 @@ for i in $(seq 1 90); do
   fi
 
   sleep 1
-  if [ "$_" -eq 90 ]; then
+  if [ "$i" -eq 90 ]; then
     echo "Garage is not ready after 90 seconds" >&2
     docker logs --tail=50 "$GARAGE_CONTAINER_NAME" 2>/dev/null || true
     exit 1
