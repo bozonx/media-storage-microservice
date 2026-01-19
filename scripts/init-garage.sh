@@ -22,7 +22,9 @@ if [ -z "${GARAGE_CONTAINER_NAME:-}" ]; then
 fi
 
 exec_garage() {
-  docker exec -i "$GARAGE_CONTAINER_NAME" /garage "$@"
+  # Use < /dev/null to prevent docker exec from eating the rest of this script
+  # when the script itself is piped to bash
+  docker exec -i "$GARAGE_CONTAINER_NAME" /garage "$@" < /dev/null
 }
 
 is_container_running() {
