@@ -251,6 +251,7 @@ When uploading images, you can control the optimization process:
 | `lossless` | boolean | false | Use lossless compression (WebP only). |
 | `stripMetadata` | boolean | false | Remove EXIF and other metadata. |
 | `autoOrient` | boolean | true | Rotate image based on EXIF Orientation. |
+| `flatten` | string | - | Remove transparency and fill with hex color (e.g., `#ffffff`). |
 | `chromaSubsampling` | string | `4:2:0` | AVIF chroma subsampling (`4:2:0`, `4:4:4`). |
 | `effort` | number | 6 | CPU effort (0-9, higher is slower but better). |
 

@@ -77,7 +77,7 @@ export class ImageOptimizerService {
       const autoOrient = forceCompress
         ? this.compressionConfig.autoOrient
         : (params.autoOrient ?? this.compressionConfig.autoOrient);
-      const removeAlpha = params.removeAlpha;
+      const flatten = params.flatten ?? (params.removeAlpha ? '#ffffff' : undefined);
 
       let quality: number;
       let effort: number;
@@ -87,25 +87,19 @@ export class ImageOptimizerService {
         stripMetadata,
       };
 
-      if (format === 'webp') {
-        quality = forceCompress
-          ? this.compressionConfig.webp.quality
-          : (params.quality ?? this.compressionConfig.webp.quality);
-        effort = forceCompress
-          ? this.compressionConfig.webp.effort
-          : (params.effort ?? this.compressionConfig.webp.effort);
-        output.quality = quality;
-        output.effort = effort;
-      } else if (format === 'avif') {
-        quality = forceCompress
-          ? this.compressionConfig.avif.quality
-          : (params.quality ?? this.compressionConfig.avif.quality);
-        effort = forceCompress
-          ? this.compressionConfig.avif.effort
-          : (params.effort ?? this.compressionConfig.avif.effort);
-        output.quality = quality;
-        output.effort = effort;
+      const configForFormat = format === 'avif' ? this.compressionConfig.avif : this.compressionConfig.webp;
+      
+      quality = forceCompress
+        ? configForFormat.quality
+        : (params.quality ?? configForFormat.quality);
+      effort = forceCompress
+        ? configForFormat.effort
+        : (params.effort ?? configForFormat.effort);
 
+      output.quality = quality;
+      output.effort = effort;
+
+      if (format === 'avif') {
         const chromaSubsampling = forceCompress
           ? this.compressionConfig.avif.chromaSubsampling
           : (params.chromaSubsampling ?? this.compressionConfig.avif.chromaSubsampling);
@@ -113,8 +107,6 @@ export class ImageOptimizerService {
         if (chromaSubsampling) {
           output.chromaSubsampling = chromaSubsampling;
         }
-      } else {
-        throw new BadRequestException(`Unsupported format: ${format}`);
       }
 
       const result = await this.imageProcessingClient.process({
@@ -128,7 +120,7 @@ export class ImageOptimizerService {
             withoutEnlargement: true,
           },
           autoOrient,
-          removeAlpha,
+          flatten,
         },
         output,
       });

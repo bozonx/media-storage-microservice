@@ -23,6 +23,15 @@ export interface ImageProcessingProcessRequest {
   };
 }
 
+export interface ImageProcessingHealthResponse {
+  status: string;
+  timestamp: string;
+  queue: {
+    size: number;
+    pending: number;
+  };
+}
+
 export interface ImageProcessingProcessResponse {
   buffer: Buffer;
   mimeType: string;
@@ -155,6 +164,27 @@ export class ImageProcessingClient {
         throw err;
       }
       throw this.mapConnectionError(err, 'EXIF extraction failed');
+    }
+  }
+
+  async health(): Promise<ImageProcessingHealthResponse> {
+    try {
+      const { statusCode, body } = await request(`${this.baseUrl}/health`, {
+        method: 'GET',
+        headersTimeout: 2000,
+        bodyTimeout: 2000,
+      });
+
+      if (statusCode >= 400) {
+        throw new ServiceUnavailableException('Image processing service health check failed');
+      }
+
+      return (await body.json()) as ImageProcessingHealthResponse;
+    } catch (err) {
+      if (err instanceof ServiceUnavailableException) {
+        throw err;
+      }
+      throw new ServiceUnavailableException('Image processing service is unreachable');
     }
   }
 

@@ -40,6 +40,9 @@ export class CompressParamsDto {
   @IsOptional()
   removeAlpha?: boolean;
 
+  @IsOptional()
+  flatten?: string;
+
   @Type(() => Number)
   @IsInt()
   @Min(0)
