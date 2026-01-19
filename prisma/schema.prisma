@@ -9,6 +9,7 @@ datasource db {
 
 model File {
   id                      String              @id @default(uuid()) @db.Uuid
+  // Original filename as provided by the client
   filename                String              @db.VarChar(255)
   // Identifier of the application that owns this file
   appId                   String?             @map("app_id") @db.VarChar(100)
@@ -26,25 +27,36 @@ model File {
   
   // Optimized (final version to serve)
   s3Key                   String              @map("s3_key") @db.VarChar(500)
+  // Final MIME type (may differ from original if transcoded)
   mimeType                String              @map("mime_type") @db.VarChar(100)
+  // Final file size in bytes
   size                    BigInt?
   // Hash of the optimized file content
   checksum                String?             @db.VarChar(100)
   
+  // S3 bucket where the file is physically stored
   s3Bucket                String              @map("s3_bucket") @db.VarChar(100)
+  // Current lifecycle state of the file
   status                  FileStatus          @default(uploading)
   
   // Optimization tracking
   optimizationStatus      OptimizationStatus? @map("optimization_status")
   // Configuration used for image processing (e.g., resize, format, quality)
   optimizationParams      Json?               @map("optimization_params")
+  // Stores raw error message if the optimization process fails
   optimizationError       String?             @map("optimization_error") @db.Text
+  // When the optimization job was picked up by a worker
   optimizationStartedAt   DateTime?           @map("optimization_started_at") @db.Timestamp(6)
+  // When the optimization job finished (either success or failure)
   optimizationCompletedAt DateTime?           @map("optimization_completed_at") @db.Timestamp(6)
   
+  // Custom user-defined JSON data from the upload request
   metadata                Json?
+  // Technical metadata auto-extracted from the file (e.g. EXIF for images)
   exif                    Json?
+  // Timestamp when the file was finalized and ready for use
   uploadedAt              DateTime?           @map("uploaded_at") @db.Timestamp(6)
+  // Soft-deletion timestamp; file remains in S3 until cleanup
   deletedAt               DateTime?           @map("deleted_at") @db.Timestamp(6)
   // Timestamp of the last lifecycle status transition
   statusChangedAt         DateTime            @default(now()) @map("status_changed_at") @db.Timestamp(6)
@@ -70,15 +82,20 @@ model File {
 
 model Thumbnail {
   id             String   @id @default(uuid()) @db.Uuid
+  // Reference to the parent file
   fileId         String   @map("file_id") @db.Uuid
   width          Int
   height         Int
   quality        Int
   // Deterministic hash of resizing parameters to identify existing thumbnails
   paramsHash     String   @map("params_hash") @db.VarChar(64)
+  // S3 path where this specific thumbnail is stored
   s3Key          String   @map("s3_key") @db.VarChar(500)
+  // S3 bucket name for this thumbnail
   s3Bucket       String   @map("s3_bucket") @db.VarChar(100)
+  // Size of the thumbnail file in bytes
   size           BigInt
+  // MIME type of the thumbnail (usually image/webp or image/jpeg)
   mimeType       String   @map("mime_type") @db.VarChar(100)
   // Tracked for cache eviction policies (LRU cleanup)
   lastAccessedAt DateTime @default(now()) @map("last_accessed_at") @db.Timestamp(6)
