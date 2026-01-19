@@ -103,6 +103,7 @@ If running in production with the bundled Garage:
    **Tip: If you don't have the source code on the Host (Docker only):**
    You can run the script directly from the image by piping it to your host's bash:
    ```bash
+   export GARAGE_CONTAINER_NAME=your_garage_container_name
    docker exec media-storage-microservice cat scripts/init-garage.sh | bash
    ```
 

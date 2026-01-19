@@ -24,9 +24,11 @@ is_container_running() {
   docker inspect -f '{{.State.Running}}' "$GARAGE_CONTAINER_NAME" 2>/dev/null | grep -Fxq true
 }
 
-echo "Waiting for Garage to be ready..."
+echo "Waiting for Garage (${GARAGE_CONTAINER_NAME}) to be ready..."
 consecutive_ok=0
-for _ in $(seq 1 90); do
+for i in $(seq 1 90); do
+  # Check if container is running and 'garage status' works
+  # We use -i without -t to support pipes
   if is_container_running && exec_garage status >/dev/null 2>&1; then
     consecutive_ok=$((consecutive_ok + 1))
     if [ "$consecutive_ok" -ge 2 ]; then
@@ -34,6 +36,11 @@ for _ in $(seq 1 90); do
     fi
   else
     consecutive_ok=0
+    # Optional: print progress every 10 seconds
+    if [ $((i % 10)) -eq 0 ]; then
+       echo "Still waiting for Garage... (Attempt $i/90)"
+       if ! is_container_running; then echo "Hint: Container ${GARAGE_CONTAINER_NAME} is NOT running"; fi
+    fi
   fi
 
   sleep 1
