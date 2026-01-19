@@ -43,7 +43,7 @@ export default registerAs(
   (): CleanupConfig => ({
     enabled: process.env.CLEANUP_ENABLED !== 'false',
     cron: parseCron(process.env.CLEANUP_CRON, '0 */6 * * *'),
-    badStatusTtlDays: parsePositiveInt(process.env.CLEANUP_BAD_STATUS_TTL_DAYS, 7),
+    badStatusTtlDays: parsePositiveInt(process.env.CLEANUP_BAD_STATUS_TTL_DAYS, 1),
     softDeletedRetryDelayMinutes: parsePositiveInt(
       process.env.CLEANUP_SOFT_DELETED_RETRY_DELAY_MINUTES,
       30,
