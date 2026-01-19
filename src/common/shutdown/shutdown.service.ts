@@ -7,7 +7,10 @@ export class ShutdownService implements BeforeApplicationShutdown {
   private readonly shutdownTimeoutMs: number;
 
   constructor() {
-    const parsedSeconds = Number.parseInt(process.env.SHUTDOWN_TIMEOUT ?? '', 10);
+    const parsedSeconds = Number.parseInt(
+      process.env.SHUTDOWN_TIMEOUT_SECONDS ?? '',
+      10,
+    );
     const timeoutSeconds =
       Number.isFinite(parsedSeconds) && parsedSeconds > 0 ? parsedSeconds : 30;
     this.shutdownTimeoutMs = timeoutSeconds * 1000;
