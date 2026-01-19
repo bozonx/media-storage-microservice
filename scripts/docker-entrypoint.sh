@@ -6,4 +6,7 @@ if [ -z "${DATABASE_URL:-}" ]; then
   exit 1
 fi
 
+echo "Running migrations..."
+npx prisma migrate deploy
+
 exec node dist/src/main.js
