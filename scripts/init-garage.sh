@@ -1,8 +1,13 @@
 #!/bin/bash
-set -euo pipefail
+# We avoid 'set -e' here to handle intermediate check failures manually.
+
 
 BUCKET_NAME=${S3_BUCKET:-media-files}
 KEY_NAME=${GARAGE_KEY_NAME:-media-storage-app}
+
+echo "DEBUG: Script started. Bucket=$BUCKET_NAME, Key=$KEY_NAME"
+echo "DEBUG: Target container=$GARAGE_CONTAINER_NAME"
+
 
 # Auto-detect container name if not specified
 if [ -z "${GARAGE_CONTAINER_NAME:-}" ]; then
@@ -26,20 +31,35 @@ is_container_running() {
 
 echo "Waiting for Garage (${GARAGE_CONTAINER_NAME}) to be ready..."
 consecutive_ok=0
-for i in $(seq 1 90); do
-  # Check if container is running and 'garage status' works
-  # We use -i without -t to support pipes
-  if is_container_running && exec_garage status >/dev/null 2>&1; then
+i=1
+while [ $i -le 90 ]; do
+  RUNNING=false
+  # Use simple if to avoid set -e issues in some shells
+  if is_container_running; then
+    RUNNING=true
+  fi
+  
+  READY=false
+  if [ "$RUNNING" = "true" ]; then
+    # Try status check, redirecting stderr to null to keep it clean
+    if exec_garage status >/dev/null 2>&1; then
+      READY=true
+    fi
+  fi
+
+  # Explicit debug for every step for now
+  echo "DEBUG: i=$i, running=$RUNNING, ready=$READY"
+
+  if [ "$READY" = "true" ]; then
     consecutive_ok=$((consecutive_ok + 1))
     if [ "$consecutive_ok" -ge 2 ]; then
       break
     fi
   else
     consecutive_ok=0
-    # Optional: print progress every 10 seconds
-    if [ $((i % 10)) -eq 0 ]; then
-       echo "Still waiting for Garage... (Attempt $i/90)"
-       if ! is_container_running; then echo "Hint: Container ${GARAGE_CONTAINER_NAME} is NOT running"; fi
+    # Print status every 5 seconds instead of 10 for better feedback
+    if [ $((i % 5)) -eq 0 ]; then
+       echo "  ... Attempt $i/90: Running=$RUNNING, StatusCheck=$READY"
     fi
   fi
 
@@ -49,15 +69,20 @@ for i in $(seq 1 90); do
     docker logs --tail=50 "$GARAGE_CONTAINER_NAME" 2>/dev/null || true
     exit 1
   fi
+  i=$((i + 1))
 done
 
 echo "Garage is ready. Ensuring cluster layout..."
 
-STATUS_OUTPUT=$(exec_garage status 2>&1) || {
-  echo "Failed to run 'garage status'" >&2
+# We call this once here to make sure we don't crash on assignment
+# The subshell $(...) with pipefail can be tricky
+STATUS_OUTPUT=$(exec_garage status 2>&1)
+EXIT_CODE=$?
+if [ $EXIT_CODE -ne 0 ]; then
+  echo "Failed to run 'garage status'. Exit code: $EXIT_CODE" >&2
   echo "${STATUS_OUTPUT}" >&2
   exit 1
-}
+fi
 
 NODE_ID=$(echo "${STATUS_OUTPUT}" | awk 'NF > 0 && $1 ~ /^[0-9a-f]{4,}$/ { print $1; exit }')
 if [ -z "${NODE_ID:-}" ]; then
