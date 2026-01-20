@@ -266,6 +266,16 @@ export class FilesService {
     };
   }
 
+  /**
+   * Reprocesses an existing image with new optimization settings.
+   *
+   * Creates a new file record and deletes the old one upon success.
+   * If a duplicate file already exists, it deletes the current file and returns the existing one.
+   *
+   * @param id - The ID of the file to reprocess
+   * @param params - New compression/optimization parameters
+   * @returns Metadata of the new (or existing duplicate) file
+   */
   async reprocessFile(id: string, params: CompressParamsDto): Promise<FileResponseDto> {
     const file = await this.prismaService.file.findUnique({ where: { id, deletedAt: null } });
     if (!file) throw new NotFoundException('File not found');

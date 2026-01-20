@@ -287,8 +287,9 @@ Accepts `Optimization Parameters` (see section 2).
 
 **Behavior:**
 - Uses the original source image for maximum quality if it's still available in storage (see `CLEANUP_ORIGINALS_TTL_DAYS`).
+- If the original is gone (already optimized and deleted), falls back to the current optimized version as the source.
 - Automatically deduplicates: returns an existing file if the same result has already been generated.
-- Creates a new file record linked to the same original metadata where possible.
+- Creates a new file record and **deletes the old file record (soft delete)** upon success, as the replaced version is no longer needed.
 
 ---
 
