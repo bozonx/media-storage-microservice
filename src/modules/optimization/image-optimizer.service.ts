@@ -15,6 +15,7 @@ export interface OptimizationResult {
   buffer: Buffer;
   size: number;
   format: string;
+  params: Record<string, any>;
 }
 
 interface CompressionConfig {
@@ -63,6 +64,7 @@ export class ImageOptimizerService {
         buffer,
         size: buffer.length,
         format: originalMimeType,
+        params: {},
       };
     }
 
@@ -151,10 +153,26 @@ export class ImageOptimizerService {
         'Image compressed',
       );
 
+      // Build the actual optimization parameters that were used
+      const actualParams: Record<string, any> = {
+        format,
+        quality,
+        maxDimension,
+        lossless,
+        effort,
+        stripMetadata,
+        autoOrient,
+      };
+
+      if (format === 'avif' && output.chromaSubsampling) {
+        actualParams.chromaSubsampling = output.chromaSubsampling;
+      }
+
       return {
         buffer: resultBuffer,
         size: resultBuffer.length,
         format: result.mimeType,
+        params: actualParams,
       };
     } catch (error) {
       this.logger.error({ err: error }, 'Failed to compress image');

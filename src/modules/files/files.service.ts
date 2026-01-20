@@ -359,7 +359,7 @@ export class FilesService {
           s3Bucket: this.bucket,
           status: FileStatus.ready,
           optimizationStatus: OptimizationStatus.ready,
-          optimizationParams: params as any,
+          optimizationParams: result.params as any,
           optimizationCompletedAt: new Date(),
           uploadedAt: new Date(),
           statusChangedAt: new Date(),
@@ -761,6 +761,7 @@ export class FilesService {
             size: BigInt(result.size),
             checksum,
             optimizationStatus: OptimizationStatus.ready,
+            optimizationParams: result.params as any,
             optimizationCompletedAt: new Date(),
           },
         });
