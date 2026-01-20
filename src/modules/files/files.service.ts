@@ -305,6 +305,9 @@ export class FilesService {
       const existing = await this.findReadyByChecksum({ checksum, mimeType: result.format });
 
       if (existing) {
+        if (existing.id !== id) {
+          await this.deleteFile(id);
+        }
         return this.mapper.toResponseDto(existing);
       }
 
@@ -336,6 +339,8 @@ export class FilesService {
           metadata: (file.metadata ?? null) as any,
         },
       });
+
+      await this.deleteFile(id);
 
       const exif = await this.extractAndSaveExif(newFile);
       return this.mapper.toResponseDto({ ...newFile, exif });
