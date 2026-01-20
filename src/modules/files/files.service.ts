@@ -786,6 +786,8 @@ export class FilesService {
       await this.prismaService.file.update({
         where: { id: fileId },
         data: {
+          status: FileStatus.failed, // Mark the file as failed so it's not served and can be cleaned up
+          statusChangedAt: new Date(),
           optimizationStatus: OptimizationStatus.failed,
           optimizationError: err instanceof Error ? err.message : 'Unknown',
           optimizationCompletedAt: new Date(),
