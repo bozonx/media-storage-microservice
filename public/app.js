@@ -207,10 +207,11 @@ function renderFileList() {
 
 async function uploadFile(file, optimize) {
     const formData = new FormData();
-    formData.append('file', file);
     if (optimize) {
         formData.append('optimize', JSON.stringify(optimize));
     }
+    // Append file last to ensure fields are parsed before the stream
+    formData.append('file', file);
 
     try {
         const response = await fetch(buildApiUrl('/api/v1/files'), {
