@@ -229,6 +229,34 @@ curl -X POST http://localhost:8080/api/v1/files \
   -F 'appId=my-app'
 ```
 
+**Response (JSON):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "filename": "photo.jpg",
+  "appId": "my-app",
+  "userId": "user-123",
+  "purpose": "avatar",
+  "mimeType": "image/webp",
+  "size": 45000,
+  "originalSize": 120000,
+  "checksum": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "uploadedAt": "2023-10-27T10:00:00.000Z",
+  "statusChangedAt": "2023-10-27T10:00:05.000Z",
+  "status": "ready",
+  "metadata": {
+    "alt": "User Profile Picture"
+  },
+  "originalMimeType": "image/jpeg",
+  "optimizationStatus": "ready",
+  "url": "/api/v1/files/550e8400-e29b-41d4-a716-446655440000/download",
+  "exif": {
+    "Make": "Canon",
+    "Model": "Canon EOS 5D Mark IV"
+  }
+}
+```
+
 #### POST `/files/from-url`
 Upload a file by providing a remote URL.
 
@@ -262,11 +290,40 @@ When uploading images, you can control the optimization process:
 #### GET `/files/:id`
 Retrieve file metadata (JSON).
 
+**Response (JSON):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "filename": "photo.jpg",
+  "mimeType": "image/webp",
+  "size": 45000,
+  "url": "/api/v1/files/550e8400-e29b-41d4-a716-446655440000/download",
+  "checksum": "sha256:...",
+  "status": "ready",
+  "metadata": {},
+  "originalMimeType": "image/jpeg",
+  "optimizationStatus": "ready"
+}
+```
+
 #### GET `/files/:id/download`
 Download the raw file. Supports `Range` headers for partial downloads and `If-None-Match` for caching.
 
 #### GET `/files/:id/exif`
 Retrieve extracted EXIF data from the image.
+
+**Response (JSON):**
+```json
+{
+  "exif": {
+    "Make": "Canon",
+    "Model": "Canon EOS 5D Mark IV",
+    "DateTimeOriginal": "2023:10:21 14:30:00",
+    "GPSLatitude": 35.6895,
+    "GPSLongitude": 139.6917
+  }
+}
+```
 
 #### DELETE `/files/:id`
 Mark a file as deleted (Soft Delete).
@@ -291,6 +348,9 @@ curl -X POST http://localhost:8080/api/v1/files/abc-123/reprocess \
   -H "Content-Type: application/json" \
   -d '{"format":"avif", "quality":60, "maxDimension":2048}'
 ```
+
+**Response (JSON):**
+Returns the updated file metadata (same format as `GET /files/:id`).
 
 **Behavior:**
 - Uses the original source image for maximum quality if it's still available in storage (see `CLEANUP_ORIGINALS_TTL_DAYS`).
@@ -335,6 +395,23 @@ Search and filter files.
 - `q`: Search by filename or original name.
 - `mimeType`: Filter by MIME type.
 - `appId`, `userId`, `purpose`: Filter by tags provided during upload.
+
+**Response (JSON):**
+```json
+{
+  "items": [
+    {
+      "id": "file-1",
+      "filename": "photo.jpg",
+      "size": 1024,
+      "url": "..."
+    }
+  ],
+  "total": 50,
+  "limit": 10,
+  "offset": 0
+}
+```
 
 ---
 
