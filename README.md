@@ -249,6 +249,16 @@ curl -X POST http://localhost:8080/api/v1/files \
   },
   "originalMimeType": "image/jpeg",
   "optimizationStatus": "ready",
+  "optimizationParams": {
+    "format": "webp",
+    "quality": 80,
+    "maxDimension": 2048,
+    "lossless": false,
+    "effort": 4,
+    "chromaSubsampling": "4:2:0",
+    "stripMetadata": false,
+    "autoOrient": true
+  },
   "url": "/api/v1/files/550e8400-e29b-41d4-a716-446655440000/download",
   "exif": {
     "Make": "Canon",
@@ -302,7 +312,21 @@ Retrieve file metadata (JSON).
   "status": "ready",
   "metadata": {},
   "originalMimeType": "image/jpeg",
-  "optimizationStatus": "ready"
+  "optimizationStatus": "ready",
+  "optimizationParams": {
+    "format": "webp",
+    "quality": 80,
+    "maxDimension": 2048,
+    "lossless": false,
+    "effort": 4,
+    "chromaSubsampling": "4:2:0",
+    "stripMetadata": false,
+    "autoOrient": true
+  },
+  "exif": {
+    "Make": "Canon",
+    "Model": "Canon EOS 5D Mark IV"
+  }
 }
 ```
 

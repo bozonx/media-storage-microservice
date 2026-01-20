@@ -53,6 +53,9 @@ export class FileResponseDto {
   optimizationError?: string;
 
   @Expose()
+  optimizationParams?: Record<string, any>;
+
+  @Expose()
   url!: string;
 
   @Expose()

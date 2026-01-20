@@ -39,6 +39,7 @@ export class FilesMapper {
     dto.originalMimeType = file.originalMimeType ?? undefined;
     dto.optimizationStatus = file.optimizationStatus ?? undefined;
     dto.optimizationError = file.optimizationError ?? undefined;
+    dto.optimizationParams = file.optimizationParams ?? undefined;
 
     dto.url = `${this.basePath ? `/${this.basePath}` : ''}/api/v1/files/${file.id}/download`;
 
