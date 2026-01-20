@@ -464,7 +464,7 @@ describe('FilesService - Deduplication', () => {
         where: { id: fileId },
         data: expect.objectContaining({ optimizationStatus: OptimizationStatus.failed }),
       });
-      expect(storageService.deleteFile).toHaveBeenCalledWith(originalS3Key);
+      expect(storageService.deleteFile).not.toHaveBeenCalledWith(originalS3Key);
     });
   });
 });
