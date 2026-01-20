@@ -278,8 +278,14 @@ export class FilesService {
       throw new BadRequestException('Only images can be reprocessed');
     }
 
-    // Try to use original if it exists, otherwise use current
-    const sourceKey = file.originalS3Key || file.s3Key;
+    // If the file was successfully optimized, the original is temporary and already deleted.
+    // In that case, we must use the current s3Key as the source.
+    // Otherwise (if optimization failed or wasn't requested), we prefer originalS3Key if it exists.
+    const sourceKey =
+      file.optimizationStatus === OptimizationStatus.ready
+        ? file.s3Key
+        : file.originalS3Key || file.s3Key;
+
     if (!sourceKey) {
       throw new ConflictException('No source key found for reprocessing');
     }
