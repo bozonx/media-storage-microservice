@@ -195,14 +195,22 @@ export class ImageProcessingClient {
   ): Promise<Error> {
     let responseMessage: string | undefined;
     try {
-      const data = await body.json();
-      responseMessage = typeof data === 'string' ? data : data?.message;
+      const text = await body.text();
+      try {
+        const data = JSON.parse(text);
+        responseMessage = typeof data === 'string' ? data : data?.message;
+      } catch {
+        // Fallback to raw text if not JSON
+        responseMessage = text.trim();
+      }
     } catch {
-      // Body might not be JSON
+      // Body could not be read
     }
 
+    const finalMessage = responseMessage || fallbackMessage;
+
     if (status >= 400 && status < 500) {
-      return new BadRequestException(responseMessage ?? fallbackMessage);
+      return new BadRequestException(finalMessage);
     }
 
     if (status >= 500) {
@@ -210,10 +218,10 @@ export class ImageProcessingClient {
         { status, responseMessage },
         'Image processing service responded with server error',
       );
-      return new BadGatewayException(fallbackMessage);
+      return new BadGatewayException(finalMessage);
     }
 
-    return new BadRequestException(fallbackMessage);
+    return new BadRequestException(finalMessage);
   }
 
   private mapConnectionError(err: any, fallbackMessage: string): Error {

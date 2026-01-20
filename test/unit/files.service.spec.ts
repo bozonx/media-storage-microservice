@@ -647,6 +647,7 @@ describe('FilesService (unit)', () => {
 
       (prismaMock as any).file.create.mockResolvedValue(created);
       (prismaMock as any).file.update.mockResolvedValue(updated);
+      jest.spyOn(service, 'ensureOptimized').mockResolvedValue(updated);
 
       const stream = (await import('stream')).Readable.from([
         Buffer.from('a'),
@@ -739,6 +740,12 @@ describe('FilesService (unit)', () => {
         mimeType: 'image/jpeg',
         originalMimeType: 'image/jpeg'
       });
+      jest.spyOn(service, 'ensureOptimized').mockResolvedValue({
+        ...created,
+        status: FileStatus.ready,
+        mimeType: 'image/jpeg',
+        optimizationStatus: OptimizationStatus.ready
+      } as any);
 
       const stream = (await import('stream')).Readable.from([Buffer.from('abc')]);
       
