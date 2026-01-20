@@ -249,6 +249,7 @@ curl -X POST http://localhost:8080/api/v1/files \
   },
   "originalMimeType": "image/jpeg",
   "optimizationStatus": "ready",
+  "optimizationError": null,
   "optimizationParams": {
     "format": "webp",
     "quality": 80,
@@ -274,6 +275,23 @@ Upload a file by providing a remote URL.
 - `url` (Required): Remote URL of the file.
 - `filename` (Optional): Override the filename.
 - `metadata`, `appId`, `userId`, `purpose`, `optimize`: Same as above.
+
+**Example:**
+```json
+{
+  "url": "https://example.com/image.jpg",
+  "filename": "remote-image.jpg",
+  "optimize": {
+    "format": "avif",
+    "quality": 70
+  },
+  "appId": "my-app"
+}
+```
+
+**Response (JSON):**
+Returns the same file metadata format as `POST /files`.
+
 
 ---
 
@@ -305,15 +323,21 @@ Retrieve file metadata (JSON).
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
   "filename": "photo.jpg",
+  "appId": "my-app",
+  "userId": "user-123",
+  "purpose": "avatar",
   "mimeType": "image/webp",
   "size": 45000,
   "originalSize": 120000,
   "url": "/api/v1/files/550e8400-e29b-41d4-a716-446655440000/download",
   "checksum": "sha256:...",
   "status": "ready",
+  "uploadedAt": "2023-10-27T10:00:00.000Z",
+  "statusChangedAt": "2023-10-27T10:00:05.000Z",
   "metadata": {},
   "originalMimeType": "image/jpeg",
   "optimizationStatus": "ready",
+  "optimizationError": null,
   "optimizationParams": {
     "format": "webp",
     "quality": 80,
@@ -360,6 +384,14 @@ Mark multiple files as deleted based on tags. **Requires at least one filter.**
 - `appId` (Optional): Filter by Application ID.
 - `userId` (Optional): Filter by User ID.
 - `purpose` (Optional): Filter by Purpose.
+
+**Response (JSON):**
+```json
+{
+  "matched": 10,
+  "deleted": 10
+}
+```
 
 #### POST `/files/:id/reprocess`
 Reprocess an existing image with new optimization settings.
@@ -426,15 +458,62 @@ Search and filter files.
 {
   "items": [
     {
-      "id": "file-1",
+      "id": "550e8400-e29b-41d4-a716-446655440000",
       "filename": "photo.jpg",
-      "size": 1024,
-      "url": "..."
+      "appId": "my-app",
+      "userId": "user123",
+      "purpose": "avatar",
+      "mimeType": "image/webp",
+      "size": 45000,
+      "originalSize": 120000,
+      "url": "/api/v1/files/550e8400-e29b-41d4-a716-446655440000/download",
+      "checksum": "sha256:...",
+      "status": "ready",
+      "uploadedAt": "2023-10-27T10:00:00.000Z",
+      "statusChangedAt": "2023-10-27T10:00:05.000Z",
+      "metadata": {},
+      "originalMimeType": "image/jpeg",
+      "optimizationStatus": "ready",
+      "optimizationParams": {
+        "format": "webp",
+        "quality": 80,
+        "maxDimension": 2048
+      },
+      "exif": {
+        "Make": "Canon"
+      }
     }
   ],
   "total": 50,
   "limit": 10,
   "offset": 0
+}
+```
+
+#### GET `/files/problems`
+List files that have stuck states, failures, or inconsistencies.
+
+**Query Parameters:**
+- `limit` (Optional): Max items (default 10, max 50).
+
+**Response (JSON):**
+```json
+{
+  "items": [
+    {
+      "id": "file-failure-1",
+      "filename": "corrupt.jpg",
+      "status": "failed",
+      "optimizationStatus": "failed",
+      "problems": [
+        {
+          "code": "OPTIMIZATION_FAILED",
+          "message": "Corrupt image data"
+        }
+      ],
+      "url": "/api/v1/files/file-failure-1/download"
+    }
+  ]
 }
 ```
 
