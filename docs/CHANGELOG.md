@@ -34,12 +34,20 @@
     - Add `CLEANUP_SOFT_DELETED_RETRY_DELAY_MINUTES` (default 30).
     - Add `CLEANUP_SOFT_DELETED_STUCK_WARN_DAYS` (default 3).
 - Files: harden download headers and improve deduplication behavior.
-  - **Fix**: Handle deduplication race conditions in image optimization pipeline (`optimizeImage`).
+  - **Fix**: Handle deduplication race conditions in image optimization pipeline.
   - **Fix**: Ensure temporary objects (`tmp/`, `originals/`) are cleaned up via cleanup job to reduce storage waste.
   - **Enhancement**: Pre-check for existing optimized content before upload to avoid duplicate work.
   - **Enhancement**: Graceful handling of P2002 unique constraint violations during concurrent uploads.
   - **Enhancement**: Improved error logging for deduplication and cleanup operations.
   - Prisma: deduplication uses a partial unique index for active READY files (allows re-upload after soft delete).
+
+- **Files (breaking)**: remove `POST /api/v1/files/:id/reprocess` endpoint.
+  - Image optimization settings can only be provided during upload.
+  - File metadata becomes immutable after a successful upload (no post-upload reprocessing).
+
+- **Files (breaking)**: make image optimization synchronous during upload.
+  - Upload request waits for EXIF extraction and image optimization to complete.
+  - Upload request fails with a clear HTTP error if optimization fails.
 - **Files: add optional tagging support** (`appId`, `userId`, `purpose`).
   - Add nullable `appId`, `userId`, `purpose` fields to File model with indexes for filtering.
   - Support multipart fields `appId`, `userId`, `purpose` on upload (`POST /api/v1/files`).

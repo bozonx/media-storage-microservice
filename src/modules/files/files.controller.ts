@@ -331,12 +331,6 @@ export class FilesController {
     return response.send(result.stream);
   }
 
-  @Post(':id/reprocess')
-  @HttpCode(HttpStatus.OK)
-  async reprocessFile(@Param('id') id: string, @Body() body: CompressParamsDto) {
-    return this.filesService.reprocessFile(id, body);
-  }
-
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteFile(@Param('id') id: string) {

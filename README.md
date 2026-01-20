@@ -213,6 +213,11 @@ Base Path: `/api/v1`
 #### POST `/files`
 Upload a file using `multipart/form-data`.
 
+Behavior:
+- If `optimize` is provided (or compression is forced by config), image optimization and EXIF extraction are performed during the upload request.
+- The response is returned only after optimization completes and results are persisted.
+- If optimization fails, the upload request fails with a clear HTTP error.
+
 **Fields:**
 - `file` (Required): The binary file to upload.
 - `optimize` (Optional): JSON string containing `Optimization Parameters`.
@@ -392,28 +397,6 @@ Mark multiple files as deleted based on tags. **Requires at least one filter.**
   "deleted": 10
 }
 ```
-
-#### POST `/files/:id/reprocess`
-Reprocess an existing image with new optimization settings.
-
-**Body (JSON):**
-Accepts `Optimization Parameters` (see section 2).
-
-**Example:**
-```bash
-curl -X POST http://localhost:8080/api/v1/files/abc-123/reprocess \
-  -H "Content-Type: application/json" \
-  -d '{"format":"avif", "quality":60, "maxDimension":2048}'
-```
-
-**Response (JSON):**
-Returns the updated file metadata (same format as `GET /files/:id`).
-
-**Behavior:**
-- Uses the original source image for maximum quality if it's still available in storage (see `CLEANUP_ORIGINALS_TTL_DAYS`).
-- If the original is gone (already optimized and deleted), falls back to the current optimized version as the source.
-- Automatically deduplicates: returns an existing file if the same result has already been generated.
-- Creates a new file record and **deletes the old file record (soft delete)** upon success, as the replaced version is no longer needed.
 
 ---
 

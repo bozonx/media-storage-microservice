@@ -55,10 +55,6 @@ function buildApiUrl(pathname, searchParams) {
     return url.toString();
 }
 
-function buildThumbnailUrl(fileId, params) {
-    return buildApiUrl(`/api/v1/files/${encodeURIComponent(fileId)}/thumbnail`, params);
-}
-
 function formatFileSize(bytes) {
     if (!Number.isFinite(bytes) || bytes <= 0) {
         return '0 Bytes';
@@ -113,26 +109,6 @@ async function deleteFileById(fileId) {
     }
 }
 
-async function reprocessFileById(fileId, params) {
-    const url = buildApiUrl(`/api/v1/files/${encodeURIComponent(fileId)}/reprocess`);
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(params || {}),
-    });
-
-    if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        const message = typeof body.message === 'string' ? body.message : 'Reprocess request failed';
-        throw new Error(message);
-    }
-
-    return response.json();
-}
-
 function renderFiles(items) {
     if (!Array.isArray(items) || items.length === 0) {
         filesList.innerHTML = '<div class="empty-state">No files found</div>';
@@ -172,22 +148,8 @@ function renderFiles(items) {
 
             const statusClass = typeof item.status === 'string' ? `status-${escapeHtml(item.status)}` : '';
 
-            const isImage = typeof item.mimeType === 'string' && item.mimeType.startsWith('image/');
-            const thumbnailUrl = isImage
-                ? buildThumbnailUrl(item.id, {
-                    width: 96,
-                    height: 96,
-                })
-                : null;
-
             return `
                 <div class="file-row">
-                    <div class="file-row-thumb">
-                        ${isImage
-                    ? `<img class="file-thumb" src="${thumbnailUrl}" alt="Thumbnail" loading="lazy" onerror="this.closest('.file-row-thumb').classList.add('failed')">`
-                    : `<div class="file-thumb-placeholder">—</div>`
-                }
-                    </div>
                     <div class="file-row-main">
                         <div class="file-row-title">
                             <span class="file-row-filename">${filename}</span>
@@ -217,10 +179,6 @@ function renderFiles(items) {
                     </div>
                     <div class="file-row-actions">
                         <a class="link" href="${url}" target="_blank" rel="noreferrer">Download</a>
-                        ${isImage
-                    ? `<button type="button" class="btn btn-secondary file-reprocess" data-file-id="${id}" style="padding: 6px 12px; font-size: 0.85rem;">Reprocess</button>`
-                    : ''
-                }
                         <button type="button" class="btn btn-danger file-delete" data-file-id="${id}">Delete</button>
                     </div>
                 </div>
@@ -265,54 +223,6 @@ filesList.addEventListener('click', async (event) => {
     } catch (error) {
         button.disabled = false;
         setStatus(error?.message || 'Failed to delete file', 'error');
-    }
-});
-
-filesList.addEventListener('click', async (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
-        return;
-    }
-
-    const button = target.closest('button.file-reprocess');
-    if (!(button instanceof HTMLButtonElement)) {
-        return;
-    }
-
-    const fileId = button.getAttribute('data-file-id');
-    if (!fileId) {
-        return;
-    }
-
-    const format = window.prompt('Enter target format (webp or avif)', 'webp');
-    if (!format) return;
-    if (format !== 'webp' && format !== 'avif') {
-        alert('Invalid format. Use webp or avif');
-        return;
-    }
-
-    const qualityStr = window.prompt('Enter quality (1-100)', '80');
-    if (qualityStr === null) return;
-    const quality = parseInt(qualityStr, 10);
-    if (isNaN(quality) || quality < 1 || quality > 100) {
-        alert('Invalid quality. Use 1-100');
-        return;
-    }
-
-    button.disabled = true;
-    setStatus('Reprocessing...', 'info');
-
-    try {
-        const result = await reprocessFileById(fileId, {
-            format,
-            quality,
-        });
-
-        setStatus(`Reprocessed successfully! New file ID: ${result.id}`, 'success');
-        await loadFiles();
-    } catch (error) {
-        button.disabled = false;
-        setStatus(error?.message || 'Failed to reprocess file', 'error');
     }
 });
 

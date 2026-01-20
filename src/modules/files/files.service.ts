@@ -5,7 +5,6 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
-  RequestTimeoutException,
   ServiceUnavailableException,
   BadGatewayException,
   GatewayTimeoutException,
@@ -66,7 +65,6 @@ export interface DownloadFileStreamResult {
 export class FilesService {
   private readonly bucket: string;
   private readonly basePath: string;
-  private readonly optimizationWaitTimeout: number;
   private readonly forceCompression: boolean;
   private readonly imageMaxBytes: number;
   private readonly stuckUploadTimeoutMs: number;
@@ -89,8 +87,6 @@ export class FilesService {
       this.configService.get<string>('app.basePath') ||
       this.configService.get<string>('BASE_PATH') ||
       '';
-    this.optimizationWaitTimeout =
-      this.configService.get<number>('imageProcessing.requestTimeoutMs') ?? 60000;
     this.forceCompression = this.configService.get<boolean>('compression.forceEnabled') ?? false;
 
     this.stuckUploadTimeoutMs =
@@ -118,8 +114,7 @@ export class FilesService {
   }): Promise<FileResponseDto> {
     const { stream, filename, mimeType, compressParams, metadata, appId, userId, purpose } = params;
     const hasParams = compressParams && Object.keys(compressParams).length > 0;
-    const wantsOptimization =
-      this.isImage(mimeType) && (this.forceCompression || hasParams);
+    const wantsOptimization = this.isImage(mimeType) && (this.forceCompression || hasParams);
     const originalKey = wantsOptimization ? `originals/${randomUUID()}` : `tmp/${randomUUID()}`;
 
     // Calculate full optimization params upfront (with defaults)
@@ -149,29 +144,104 @@ export class FilesService {
       },
     });
 
-    const { checksum, size, hashFinalized } = await (async () => {
+    const { checksum, size, buffer } = await (async () => {
       if (wantsOptimization) {
-        // Fail-fast: check if image processing service is available before uploading to S3
         await this.imageOptimizer.validateAvailability();
       }
-      return this.performStreamUpload(stream, originalKey, mimeType, file.id);
+      return this.performStreamUpload(stream, originalKey, mimeType, file.id, {
+        captureBufferMaxBytes: wantsOptimization ? this.imageMaxBytes : undefined,
+      });
     })();
 
     if (wantsOptimization) {
-      const updated = await this.prismaService.file.update({
+      if (!buffer) {
+        throw new InternalServerErrorException('Image buffer is missing');
+      }
+
+      const startedAt = new Date();
+      await this.prismaService.file.update({
         where: { id: file.id },
         data: {
           originalChecksum: checksum,
           originalSize: BigInt(size),
-          status: FileStatus.ready,
-          statusChangedAt: new Date(),
-          uploadedAt: new Date(),
+          optimizationStatus: OptimizationStatus.processing,
+          optimizationStartedAt: startedAt,
         },
       });
 
-      this.triggerOptimizationIfPending(updated.id);
-      const exif = await this.extractAndSaveExif(updated);
-      return this.mapper.toResponseDto({ ...updated, exif });
+      const exifPromise = this.exifService.tryExtractFromBuffer({ buffer, mimeType }).catch(err => {
+        this.logger.debug({ err, fileId: file.id }, 'Failed to extract EXIF');
+        return undefined;
+      });
+
+      const optimizationPromise = this.imageOptimizer.compressImage(
+        buffer,
+        mimeType,
+        (compressParams ?? {}) as any,
+        this.forceCompression,
+      );
+
+      try {
+        const [exif, result] = await Promise.all([exifPromise, optimizationPromise]);
+
+        const optimizedChecksum = this.calculateChecksum(result.buffer);
+        const existing = await this.findReadyByChecksum({
+          checksum: optimizedChecksum,
+          mimeType: result.format,
+        });
+
+        if (existing) {
+          await this.storageService.deleteFile(originalKey);
+          await this.prismaService.file.delete({ where: { id: file.id } });
+          return this.mapper.toResponseDto(existing);
+        }
+
+        const finalKey = this.generateS3Key(optimizedChecksum, result.format);
+        await this.storageService.uploadFile(finalKey, result.buffer, result.format);
+
+        const updated = await this.prismaService.file.update({
+          where: { id: file.id },
+          data: {
+            s3Key: finalKey,
+            mimeType: result.format,
+            size: BigInt(result.size),
+            checksum: optimizedChecksum,
+            status: FileStatus.ready,
+            uploadedAt: new Date(),
+            statusChangedAt: new Date(),
+            optimizationStatus: OptimizationStatus.ready,
+            optimizationParams: result.params as any,
+            optimizationCompletedAt: new Date(),
+            exif: (exif ?? null) as any,
+          },
+        });
+
+        await this.storageService.deleteFile(originalKey);
+
+        return this.mapper.toResponseDto(updated);
+      } catch (err) {
+        try {
+          await this.storageService.deleteFile(originalKey);
+        } catch (deleteErr) {
+          this.logger.warn(
+            { err: deleteErr, fileId: file.id, s3Key: originalKey },
+            'Failed to cleanup original file after optimization error',
+          );
+        }
+
+        await this.prismaService.file.update({
+          where: { id: file.id },
+          data: {
+            status: FileStatus.failed,
+            statusChangedAt: new Date(),
+            optimizationStatus: OptimizationStatus.failed,
+            optimizationError: err instanceof Error ? err.message : 'Unknown error',
+            optimizationCompletedAt: new Date(),
+          },
+        });
+
+        throw err;
+      }
     }
 
     const finalKey = this.generateS3Key(checksum, mimeType);
@@ -261,7 +331,7 @@ export class FilesService {
       file.optimizationStatus === OptimizationStatus.pending ||
       file.optimizationStatus === OptimizationStatus.processing
     ) {
-      file = await this.ensureOptimized(id);
+      throw new ConflictException('Image optimization is in progress');
     }
 
     if (!file?.s3Key) throw new ConflictException('File has no valid S3 key');
@@ -283,114 +353,6 @@ export class FilesService {
       isPartial: result.isPartial,
       contentRange: result.contentRange,
     };
-  }
-
-  /**
-   * Reprocesses an existing image with new optimization settings.
-   *
-   * Creates a new file record and deletes the old one upon success.
-   * If a duplicate file already exists, it deletes the current file and returns the existing one.
-   *
-   * @param id - The ID of the file to reprocess
-   * @param params - New compression/optimization parameters
-   * @returns Metadata of the new (or existing duplicate) file
-   */
-  async reprocessFile(id: string, params: CompressParamsDto): Promise<FileResponseDto> {
-    const file = await this.prismaService.file.findUnique({ where: { id, deletedAt: null } });
-    if (!file) throw new NotFoundException('File not found');
-    if (file.status !== FileStatus.ready) {
-      throw new ConflictException('File is not ready for reprocessing');
-    }
-
-    const mimeType = file.originalMimeType || file.mimeType;
-    if (!this.isImage(mimeType)) {
-      throw new BadRequestException('Only images can be reprocessed');
-    }
-
-    const hasParams = params && Object.keys(params).length > 0;
-    if (!hasParams && !this.forceCompression) {
-      throw new BadRequestException('Optimization parameters are required for reprocessing');
-    }
-
-    // If the file was successfully optimized, the original is temporary and already deleted.
-    // In that case, we must use the current s3Key as the source.
-    // Otherwise (if optimization failed or wasn't requested), we prefer originalS3Key if it exists.
-    const sourceKey =
-      file.optimizationStatus === OptimizationStatus.ready
-        ? file.s3Key
-        : file.originalS3Key || file.s3Key;
-
-    if (!sourceKey) {
-      throw new ConflictException('No source key found for reprocessing');
-    }
-
-    try {
-      const { stream } = await this.storageService.downloadStream(sourceKey);
-      const buffer = await this.readToBufferWithLimit(stream, this.imageMaxBytes);
-
-      const result = await this.imageOptimizer.compressImage(
-        buffer,
-        mimeType,
-        params,
-        false, // forceCompress=false because we want to use provided params
-      );
-
-      const checksum = this.calculateChecksum(result.buffer);
-      const existing = await this.findReadyByChecksum({ checksum, mimeType: result.format });
-
-      if (existing) {
-        if (existing.id !== id) {
-          await this.deleteFile(id);
-        }
-        return this.mapper.toResponseDto(existing);
-      }
-
-      const finalKey = this.generateS3Key(checksum, result.format);
-      await this.storageService.uploadFile(finalKey, result.buffer, result.format);
-
-      // Create a new file record (deduplication handled above)
-      const newFile = await this.prismaService.file.create({
-        data: {
-          filename: file.filename, // keep same filename
-          appId: file.appId,
-          userId: file.userId,
-          purpose: file.purpose,
-          originalMimeType: mimeType,
-          originalS3Key: file.originalS3Key || file.s3Key, // carry over original source
-          originalChecksum: file.originalChecksum || file.checksum,
-          originalSize: file.originalSize || file.size,
-          mimeType: result.format,
-          s3Key: finalKey,
-          checksum,
-          size: BigInt(result.size),
-          s3Bucket: this.bucket,
-          status: FileStatus.ready,
-          optimizationStatus: OptimizationStatus.ready,
-          optimizationParams: result.params as any,
-          optimizationCompletedAt: new Date(),
-          uploadedAt: new Date(),
-          statusChangedAt: new Date(),
-          metadata: (file.metadata ?? null) as any,
-        },
-      });
-
-      await this.deleteFile(id);
-
-      const exif = await this.extractAndSaveExif(newFile);
-      return this.mapper.toResponseDto({ ...newFile, exif });
-    } catch (err) {
-      this.logger.error({ err, fileId: id }, 'Reprocessing failed');
-      if (
-        err instanceof BadRequestException ||
-        err instanceof ConflictException ||
-        err instanceof ServiceUnavailableException ||
-        err instanceof BadGatewayException ||
-        err instanceof GatewayTimeoutException
-      ) {
-        throw err;
-      }
-      throw new InternalServerErrorException('Reprocessing failed');
-    }
   }
 
   // --- Delete API ---
@@ -535,10 +497,16 @@ export class FilesService {
     key: string,
     mimeType: string,
     fileId: string,
+    options?: {
+      captureBufferMaxBytes?: number;
+    },
   ) {
     const hash = createHash('sha256');
     let size = 0;
-    let hashFinalized = false;
+
+    const captureLimit = options?.captureBufferMaxBytes;
+    const captureChunks: Buffer[] = [];
+    let captured = 0;
 
     const hasher = new Transform({
       transform: (chunk, _encoding, callback) => {
@@ -548,9 +516,25 @@ export class FilesService {
           const limitMb = Math.floor(this.getFileSizeLimit(mimeType) / (1024 * 1024));
           return callback(new BadRequestException(`File is too large (limit: ${limitMb}MB)`));
         }
-        if (!hashFinalized) hash.update(buf);
+
+        hash.update(buf);
+
+        if (typeof captureLimit === 'number') {
+          captured += buf.length;
+          if (captured > captureLimit) {
+            const limitMb = Math.floor(captureLimit / (1024 * 1024));
+            return callback(new BadRequestException(`Image is too large (limit: ${limitMb}MB)`));
+          }
+          captureChunks.push(buf);
+        }
+
         callback(null, buf);
       },
+    });
+
+    const waitForHasherFinish = new Promise<void>((resolve, reject) => {
+      hasher.once('finish', () => resolve());
+      hasher.once('error', err => reject(err));
     });
 
     const onAbort = async () => {
@@ -572,8 +556,14 @@ export class FilesService {
         mimeType,
         onAbort,
       });
-      hashFinalized = true;
-      return { checksum: `sha256:${hash.digest('hex')}`, size, hashFinalized };
+
+      await waitForHasherFinish;
+
+      return {
+        checksum: `sha256:${hash.digest('hex')}`,
+        size,
+        buffer: typeof captureLimit === 'number' ? Buffer.concat(captureChunks) : undefined,
+      };
     } catch (err) {
       await onAbort();
       throw err;
@@ -685,126 +675,4 @@ export class FilesService {
   }
 
   // --- Optimization Logic ---
-
-  public async ensureOptimized(fileId: string): Promise<any> {
-    const updated = await this.prismaService.file.updateMany({
-      where: { id: fileId, optimizationStatus: OptimizationStatus.pending },
-      data: {
-        optimizationStatus: OptimizationStatus.processing,
-        optimizationStartedAt: new Date(),
-      },
-    });
-
-    if (updated.count > 0) {
-      void this.optimizeImage(fileId).catch(err =>
-        this.logger.error({ err, fileId }, 'Optimization failed'),
-      );
-    }
-
-    const start = Date.now();
-    while (Date.now() - start < this.optimizationWaitTimeout) {
-      const file = await this.prismaService.file.findUnique({ where: { id: fileId } });
-      if (!file) throw new NotFoundException('File not found');
-      if (file.optimizationStatus === OptimizationStatus.ready) return file;
-      if (file.optimizationStatus === OptimizationStatus.failed) {
-        throw new ConflictException(
-          `Optimization failed: ${file.optimizationError || 'Unknown error'}`,
-        );
-      }
-      await new Promise(r => setTimeout(r, 300));
-    }
-    throw new RequestTimeoutException('Optimization timeout');
-  }
-
-  private triggerOptimizationIfPending(fileId: string): void {
-    void (async () => {
-      const updated = await this.prismaService.file.updateMany({
-        where: { id: fileId, optimizationStatus: OptimizationStatus.pending },
-        data: {
-          optimizationStatus: OptimizationStatus.processing,
-          optimizationStartedAt: new Date(),
-        },
-      });
-      if (updated.count > 0) {
-        await this.optimizeImage(fileId);
-      }
-    })().catch(err => this.logger.error({ err, fileId }, 'Optimization schedule failed'));
-  }
-
-  private async optimizeImage(fileId: string): Promise<void> {
-    let originalS3Key: string | null = null;
-    try {
-      const file = await this.prismaService.file.findUnique({ where: { id: fileId } });
-      if (!file?.originalS3Key || !file.originalMimeType) return;
-      originalS3Key = file.originalS3Key;
-
-      const { stream } = await this.storageService.downloadStream(originalS3Key);
-      const buffer = await this.readToBufferWithLimit(stream, this.imageMaxBytes);
-      const result = await this.imageOptimizer.compressImage(
-        buffer,
-        file.originalMimeType,
-        (file.optimizationParams as any) || {},
-        this.forceCompression,
-      );
-
-      const checksum = this.calculateChecksum(result.buffer);
-      const existing = await this.findReadyByChecksum({ checksum, mimeType: result.format });
-
-      if (existing) {
-        await this.prismaService.file.delete({ where: { id: fileId } });
-        await this.storageService.deleteFile(originalS3Key);
-        return;
-      }
-
-      const finalKey = this.generateS3Key(checksum, result.format);
-      await this.storageService.uploadFile(finalKey, result.buffer, result.format);
-
-      try {
-        await this.prismaService.file.update({
-          where: { id: fileId },
-          data: {
-            s3Key: finalKey,
-            mimeType: result.format,
-            size: BigInt(result.size),
-            checksum,
-            optimizationStatus: OptimizationStatus.ready,
-            optimizationParams: result.params as any,
-            optimizationCompletedAt: new Date(),
-          },
-        });
-      } catch (updateError) {
-        if (this.isUniqueConstraintViolation(updateError)) {
-          this.logger.warn(
-            { fileId, checksum },
-            'Race condition during optimization: duplicate checksum detected',
-          );
-          const raceExisting = await this.findReadyByChecksum({
-            checksum,
-            mimeType: result.format,
-          });
-          if (raceExisting) {
-            await this.prismaService.file.delete({ where: { id: fileId } });
-            await this.storageService.deleteFile(originalS3Key);
-            return;
-          }
-        }
-        throw updateError;
-      }
-
-      await this.storageService.deleteFile(originalS3Key);
-    } catch (err) {
-      this.logger.error({ err, fileId }, 'Optimization error');
-      await this.prismaService.file.update({
-        where: { id: fileId },
-        data: {
-          status: FileStatus.failed, // Mark the file as failed so it's not served and can be cleaned up
-          statusChangedAt: new Date(),
-          optimizationStatus: OptimizationStatus.failed,
-          optimizationError: err instanceof Error ? err.message : 'Unknown',
-          optimizationCompletedAt: new Date(),
-        },
-      });
-      throw err;
-    }
-  }
 }

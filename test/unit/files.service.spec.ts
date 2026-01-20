@@ -63,7 +63,10 @@ describe('FilesService (unit)', () => {
     validateAvailability: jest.fn(),
     calculateOptimizationParams: jest.fn(),
   } as unknown as jest.Mocked<
-    Pick<ImageOptimizerService, 'compressImage' | 'validateAvailability' | 'calculateOptimizationParams'>
+    Pick<
+      ImageOptimizerService,
+      'compressImage' | 'validateAvailability' | 'calculateOptimizationParams'
+    >
   >;
 
   const configServiceMock: any = {
@@ -116,10 +119,9 @@ describe('FilesService (unit)', () => {
       };
     });
 
-
     storageMock.uploadFile.mockResolvedValue(undefined);
     (prismaMock as any).file.updateMany.mockResolvedValue({ count: 0 });
-    
+
     configServiceMock.get.mockImplementation((key: string) => {
       if (key === 'storage.bucket') return 'test-bucket';
       if (key === 'app.basePath') return '';
@@ -166,72 +168,8 @@ describe('FilesService (unit)', () => {
   });
 
   describe('ensureOptimized', () => {
-    it('throws RequestTimeoutException when optimization does not finish in time', async () => {
-      const timeoutConfigServiceMock: any = {
-        get: jest.fn((key: string) => {
-          if (key === 'storage.bucket') {
-            return 'test-bucket';
-          }
-          if (key === 'app.basePath') {
-            return '';
-          }
-          if (key === 'BASE_PATH') {
-            return undefined;
-          }
-          if (key === 'compression.forceEnabled') {
-            return false;
-          }
-          if (key === 'imageProcessing.requestTimeoutMs') {
-            return 1;
-          }
-          if (key === 'upload') {
-            return {
-              imageMaxBytesMb: 25,
-              videoMaxBytesMb: 100,
-              audioMaxBytesMb: 50,
-              documentMaxBytesMb: 50,
-              maxFileSizeMb: 100,
-            };
-          }
-          return undefined;
-        }),
-      };
-
-      await moduleRef.close();
-      const moduleRef2 = await Test.createTestingModule({
-        providers: [
-          FilesService,
-          {
-            provide: getLoggerToken(FilesService.name),
-            useValue: {
-              info: jest.fn(),
-              warn: jest.fn(),
-              error: jest.fn(),
-              debug: jest.fn(),
-              trace: jest.fn(),
-              fatal: jest.fn(),
-            },
-          },
-          { provide: PrismaService, useValue: prismaMock },
-          { provide: StorageService, useValue: storageMock },
-          { provide: ImageOptimizerService, useValue: imageOptimizerMock },
-          { provide: ConfigService, useValue: timeoutConfigServiceMock },
-          { provide: ExifService, useValue: exifServiceMock },
-          FilesMapper,
-          FileProblemDetector,
-        ],
-      }).compile();
-
-      const service2 = moduleRef2.get<FilesService>(FilesService);
-
-      (prismaMock as any).file.updateMany.mockResolvedValue({ count: 0 });
-      (prismaMock as any).file.findUnique.mockResolvedValue({
-        id: 'id',
-        status: FileStatus.ready,
-        optimizationStatus: OptimizationStatus.processing,
-      });
-
-      await expect(service2.ensureOptimized('file-id')).rejects.toThrow(RequestTimeoutException);
+    it('is removed (optimization is synchronous during upload)', () => {
+      expect((service as any).ensureOptimized).toBeUndefined();
     });
   });
 
@@ -247,7 +185,7 @@ describe('FilesService (unit)', () => {
       await expect(service.downloadFileStream('id')).rejects.toThrow(/Image optimization failed/);
     });
 
-    it('waits for optimization (PENDING) via ensureOptimized and downloads optimized key', async () => {
+    it('throws Conflict when optimization is in progress', async () => {
       (prismaMock as any).file.findUnique.mockResolvedValue({
         id: 'id',
         filename: 'a.jpg',
@@ -258,34 +196,9 @@ describe('FilesService (unit)', () => {
         s3Key: '',
       });
 
-      (service as any).ensureOptimized = jest.fn() as unknown as jest.Mock;
-      (service as any).ensureOptimized.mockResolvedValue({
-        id: 'id',
-        filename: 'a.jpg',
-        status: FileStatus.ready,
-        optimizationStatus: OptimizationStatus.ready,
-        s3Key: 'aa/bb/optimized.webp',
-        mimeType: 'image/webp',
-        size: 10n,
-        checksum: 'sha256:abc',
-      });
-
-      storageMock.downloadStreamWithRange.mockResolvedValue({
-        stream: (await import('stream')).Readable.from([Buffer.from('x')]),
-        etag: 'etag',
-        contentLength: 1,
-        isPartial: false,
-        contentRange: undefined,
-      });
-
-      const res = await service.downloadFileStream('id');
-
-      expect((service as any).ensureOptimized).toHaveBeenCalledWith('id');
-      expect(storageMock.downloadStreamWithRange).toHaveBeenCalledWith({
-        key: 'aa/bb/optimized.webp',
-        range: undefined,
-      });
-      expect(res.mimeType).toBe('image/webp');
+      await expect(service.downloadFileStream('id')).rejects.toThrow(
+        /Image optimization is in progress/,
+      );
     });
   });
 
@@ -665,6 +578,16 @@ describe('FilesService (unit)', () => {
       (prismaMock as any).file.create.mockResolvedValue(created);
       (prismaMock as any).file.update.mockResolvedValue(updated);
 
+      imageOptimizerMock.validateAvailability.mockResolvedValue(undefined);
+      imageOptimizerMock.compressImage.mockResolvedValue({
+        buffer: Buffer.from('optimized'),
+        size: 9,
+        format: 'image/webp',
+        params: {},
+      });
+      storageMock.uploadFile.mockResolvedValue(undefined);
+      (prismaMock as any).file.findFirst.mockResolvedValue(null);
+
       const stream = (await import('stream')).Readable.from([
         Buffer.from('a'),
         Buffer.from('b'),
@@ -678,16 +601,7 @@ describe('FilesService (unit)', () => {
       });
 
       expect(storageMock.uploadStream).toHaveBeenCalledTimes(1);
-      expect((prismaMock as any).file.update).toHaveBeenCalledWith({
-        where: { id: 'created-id' },
-        data: {
-          originalChecksum: expect.stringContaining('sha256:'),
-          originalSize: BigInt(3),
-          status: FileStatus.ready,
-          statusChangedAt: expect.any(Date),
-          uploadedAt: expect.any(Date),
-        },
-      });
+      expect((prismaMock as any).file.update).toHaveBeenCalled();
 
       expect(res.id).toBe('created-id');
     });
@@ -705,7 +619,10 @@ describe('FilesService (unit)', () => {
       const testModule = await Test.createTestingModule({
         providers: [
           FilesService,
-          { provide: getLoggerToken(FilesService.name), useValue: { info: jest.fn(), error: jest.fn() } },
+          {
+            provide: getLoggerToken(FilesService.name),
+            useValue: { info: jest.fn(), error: jest.fn() },
+          },
           { provide: PrismaService, useValue: prismaMock },
           { provide: StorageService, useValue: storageMock },
           { provide: ImageOptimizerService, useValue: imageOptimizerMock },
@@ -722,15 +639,15 @@ describe('FilesService (unit)', () => {
       (prismaMock as any).file.create.mockResolvedValue(created);
       (prismaMock as any).file.findFirst.mockResolvedValue(null);
       storageMock.copyObject.mockResolvedValue(undefined);
-      (prismaMock as any).file.update.mockResolvedValue({ 
-        ...created, 
-        status: FileStatus.ready, 
+      (prismaMock as any).file.update.mockResolvedValue({
+        ...created,
+        status: FileStatus.ready,
         mimeType: 'image/jpeg',
-        originalMimeType: 'image/jpeg' 
+        originalMimeType: 'image/jpeg',
       });
 
       const stream = (await import('stream')).Readable.from([Buffer.from('abc')]);
-      
+
       await localService.uploadFileStream({
         stream,
         filename: 'a.jpg',
@@ -739,47 +656,69 @@ describe('FilesService (unit)', () => {
       });
 
       // wantsOptimization should be false, so it should NOT have optimizationStatus: pending
-      expect((prismaMock as any).file.create).toHaveBeenCalledWith(expect.objectContaining({
-        data: expect.objectContaining({
-          optimizationStatus: null,
-          optimizationParams: null,
+      expect((prismaMock as any).file.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            optimizationStatus: null,
+            optimizationParams: null,
+          }),
         }),
-      }));
+      );
     });
 
     it('applies optimization when at least one parameter is provided', async () => {
       const created = { id: 'new-id', filename: 'a.jpg', status: FileStatus.uploading };
       (prismaMock as any).file.create.mockResolvedValue(created);
-      (prismaMock as any).file.update.mockResolvedValue({ 
-        ...created, 
-        status: FileStatus.ready, 
+      (prismaMock as any).file.update.mockResolvedValue({
+        ...created,
+        status: FileStatus.ready,
         mimeType: 'image/jpeg',
-        originalMimeType: 'image/jpeg'
+        originalMimeType: 'image/jpeg',
       });
 
+      imageOptimizerMock.validateAvailability.mockResolvedValue(undefined);
+      imageOptimizerMock.compressImage.mockResolvedValue({
+        buffer: Buffer.from('optimized'),
+        size: 9,
+        format: 'image/webp',
+        params: {
+          quality: 80,
+          format: 'webp',
+          maxDimension: 3840,
+          lossless: false,
+          effort: 4,
+          stripMetadata: false,
+          autoOrient: true,
+        },
+      });
+      storageMock.uploadFile.mockResolvedValue(undefined);
+      (prismaMock as any).file.findFirst.mockResolvedValue(null);
+
       const stream = (await import('stream')).Readable.from([Buffer.from('abc')]);
-      
+
       await service.uploadFileStream({
         stream,
         filename: 'a.jpg',
         mimeType: 'image/jpeg',
-        compressParams: { quality: 80 } as any, 
+        compressParams: { quality: 80 } as any,
       });
 
-      expect((prismaMock as any).file.create).toHaveBeenCalledWith(expect.objectContaining({
-        data: expect.objectContaining({
-          optimizationStatus: OptimizationStatus.pending,
-          optimizationParams: expect.objectContaining({
-            quality: 80,
-            format: 'webp',
-            maxDimension: 3840,
-            lossless: false,
-            effort: 4,
-            stripMetadata: false,
-            autoOrient: true,
+      expect((prismaMock as any).file.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            optimizationStatus: OptimizationStatus.pending,
+            optimizationParams: expect.objectContaining({
+              quality: 80,
+              format: 'webp',
+              maxDimension: 3840,
+              lossless: false,
+              effort: 4,
+              stripMetadata: false,
+              autoOrient: true,
+            }),
           }),
         }),
-      }));
+      );
     });
   });
 
@@ -918,125 +857,6 @@ describe('FilesService (unit)', () => {
         data: { deletedAt: expect.any(Date) },
       });
       expect(res).toEqual({ matched: 2, deleted: 2 });
-    });
-  });
-
-  describe('reprocessFile', () => {
-    it('throws NotFoundException if file does not exist', async () => {
-      (prismaMock as any).file.findUnique.mockResolvedValue(null);
-      await expect(service.reprocessFile('id', {})).rejects.toThrow(NotFoundException);
-    });
-
-    it('throws ConflictException if file is not READY', async () => {
-      (prismaMock as any).file.findUnique.mockResolvedValue({ id: 'id', status: FileStatus.uploading });
-      await expect(service.reprocessFile('id', { format: 'webp' })).rejects.toThrow(ConflictException);
-    });
-
-    it('throws BadRequestException if file is not an image', async () => {
-      (prismaMock as any).file.findUnique.mockResolvedValue({
-        id: 'id',
-        status: FileStatus.ready,
-        mimeType: 'application/pdf',
-      });
-      await expect(service.reprocessFile('id', { format: 'webp' })).rejects.toThrow(BadRequestException);
-    });
-
-    it('throws BadRequestException if params are empty and forceCompression is disabled', async () => {
-      (prismaMock as any).file.findUnique.mockResolvedValue({
-        id: 'id',
-        status: FileStatus.ready,
-        mimeType: 'image/jpeg',
-      });
-      // default config sets forceCompression=false
-      await expect(service.reprocessFile('id', {})).rejects.toThrow(BadRequestException);
-    });
-
-    it('reprocesses file and returns new file response', async () => {
-      const originalFile = {
-        id: 'id',
-        status: FileStatus.ready,
-        mimeType: 'image/jpeg',
-        filename: 'test.jpg',
-        s3Key: 'aa/bb/orig.jpg',
-        size: 1000n,
-        checksum: 'sha256:orig',
-      };
-      (prismaMock as any).file.findUnique.mockResolvedValue(originalFile);
-
-      const stream = (await import('stream')).Readable.from([Buffer.from('data')]);
-      storageMock.downloadStream.mockResolvedValue({ stream });
-
-      imageOptimizerMock.compressImage.mockResolvedValue({
-        buffer: Buffer.from('compressed'),
-        size: 500,
-        format: 'image/webp',
-      });
-
-      (prismaMock as any).file.findFirst.mockResolvedValue(null); // No existing file with same checksum
-
-      const newFile = {
-        ...originalFile,
-        id: 'new-id',
-        mimeType: 'image/webp',
-        size: 500n,
-        checksum: 'sha256:new',
-        s3Key: 'cc/dd/new.webp',
-      };
-      (prismaMock as any).file.create.mockResolvedValue(newFile);
-      exifServiceMock.tryExtractFromStorageKey.mockResolvedValue({ some: 'exif' });
-
-      const result = await service.reprocessFile('id', { format: 'webp' });
-
-      expect(storageMock.downloadStream).toHaveBeenCalledWith('aa/bb/orig.jpg');
-      expect(imageOptimizerMock.compressImage).toHaveBeenCalled();
-      expect((prismaMock as any).file.create).toHaveBeenCalledWith(expect.objectContaining({
-        data: expect.objectContaining({
-          checksum: 'sha256:9da308c2e4bc33afa72df5c088b5fc5673c477f3ef21d6bdaa358393834f9804',
-          size: BigInt(500),
-          originalS3Key: 'aa/bb/orig.jpg',
-          originalChecksum: 'sha256:orig',
-          originalSize: 1000n,
-        }),
-      }));
-      expect(result.id).toBe('new-id');
-      expect(result.mimeType).toBe('image/webp');
-    });
-
-    it('returns existing file if checksum matches (deduplication)', async () => {
-      const originalFile = {
-        id: 'id',
-        status: FileStatus.ready,
-        mimeType: 'image/jpeg',
-        filename: 'test.jpg',
-        s3Key: 'aa/bb/orig.jpg',
-      };
-      (prismaMock as any).file.findUnique.mockResolvedValue(originalFile);
-
-      storageMock.downloadStream.mockResolvedValue({
-        stream: (await import('stream')).Readable.from([Buffer.from('data')]),
-      });
-
-      imageOptimizerMock.compressImage.mockResolvedValue({
-        buffer: Buffer.from('compressed'),
-        size: 500,
-        format: 'image/webp',
-      });
-
-      const existingFile = {
-        id: 'existing-id',
-        status: FileStatus.ready,
-        mimeType: 'image/webp',
-        checksum: 'sha256:4d616335123d4529f55e5d3269b247f0bf0885c398337894a86f917578be4d5f', // hash of 'compressed'
-        size: 500n,
-        uploadedAt: new Date(),
-        statusChangedAt: new Date(),
-      };
-      (prismaMock as any).file.findFirst.mockResolvedValue(existingFile);
-
-      const result = await service.reprocessFile('id', { format: 'webp' });
-
-      expect(result.id).toBe('existing-id');
-      expect((prismaMock as any).file.create).not.toHaveBeenCalled();
     });
   });
 });

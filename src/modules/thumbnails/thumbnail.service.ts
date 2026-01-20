@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   forwardRef,
   HttpException,
   Inject,
@@ -97,11 +98,7 @@ export class ThumbnailService {
       file.optimizationStatus === OptimizationStatus.pending ||
       file.optimizationStatus === OptimizationStatus.processing
     ) {
-      file = await this.filesService.ensureOptimized(fileId);
-    }
-
-    if (!file) {
-      throw new NotFoundException('File not found after optimization');
+      throw new ConflictException('Image optimization is in progress');
     }
 
     if (file.optimizationStatus === OptimizationStatus.failed) {
