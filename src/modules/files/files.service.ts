@@ -239,13 +239,16 @@ export class FilesService {
 
     if (!file || file.deletedAt) throw new NotFoundException('File not found');
     if (file.status === FileStatus.deleted) throw new GoneException('File has been deleted');
-    if (file.status !== FileStatus.ready)
-      throw new ConflictException('File is not ready for download');
+
+    // Check optimization error first to provide more context than just "File not ready"
     if (file.optimizationStatus === OptimizationStatus.failed) {
       throw new ConflictException(
         `Image optimization failed: ${file.optimizationError || 'Unknown error'}`,
       );
     }
+
+    if (file.status !== FileStatus.ready)
+      throw new ConflictException('File is not ready for download');
 
     if (
       file.optimizationStatus === OptimizationStatus.pending ||
