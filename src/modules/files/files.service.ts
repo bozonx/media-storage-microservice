@@ -122,6 +122,15 @@ export class FilesService {
       this.isImage(mimeType) && (this.forceCompression || hasParams);
     const originalKey = wantsOptimization ? `originals/${randomUUID()}` : `tmp/${randomUUID()}`;
 
+    // Calculate full optimization params upfront (with defaults)
+    let fullOptimizationParams: Record<string, any> | null = null;
+    if (wantsOptimization) {
+      fullOptimizationParams = this.imageOptimizer.calculateOptimizationParams(
+        compressParams ?? {},
+        this.forceCompression,
+      );
+    }
+
     const file = await this.prismaService.file.create({
       data: {
         filename,
@@ -135,9 +144,7 @@ export class FilesService {
         s3Bucket: this.bucket,
         status: FileStatus.uploading,
         optimizationStatus: wantsOptimization ? OptimizationStatus.pending : null,
-        optimizationParams: wantsOptimization
-          ? ((this.forceCompression ? {} : (compressParams ?? {})) as any)
-          : null,
+        optimizationParams: fullOptimizationParams as any,
         metadata: (metadata ?? null) as any,
       },
     });

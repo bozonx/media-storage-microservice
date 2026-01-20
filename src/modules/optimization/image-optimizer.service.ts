@@ -53,6 +53,72 @@ export class ImageOptimizerService {
     await this.imageProcessingClient.health();
   }
 
+  /**
+   * Calculate full optimization parameters by merging user params with defaults.
+   * This allows saving complete params to the database before optimization starts.
+   */
+  calculateOptimizationParams(
+    params: CompressParamsDto,
+    forceCompress: boolean,
+  ): Record<string, any> {
+    const format = forceCompress
+      ? this.compressionConfig.format
+      : (params.format ?? this.compressionConfig.format);
+
+    const maxDimension = forceCompress
+      ? this.compressionConfig.maxDimension
+      : Math.min(
+          params.maxDimension ?? Number.POSITIVE_INFINITY,
+          this.compressionConfig.maxDimension,
+        );
+
+    const stripMetadata = forceCompress
+      ? this.compressionConfig.stripMetadata
+      : (params.stripMetadata ?? this.compressionConfig.stripMetadata);
+
+    const lossless = forceCompress
+      ? this.compressionConfig.lossless
+      : (params.lossless ?? this.compressionConfig.lossless);
+
+    const autoOrient = forceCompress
+      ? this.compressionConfig.autoOrient
+      : (params.autoOrient ?? this.compressionConfig.autoOrient);
+
+    const configForFormat =
+      format === 'avif' ? this.compressionConfig.avif : this.compressionConfig.webp;
+
+    const quality = forceCompress
+      ? configForFormat.quality
+      : (params.quality ?? configForFormat.quality);
+
+    const effort = forceCompress
+      ? configForFormat.effort
+      : (params.effort ?? configForFormat.effort);
+
+    const result: Record<string, any> = {
+      format,
+      quality,
+      maxDimension,
+      lossless,
+      effort,
+      stripMetadata,
+      autoOrient,
+    };
+
+    if (format === 'avif') {
+      const chromaSubsampling = forceCompress
+        ? this.compressionConfig.avif.chromaSubsampling
+        : (params.chromaSubsampling ?? this.compressionConfig.avif.chromaSubsampling);
+
+      if (chromaSubsampling) {
+        result.chromaSubsampling = chromaSubsampling;
+      }
+    }
+
+    return result;
+  }
+
+
   async compressImage(
     buffer: Buffer,
     originalMimeType: string,
@@ -69,56 +135,24 @@ export class ImageOptimizerService {
     }
 
     try {
-      const format = forceCompress
-        ? this.compressionConfig.format
-        : (params.format ?? this.compressionConfig.format);
+      // Use the new method to calculate full params
+      const actualParams = this.calculateOptimizationParams(params, forceCompress);
 
-      const maxDimension = forceCompress
-        ? this.compressionConfig.maxDimension
-        : Math.min(
-            params.maxDimension ?? Number.POSITIVE_INFINITY,
-            this.compressionConfig.maxDimension,
-          );
-
-      const stripMetadata = forceCompress
-        ? this.compressionConfig.stripMetadata
-        : (params.stripMetadata ?? this.compressionConfig.stripMetadata);
-      const lossless = forceCompress
-        ? this.compressionConfig.lossless
-        : (params.lossless ?? this.compressionConfig.lossless);
-      const autoOrient = forceCompress
-        ? this.compressionConfig.autoOrient
-        : (params.autoOrient ?? this.compressionConfig.autoOrient);
+      // Extract values for processing
+      const { format, quality, maxDimension, lossless, effort, stripMetadata, autoOrient, chromaSubsampling } =
+        actualParams;
       const flatten = params.flatten ?? (params.removeAlpha ? '#ffffff' : undefined);
 
-      let quality: number;
-      let effort: number;
       const output: Record<string, any> = {
         format,
         lossless,
         stripMetadata,
+        quality,
+        effort,
       };
 
-      const configForFormat = format === 'avif' ? this.compressionConfig.avif : this.compressionConfig.webp;
-      
-      quality = forceCompress
-        ? configForFormat.quality
-        : (params.quality ?? configForFormat.quality);
-      effort = forceCompress
-        ? configForFormat.effort
-        : (params.effort ?? configForFormat.effort);
-
-      output.quality = quality;
-      output.effort = effort;
-
-      if (format === 'avif') {
-        const chromaSubsampling = forceCompress
-          ? this.compressionConfig.avif.chromaSubsampling
-          : (params.chromaSubsampling ?? this.compressionConfig.avif.chromaSubsampling);
-
-        if (chromaSubsampling) {
-          output.chromaSubsampling = chromaSubsampling;
-        }
+      if (chromaSubsampling) {
+        output.chromaSubsampling = chromaSubsampling;
       }
 
       const result = await this.imageProcessingClient.process({
@@ -152,21 +186,6 @@ export class ImageOptimizerService {
         },
         'Image compressed',
       );
-
-      // Build the actual optimization parameters that were used
-      const actualParams: Record<string, any> = {
-        format,
-        quality,
-        maxDimension,
-        lossless,
-        effort,
-        stripMetadata,
-        autoOrient,
-      };
-
-      if (format === 'avif' && output.chromaSubsampling) {
-        actualParams.chromaSubsampling = output.chromaSubsampling;
-      }
 
       return {
         buffer: resultBuffer,

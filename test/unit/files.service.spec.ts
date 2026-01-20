@@ -61,7 +61,10 @@ describe('FilesService (unit)', () => {
   const imageOptimizerMock = {
     compressImage: jest.fn(),
     validateAvailability: jest.fn(),
-  } as unknown as jest.Mocked<Pick<ImageOptimizerService, 'compressImage' | 'validateAvailability'>>;
+    calculateOptimizationParams: jest.fn(),
+  } as unknown as jest.Mocked<
+    Pick<ImageOptimizerService, 'compressImage' | 'validateAvailability' | 'calculateOptimizationParams'>
+  >;
 
   const configServiceMock: any = {
     get: jest.fn((key: string) => {
@@ -99,6 +102,20 @@ describe('FilesService (unit)', () => {
     exifServiceMock.tryExtractFromBuffer.mockResolvedValue(undefined);
     exifServiceMock.tryExtractFromStorageKey.mockResolvedValue(undefined);
     imageOptimizerMock.validateAvailability.mockResolvedValue(undefined);
+    imageOptimizerMock.calculateOptimizationParams.mockImplementation((params, forceCompress) => {
+      // Return full params with defaults (simulating actual behavior)
+      return {
+        format: params.format ?? 'webp',
+        quality: params.quality ?? 80,
+        maxDimension: params.maxDimension ?? 3840,
+        lossless: params.lossless ?? false,
+        effort: params.effort ?? 4,
+        stripMetadata: params.stripMetadata ?? false,
+        autoOrient: params.autoOrient ?? true,
+        ...(params.format === 'avif' && { chromaSubsampling: params.chromaSubsampling ?? '4:2:0' }),
+      };
+    });
+
 
     storageMock.uploadFile.mockResolvedValue(undefined);
     (prismaMock as any).file.updateMany.mockResolvedValue({ count: 0 });
@@ -752,7 +769,15 @@ describe('FilesService (unit)', () => {
       expect((prismaMock as any).file.create).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({
           optimizationStatus: OptimizationStatus.pending,
-          optimizationParams: { quality: 80 },
+          optimizationParams: expect.objectContaining({
+            quality: 80,
+            format: 'webp',
+            maxDimension: 3840,
+            lossless: false,
+            effort: 4,
+            stripMetadata: false,
+            autoOrient: true,
+          }),
         }),
       }));
     });
