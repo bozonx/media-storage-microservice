@@ -256,8 +256,17 @@ Errors:
 POST /api/v1/files/:id/reprocess
 Content-Type: application/json
 
-Request:
+Request (JSON):
 - Параметры оптимизации (аналогично загрузке)
+
+**Пример:**
+```json
+{
+  "format": "avif",
+  "quality": 60,
+  "maxDimension": 2048
+}
+```
 
 Behavior:
 - Использует оригинал для максимального качества (если он еще в хранилище).

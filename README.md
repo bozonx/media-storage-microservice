@@ -285,6 +285,13 @@ Reprocess an existing image with new optimization settings.
 **Body (JSON):**
 Accepts `Optimization Parameters` (see section 2).
 
+**Example:**
+```bash
+curl -X POST http://localhost:8080/api/v1/files/abc-123/reprocess \
+  -H "Content-Type: application/json" \
+  -d '{"format":"avif", "quality":60, "maxDimension":2048}'
+```
+
 **Behavior:**
 - Uses the original source image for maximum quality if it's still available in storage (see `CLEANUP_ORIGINALS_TTL_DAYS`).
 - If the original is gone (already optimized and deleted), falls back to the current optimized version as the source.
