@@ -105,7 +105,9 @@ export class ThumbnailService {
     }
 
     if (file.optimizationStatus === OptimizationStatus.failed) {
-      throw new BadRequestException('Image optimization failed');
+      throw new BadRequestException(
+        `Image optimization failed: ${file.optimizationError || 'Unknown error'}`,
+      );
     }
 
     const fileS3Key = file.s3Key || file.originalS3Key;
