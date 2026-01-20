@@ -307,6 +307,7 @@ Retrieve file metadata (JSON).
   "filename": "photo.jpg",
   "mimeType": "image/webp",
   "size": 45000,
+  "originalSize": 120000,
   "url": "/api/v1/files/550e8400-e29b-41d4-a716-446655440000/download",
   "checksum": "sha256:...",
   "status": "ready",
