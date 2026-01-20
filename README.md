@@ -519,6 +519,75 @@ List files that have stuck states, failures, or inconsistencies.
 
 ---
 
+### 6. Error Handling
+
+The microservice returns consistent JSON error responses for all API endpoints.
+
+#### Error Response Format
+
+```json
+{
+  "statusCode": 400,
+  "timestamp": "2023-10-27T10:00:00.000Z",
+  "path": "/api/v1/files",
+  "method": "POST",
+  "message": "Error message description",
+  "error": {
+    "error": "Bad Request",
+    "message": "Detailed validation error info"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statusCode` | number | HTTP status code. |
+| `timestamp` | string | ISO 8601 timestamp of the error. |
+| `path` | string | The requested API path. |
+| `method` | string | The requested HTTP method. |
+| `message` | string | Human-readable error summary. |
+| `error` | object | (Optional) Detailed error information from the underlying framework. |
+
+#### Common HTTP Status Codes
+
+| Status Code | Name | Description |
+|-------------|------|-------------|
+| `400` | Bad Request | Invalid input, validation failure, file too large, or unsupported format. |
+| `401` | Unauthorized | (Reserved) Authentication failed or missing. |
+| `404` | Not Found | The requested file or resource does not exist. |
+| `409` | Conflict | File is not ready for processing or resource already exists. |
+| `500` | Internal Server Error | An unexpected server error occurred. |
+
+#### Examples
+
+**404 Not Found:**
+```json
+{
+  "statusCode": 404,
+  "timestamp": "2023-10-27T10:05:00.000Z",
+  "path": "/api/v1/files/non-existent-id",
+  "method": "GET",
+  "message": "File not found"
+}
+```
+
+**400 Bad Request (Validation):**
+```json
+{
+  "statusCode": 400,
+  "timestamp": "2023-10-27T10:10:00.000Z",
+  "path": "/api/v1/files",
+  "method": "POST",
+  "message": "File is too large (limit: 25MB)",
+  "error": {
+    "error": "Bad Request",
+    "message": "File is too large (limit: 25MB)"
+  }
+}
+```
+
+---
+
 ## Development
 
 ### Requirements
