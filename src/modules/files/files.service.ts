@@ -6,6 +6,9 @@ import {
   InternalServerErrorException,
   NotFoundException,
   RequestTimeoutException,
+  ServiceUnavailableException,
+  BadGatewayException,
+  GatewayTimeoutException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomUUID } from 'crypto';
@@ -114,7 +117,9 @@ export class FilesService {
     purpose?: string;
   }): Promise<FileResponseDto> {
     const { stream, filename, mimeType, compressParams, metadata, appId, userId, purpose } = params;
-    const wantsOptimization = this.isImage(mimeType) && (this.forceCompression || !!compressParams);
+    const hasParams = compressParams && Object.keys(compressParams).length > 0;
+    const wantsOptimization =
+      this.isImage(mimeType) && (this.forceCompression || hasParams);
     const originalKey = wantsOptimization ? `originals/${randomUUID()}` : `tmp/${randomUUID()}`;
 
     const file = await this.prismaService.file.create({
@@ -137,12 +142,13 @@ export class FilesService {
       },
     });
 
-    const { checksum, size, hashFinalized } = await this.performStreamUpload(
-      stream,
-      originalKey,
-      mimeType,
-      file.id,
-    );
+    const { checksum, size, hashFinalized } = await (async () => {
+      if (wantsOptimization) {
+        // Fail-fast: check if image processing service is available before uploading to S3
+        await this.imageOptimizer.validateAvailability();
+      }
+      return this.performStreamUpload(stream, originalKey, mimeType, file.id);
+    })();
 
     if (wantsOptimization) {
       const updated = await this.prismaService.file.update({
@@ -235,8 +241,11 @@ export class FilesService {
     if (file.status === FileStatus.deleted) throw new GoneException('File has been deleted');
     if (file.status !== FileStatus.ready)
       throw new ConflictException('File is not ready for download');
-    if (file.optimizationStatus === OptimizationStatus.failed)
-      throw new ConflictException('Image optimization failed');
+    if (file.optimizationStatus === OptimizationStatus.failed) {
+      throw new ConflictException(
+        `Image optimization failed: ${file.optimizationError || 'Unknown error'}`,
+      );
+    }
 
     if (
       file.optimizationStatus === OptimizationStatus.pending ||
@@ -286,6 +295,11 @@ export class FilesService {
     const mimeType = file.originalMimeType || file.mimeType;
     if (!this.isImage(mimeType)) {
       throw new BadRequestException('Only images can be reprocessed');
+    }
+
+    const hasParams = params && Object.keys(params).length > 0;
+    if (!hasParams && !this.forceCompression) {
+      throw new BadRequestException('Optimization parameters are required for reprocessing');
     }
 
     // If the file was successfully optimized, the original is temporary and already deleted.
@@ -356,7 +370,13 @@ export class FilesService {
       return this.mapper.toResponseDto({ ...newFile, exif });
     } catch (err) {
       this.logger.error({ err, fileId: id }, 'Reprocessing failed');
-      if (err instanceof BadRequestException || err instanceof ConflictException) {
+      if (
+        err instanceof BadRequestException ||
+        err instanceof ConflictException ||
+        err instanceof ServiceUnavailableException ||
+        err instanceof BadGatewayException ||
+        err instanceof GatewayTimeoutException
+      ) {
         throw err;
       }
       throw new InternalServerErrorException('Reprocessing failed');
@@ -676,8 +696,11 @@ export class FilesService {
       const file = await this.prismaService.file.findUnique({ where: { id: fileId } });
       if (!file) throw new NotFoundException('File not found');
       if (file.optimizationStatus === OptimizationStatus.ready) return file;
-      if (file.optimizationStatus === OptimizationStatus.failed)
-        throw new ConflictException('Optimization failed');
+      if (file.optimizationStatus === OptimizationStatus.failed) {
+        throw new ConflictException(
+          `Optimization failed: ${file.optimizationError || 'Unknown error'}`,
+        );
+      }
       await new Promise(r => setTimeout(r, 300));
     }
     throw new RequestTimeoutException('Optimization timeout');

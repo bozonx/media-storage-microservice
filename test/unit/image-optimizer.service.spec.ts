@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getLoggerToken } from 'nestjs-pino';
@@ -352,21 +352,33 @@ describe('ImageOptimizerService (unit)', () => {
       );
     });
 
-    it('should handle compression errors gracefully', async () => {
+    it('should handle compression errors gracefully by propagating ServiceUnavailableException', async () => {
       const invalidBuffer = Buffer.from('invalid image data');
+      const error = new ServiceUnavailableException('service down');
 
-      imageProcessingClientMock.process.mockRejectedValueOnce(new Error('boom'));
+      imageProcessingClientMock.process.mockRejectedValueOnce(error);
+
+      await expect(
+        service.compressImage(invalidBuffer, 'image/png', { format: 'webp' }, false),
+      ).rejects.toThrow(ServiceUnavailableException);
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          err: error,
+        }),
+        'Failed to compress image',
+      );
+    });
+
+    it('should wrap unknown errors in BadRequestException', async () => {
+      const invalidBuffer = Buffer.from('invalid image data');
+      const error = new Error('unknown');
+
+      imageProcessingClientMock.process.mockRejectedValueOnce(error);
 
       await expect(
         service.compressImage(invalidBuffer, 'image/png', { format: 'webp' }, false),
       ).rejects.toThrow(BadRequestException);
-
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({
-          err: expect.any(Error),
-        }),
-        'Failed to compress image',
-      );
     });
   });
 });

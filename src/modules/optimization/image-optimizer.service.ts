@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadGatewayException,
+  BadRequestException,
+  GatewayTimeoutException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
@@ -40,6 +46,10 @@ export class ImageOptimizerService {
     private readonly imageProcessingClient: ImageProcessingClient,
   ) {
     this.compressionConfig = this.configService.get<CompressionConfig>('compression')!;
+  }
+
+  async validateAvailability(): Promise<void> {
+    await this.imageProcessingClient.health();
   }
 
   async compressImage(
@@ -148,6 +158,9 @@ export class ImageOptimizerService {
       };
     } catch (error) {
       this.logger.error({ err: error }, 'Failed to compress image');
+      if (error instanceof BadRequestException || error instanceof ServiceUnavailableException || error instanceof BadGatewayException || error instanceof GatewayTimeoutException) {
+        throw error;
+      }
       throw new BadRequestException('Failed to compress image');
     }
   }
